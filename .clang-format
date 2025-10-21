@@ -1,7 +1,6 @@
 # Qt / C++17 기반 코드 스타일
 BasedOnStyle: LLVM
 Language: Cpp
-Standard: Cpp17
 
 # --- [기본 서식] ------------------------------------------------------
 IndentWidth: 4                 # 들여쓰기 4칸 (Qt 공식 권장)
@@ -14,7 +13,7 @@ ContinuationIndentWidth: 8     # 줄이 길어질 때 추가 들여쓰기 폭
 BreakBeforeBraces: Custom
 BraceWrapping:
   AfterClass: true             # 클래스 선언 시 새 줄에서 여는 괄호
-  AfterFunction: false         # 함수 정의 시 같은 줄에서 여는 괄호
+  AfterFunction: true         # 함수 정의 시 같은 줄에서 여는 괄호
   AfterNamespace: true         # 네임스페이스는 새 줄
   AfterStruct: true
   AfterControlStatement: false # if/else 등은 같은 줄
@@ -86,7 +85,6 @@ AccessModifierOffset: -2
 Cpp11BracedListStyle: true
 BinPackParameters: false
 BinPackArguments: false
-BinPackParametersOnNextLine: false
 
 # --- [매크로 및 조건부 컴파일] ---------------------------------------
 IndentPPDirectives: AfterHash
@@ -96,10 +94,7 @@ MacroBlockEnd: '^Q_SIGNALS|^Q_SLOTS'
 # --- [기타 옵션] -----------------------------------------------------
 SortUsingDeclarations: true
 ReflowComments: false
-SpacesInLineCommentPrefix: 1
 FixNamespaceComments: true
 InsertTrailingCommas: None
 AllowAllArgumentsOnNextLine: true
 DerivePointerAlignment: false
-...
-
