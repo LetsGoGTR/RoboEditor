@@ -1,26 +1,28 @@
+# ==========================================================
 # Qt / C++17 기반 코드 스타일
+# ==========================================================
 BasedOnStyle: LLVM
 Language: Cpp
 
 # --- [기본 서식] ------------------------------------------------------
-IndentWidth: 4                 # 들여쓰기 4칸 (Qt 공식 권장)
-UseTab: Never                  # 탭 대신 공백 사용
+IndentWidth: 4                  # Qt 권장 들여쓰기
+UseTab: Never                   # 탭 대신 공백 사용
 TabWidth: 4
-ColumnLimit: 100               # 한 줄 최대 길이 (가독성 기준)
-ContinuationIndentWidth: 8     # 줄이 길어질 때 추가 들여쓰기 폭
+ColumnLimit: 100                # 한 줄 최대 길이
+ContinuationIndentWidth: 8      # 줄 길어질 때 추가 들여쓰기 폭
 
 # --- [중괄호 및 공백] -------------------------------------------------
 BreakBeforeBraces: Custom
 BraceWrapping:
-  AfterClass: true             # 클래스 선언 시 새 줄에서 여는 괄호
-  AfterFunction: true         # 함수 정의 시 같은 줄에서 여는 괄호
-  AfterNamespace: true         # 네임스페이스는 새 줄
+  AfterClass: true              # 클래스 선언 시 새 줄에서 여는 괄호
   AfterStruct: true
-  AfterControlStatement: false # if/else 등은 같은 줄
+  AfterFunction: true           # 함수 정의 시 새 줄에서 여는 괄호
+  AfterNamespace: true
+  AfterControlStatement: false  # if, else 등은 같은 줄
   BeforeElse: false
   IndentBraces: false
 
-SpaceBeforeParens: ControlStatements  # 제어문 뒤 괄호 앞에 공백
+SpaceBeforeParens: ControlStatements
 SpacesBeforeTrailingComments: 2
 SpaceInEmptyParentheses: false
 SpacesInParentheses: false
@@ -32,14 +34,11 @@ SpaceBeforeAssignmentOperators: true
 SpaceBeforeRangeBasedForLoopColon: true
 SpaceAroundPointerQualifiers: Default
 
-# --- [포인터/참조] ---------------------------------------------------
-PointerAlignment: Right        # int* p; 형태
+# --- [포인터 및 참조] -------------------------------------------------
+PointerAlignment: Right          # int* ptr;
 ReferenceAlignment: Right
 
-# --- [네이밍 관련은 clang-format 비지원, 별도 규칙 문서에서 관리] -----
-# (Qt에서는 CamelCase 규칙을 별도 lint에서 점검)
-
-# --- [주석 및 공백 처리] ---------------------------------------------
+# --- [라인 및 블록 처리] ----------------------------------------------
 KeepEmptyLinesAtTheStartOfBlocks: false
 MaxEmptyLinesToKeep: 1
 AllowShortBlocksOnASingleLine: false
@@ -47,7 +46,7 @@ AllowShortFunctionsOnASingleLine: Empty
 AllowShortIfStatementsOnASingleLine: false
 AllowShortLoopsOnASingleLine: false
 
-# --- [Include 및 헤더 순서] ------------------------------------------
+# --- [Include 및 헤더 순서] -------------------------------------------
 IncludeBlocks: Regroup
 IncludeCategories:
   - Regex: '^<Qt.*>'
@@ -72,26 +71,26 @@ BreakConstructorInitializers: AfterColon
 ConstructorInitializerAllOnOneLineOrOnePerLine: true
 AllowAllConstructorInitializersOnNextLine: false
 
-# --- [Switch / Case] -------------------------------------------------
+# --- [Switch / Case] --------------------------------------------------
 IndentCaseLabels: false
 AllowShortCaseLabelsOnASingleLine: false
 
-# --- [Namespace / Access Specifier] ----------------------------------
+# --- [Namespace / Access Specifier] -----------------------------------
 IndentAccessModifiers: false
-NamespaceIndentation: All       # namespace 내부 들여쓰기 허용
+NamespaceIndentation: All        # namespace 내부 들여쓰기 허용
 AccessModifierOffset: -2
 
-# --- [리스트 및 배열 서식] -------------------------------------------
+# --- [리스트 및 배열 서식] --------------------------------------------
 Cpp11BracedListStyle: true
 BinPackParameters: false
 BinPackArguments: false
 
-# --- [매크로 및 조건부 컴파일] ---------------------------------------
+# --- [매크로 및 Qt 특수문법] ------------------------------------------
 IndentPPDirectives: AfterHash
 MacroBlockBegin: '^Q_OBJECT'
-MacroBlockEnd: '^Q_SIGNALS|^Q_SLOTS'
+MacroBlockEnd: '^Q_SIGNALS|^Q_SLOTS|^Q_PROPERTY'
 
-# --- [기타 옵션] -----------------------------------------------------
+# --- [기타 옵션] ------------------------------------------------------
 SortUsingDeclarations: true
 ReflowComments: false
 FixNamespaceComments: true

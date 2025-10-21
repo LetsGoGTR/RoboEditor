@@ -1,0 +1,72 @@
+#!/bin/bash
+# ------------------------------------------------------------
+# Qt Project Auto Formatter + Static Analysis Hook
+# - clang-format for C++ (.cpp, .h)
+# - clang-tidy   for C++ quality check
+# - qmlformat    for QML (.qml)
+# ------------------------------------------------------------
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+echo -e "${GREEN}[Pre-Commit] Checking C++ and QML files...${NC}"
+
+# -----------------------------
+# 1. clang-format (C++ / Header)
+# -----------------------------
+CLANG_FORMAT_EXE=$(command -v clang-format)
+if [ -z "$CLANG_FORMAT_EXE" ]; then
+  echo -e "${YELLOW}clang-format not found. Skipping C++ formatting.${NC}"
+else
+  CHANGED_CPP=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(cpp|cc|cxx|hpp|h)$')
+  if [ -n "$CHANGED_CPP" ]; then
+    echo -e "${GREEN}→ Formatting C++ files...${NC}"
+    echo "$CHANGED_CPP" | xargs "$CLANG_FORMAT_EXE" -i --style=file
+    git add $CHANGED_CPP
+  fi
+fi
+
+# # -----------------------------
+# # 2. clang-tidy (C++ quality check)
+# # -----------------------------
+# CLANG_TIDY_EXE=$(command -v clang-tidy)
+# if [ -z "$CLANG_TIDY_EXE" ]; then
+#   echo -e "${YELLOW}clang-tidy not found. Skipping static analysis.${NC}"
+# else
+#   if [ ! -f "build/compile_commands.json" ]; then
+#     echo -e "${RED}compile_commands.json not found. Run cmake with -DCMAKE_EXPORT_COMPILE_COMMANDS=ON${NC}"
+#   else
+#     echo -e "${GREEN}→ Running clang-tidy quality checks...${NC}"
+#     for file in $(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(cpp|cc|cxx)$'); do
+#       "$CLANG_TIDY_EXE" "$file" --config-file=.clang-tidy -p build/ > /tmp/clang_tidy.log
+#       if grep -q "warning:" /tmp/clang_tidy.log; then
+#         echo -e "${YELLOW}[clang-tidy] Warnings in $file${NC}"
+#         grep "warning:" /tmp/clang_tidy.log | head -n 10
+#         echo -e "${RED}Commit blocked due to clang-tidy warnings.${NC}"
+#         exit 1
+#       fi
+#     done
+#   fi
+# fi
+
+# -----------------------------
+# 3. qmlformat (QML)
+# -----------------------------
+QML_FORMAT_EXE=$(command -v qmlformat)
+if [ -z "$QML_FORMAT_EXE" ]; then
+  echo -e "${YELLOW}qmlformat not found. Skipping QML formatting.${NC}"
+else
+  CHANGED_QML=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.qml$')
+  if [ -n "$CHANGED_QML" ]; then
+    echo -e "${GREEN}→ Formatting QML files...${NC}"
+    for file in $CHANGED_QML; do
+      "$QML_FORMAT_EXE" -i "$file"
+      git add "$file"
+    done
+  fi
+fi
+
+echo -e "${GREEN}[Pre-Commit] All checks complete.${NC}"
+exit 0

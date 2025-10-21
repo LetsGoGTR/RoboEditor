@@ -1,0 +1,57 @@
+# ==========================================================
+# Qt / C++17 기반 Clang-Tidy 설정
+# ==========================================================
+
+Checks: >
+  clang-analyzer-*,
+  bugprone-*,
+  performance-*,
+  readability-*,
+  modernize-*,
+  cppcoreguidelines-*,
+  misc-*,
+  -cppcoreguidelines-owning-memory,
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  -cppcoreguidelines-pro-type-vararg,
+  -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+  -readability-magic-numbers,
+  -readability-named-parameter
+
+WarningsAsErrors: >
+  clang-analyzer-*,
+  modernize-*,
+  bugprone-*,
+  performance-*
+
+HeaderFilterRegex: '.*'
+FormatStyle: file
+AnalyzeTemporaryDtors: true
+
+# --- [Qt 환경 특화 예외 설정] ---------------------------------------
+CheckOptions:
+  - key: modernize-use-nullptr.NullMacros
+    value: 'NULL'              # NULL 사용 시 경고
+  - key: modernize-use-nullptr.WarnOnMacroReplacement
+    value: 'true'
+  - key: modernize-use-auto.MinTypeNameLength
+    value: '6'                 # auto는 긴 타입에만 권장
+  - key: readability-identifier-naming.ClassCase
+    value: CamelCase
+  - key: readability-identifier-naming.FunctionCase
+    value: camelBack
+  - key: readability-identifier-naming.VariableCase
+    value: camelBack
+  - key: readability-identifier-naming.ConstantCase
+    value: UPPER_CASE
+  - key: readability-identifier-naming.NamespaceCase
+    value: lower_case
+  - key: readability-identifier-naming.PrivateMemberPrefix
+    value: 'm_'
+  - key: modernize-loop-convert.MinConfidence
+    value: reasonable
+  - key: modernize-use-override.IgnoreDestructors
+    value: true
+  - key: modernize-use-override.AllowOverrideAndFinal
+    value: true
+  - key: readability-braces-around-statements.ShortStatementLines
+    value: '1'

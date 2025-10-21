@@ -1,0 +1,83 @@
+# ------------------------------------------------------------
+# Qt / C++17 / QML Unified Code Style
+# ------------------------------------------------------------
+# IDE-independent global style settings
+# Compatible with: Qt Creator, VSCode, CLion, Visual Studio
+# ------------------------------------------------------------
+
+# 최상위 EditorConfig 파일 선언
+root = true
+
+# -----------------------------
+# 기본 설정 (모든 파일 공통)
+# -----------------------------
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+# -----------------------------
+# C/C++ 파일 (.cpp, .h, .hpp 등)
+# -----------------------------
+[*.{c,cc,cpp,cxx,h,hpp}]
+indent_size = 4
+tab_width = 4
+max_line_length = 100
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# -----------------------------
+# QML 파일
+# -----------------------------
+[*.qml]
+indent_size = 2
+tab_width = 2
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+# -----------------------------
+# CMake 및 빌드 스크립트
+# -----------------------------
+[CMakeLists.txt]
+indent_size = 2
+tab_width = 2
+
+[*.cmake]
+indent_size = 2
+tab_width = 2
+
+# -----------------------------
+# Markdown / YAML / JSON
+# -----------------------------
+[*.{md,yml,yaml,json}]
+indent_size = 2
+tab_width = 2
+trim_trailing_whitespace = false  # Markdown의 경우 문단 의도적 공백 유지
+
+# -----------------------------
+# Shell / Bash / Script 파일
+# -----------------------------
+[*.{sh,bash}]
+indent_size = 2
+tab_width = 2
+end_of_line = lf
+insert_final_newline = true
+
+# -----------------------------
+# Windows용 환경 파일
+# -----------------------------
+[*.bat]
+end_of_line = crlf
+charset = utf-8
+
+# -----------------------------
+# 기타 (예: .gitignore, .clang-tidy 등)
+# -----------------------------
+[*.{gitignore,clang-tidy,clang-format,editorconfig}]
+indent_size = 2
+trim_trailing_whitespace = true
+insert_final_newline = true

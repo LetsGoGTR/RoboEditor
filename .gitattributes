@@ -1,0 +1,11 @@
+# --- [Line endings & encoding] ---
+* text=auto
+*.cpp text eol=lf
+*.h text eol=lf
+*.qml text eol=lf
+*.sh text eol=lf
+*.bat text eol=crlf
+
+# --- [Formatting & merge] ---
+*.ui merge=union
+*.qrc merge=union
