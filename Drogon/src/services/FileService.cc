@@ -1,154 +1,246 @@
 #include "FileService.h"
 
-#include <archive.h>
-#include <archive_entry.h>
 #include <filesystem>
 #include <fstream>
+#include <sstream>
 
 namespace fs = std::filesystem;
 using namespace services;
 
-const std::vector<std::string> FileService::supportedFormats_ = {
-        ".zip", ".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tbz2", ".tar.xz", ".7z", ".rar"};
-
-bool FileService::isSupportedArchive(const std::string &filename)
+bool FileService::validateFilePath(const std::string &filePath)
 {
-    std::string lower = filename;
-    std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+    if (filePath.empty()) {
+        return false;
+    }
 
-    for (const auto &format : supportedFormats_) {
-        if (lower.size() >= format.size() &&
-            lower.compare(lower.size() - format.size(), format.size(), format) == 0) {
-            return true;
+    // Check for path traversal attacks
+    if (filePath.find("..") != std::string::npos) {
+        return false;
+    }
+
+    return true;
+}
+
+bool FileService::fileExists(const std::string &filePath)
+{
+    try {
+        return fs::exists(filePath) && fs::is_regular_file(filePath);
+    } catch (const std::exception &e) {
+        LOG_ERROR << "Error checking file existence: " << e.what();
+        return false;
+    }
+}
+
+bool FileService::isDirectory(const std::string &filePath)
+{
+    try {
+        return fs::exists(filePath) && fs::is_directory(filePath);
+    } catch (const std::exception &e) {
+        LOG_ERROR << "Error checking if directory: " << e.what();
+        return false;
+    }
+}
+
+std::string FileService::getFileExtension(const std::string &filePath)
+{
+    return fs::path(filePath).extension().string();
+}
+
+int64_t FileService::getFileSize(const std::string &filePath)
+{
+    try {
+        if (fileExists(filePath)) {
+            return fs::file_size(filePath);
         }
-    }
-    return false;
-}
-
-bool FileService::createDirectory(const std::string &path)
-{
-    try {
-        return fs::create_directories(path);
+        return -1;
     } catch (const std::exception &e) {
-        LOG_ERROR << "Failed to create directory: " << e.what();
-        return false;
+        LOG_ERROR << "Error getting file size: " << e.what();
+        return -1;
     }
 }
 
-bool FileService::removeFile(const std::string &path)
+Json::Value FileService::getFileInfo(const std::string &filePath)
 {
+    Json::Value info;
+
+    if (!fileExists(filePath)) {
+        return info;
+    }
+
     try {
-        return fs::remove(path);
+        fs::path path(filePath);
+
+        info["path"]      = filePath;
+        info["name"]      = path.filename().string();
+        info["extension"] = path.extension().string();
+        info["size"]      = (Json::Int64)fs::file_size(filePath);
+
+        auto ftime       = fs::last_write_time(filePath);
+        auto sctp        = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
+                ftime - fs::file_time_type::clock::now() + std::chrono::system_clock::now());
+        auto time_t_val  = std::chrono::system_clock::to_time_t(sctp);
+        info["modified"] = (Json::Int64)time_t_val;
+
     } catch (const std::exception &e) {
-        LOG_ERROR << "Failed to remove file: " << e.what();
-        return false;
+        LOG_ERROR << "Error getting file info: " << e.what();
     }
+
+    return info;
 }
 
-bool FileService::removeDirectory(const std::string &path)
+FileOperationResult FileService::readFile(const std::string &filePath)
 {
-    try {
-        return fs::remove_all(path) > 0;
-    } catch (const std::exception &e) {
-        LOG_ERROR << "Failed to remove directory: " << e.what();
-        return false;
-    }
-}
-
-ExtractResult FileService::extractArchive(const std::string &archivePath,
-                                          const std::string &extractTo)
-{
-    ExtractResult result;
+    FileOperationResult result;
     result.success = false;
 
-    // 압축 형식 확인
-    if (!isSupportedArchive(archivePath)) {
-        result.errorMessage = "Unsupported archive format";
+    if (!validateFilePath(filePath)) {
+        result.errorMessage = "Invalid file path";
+        LOG_WARN << "Invalid file path: " << filePath;
         return result;
     }
 
-    // 파일 존재 확인
-    if (!fs::exists(archivePath)) {
-        result.errorMessage = "Archive file not found";
+    if (!fileExists(filePath)) {
+        result.errorMessage = "File does not exist";
+        LOG_WARN << "File does not exist: " << filePath;
         return result;
     }
 
-    // 압축 해제 디렉토리 생성
-    if (!createDirectory(extractTo)) {
-        result.errorMessage = "Failed to create extraction directory";
+    try {
+        std::ifstream     file(filePath, std::ios::binary);
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+
+        result.data["content"] = buffer.str();
+        result.data["info"]    = getFileInfo(filePath);
+        result.success         = true;
+
+        LOG_INFO << "Successfully read file: " << filePath;
+
+    } catch (const std::exception &e) {
+        result.errorMessage = "Failed to read file: " + std::string(e.what());
+        LOG_ERROR << result.errorMessage;
+    }
+
+    return result;
+}
+
+FileOperationResult FileService::createFile(const std::string &filePath,
+                                            const std::string &content)
+{
+    FileOperationResult result;
+    result.success = false;
+
+    if (!validateFilePath(filePath)) {
+        result.errorMessage = "Invalid file path";
+        LOG_WARN << "Invalid file path: " << filePath;
         return result;
     }
 
-    struct archive       *a;
-    struct archive       *ext;
-    struct archive_entry *entry;
-    int                   r;
-
-    a = archive_read_new();
-    archive_read_support_format_all(a);
-    archive_read_support_filter_all(a);
-
-    ext = archive_write_disk_new();
-    archive_write_disk_set_options(ext, ARCHIVE_EXTRACT_TIME);
-    archive_write_disk_set_standard_lookup(ext);
-
-    if ((r = archive_read_open_filename(a, archivePath.c_str(), 10240))) {
-        result.errorMessage = "Failed to open archive: " + std::string(archive_error_string(a));
-        archive_read_free(a);
-        archive_write_free(ext);
+    if (fileExists(filePath)) {
+        result.errorMessage = "File already exists";
+        LOG_WARN << "File already exists: " << filePath;
         return result;
     }
 
-    while (archive_read_next_header(a, &entry) == ARCHIVE_OK) {
-        // 추출 경로 설정
-        std::string currentFile    = archive_entry_pathname(entry);
-        std::string fullOutputPath = extractTo + "/" + currentFile;
-
-        archive_entry_set_pathname(entry, fullOutputPath.c_str());
-
-        LOG_DEBUG << "Extracting: " << currentFile << " to " << fullOutputPath;
-
-        r = archive_write_header(ext, entry);
-        if (r != ARCHIVE_OK) {
-            LOG_WARN << "Write header failed: " << archive_error_string(ext);
-        } else {
-            if (archive_entry_size(entry) > 0) {
-                const void *buff;
-                size_t      size;
-                int64_t     offset;
-
-                while (true) {
-                    r = archive_read_data_block(a, &buff, &size, &offset);
-                    if (r == ARCHIVE_EOF) {
-                        break;
-                    }
-                    if (r != ARCHIVE_OK) {
-                        LOG_ERROR << "Read data failed: " << archive_error_string(a);
-                        break;
-                    }
-                    r = archive_write_data_block(ext, buff, size, offset);
-                    if (r != ARCHIVE_OK) {
-                        LOG_ERROR << "Write data failed: " << archive_error_string(ext);
-                        break;
-                    }
-                }
-            }
+    try {
+        // Create parent directories if they don't exist
+        fs::path path(filePath);
+        if (path.has_parent_path()) {
+            fs::create_directories(path.parent_path());
         }
 
-        archive_write_finish_entry(ext);
-        result.extractedFiles.push_back(currentFile);
+        std::ofstream file(filePath, std::ios::binary);
+        if (!file) {
+            result.errorMessage = "Failed to create file";
+            LOG_ERROR << "Failed to create file: " << filePath;
+            return result;
+        }
+
+        file << content;
+        file.close();
+
+        result.data["info"] = getFileInfo(filePath);
+        result.success      = true;
+
+        LOG_INFO << "Successfully created file: " << filePath;
+
+    } catch (const std::exception &e) {
+        result.errorMessage = "Failed to create file: " + std::string(e.what());
+        LOG_ERROR << result.errorMessage;
     }
 
-    archive_read_close(a);
-    archive_read_free(a);
-    archive_write_close(ext);
-    archive_write_free(ext);
+    return result;
+}
 
-    result.success     = true;
-    result.extractPath = extractTo;
+FileOperationResult FileService::updateFile(const std::string &filePath,
+                                            const std::string &content)
+{
+    FileOperationResult result;
+    result.success = false;
 
-    LOG_INFO << "Extraction completed: " << result.extractedFiles.size() << " files extracted to "
-             << extractTo;
+    if (!validateFilePath(filePath)) {
+        result.errorMessage = "Invalid file path";
+        LOG_WARN << "Invalid file path: " << filePath;
+        return result;
+    }
+
+    if (!fileExists(filePath)) {
+        result.errorMessage = "File does not exist";
+        LOG_WARN << "File does not exist: " << filePath;
+        return result;
+    }
+
+    try {
+        std::ofstream file(filePath, std::ios::binary | std::ios::trunc);
+        if (!file) {
+            result.errorMessage = "Failed to open file for writing";
+            LOG_ERROR << "Failed to open file: " << filePath;
+            return result;
+        }
+
+        file << content;
+        file.close();
+
+        result.data["info"] = getFileInfo(filePath);
+        result.success      = true;
+
+        LOG_INFO << "Successfully updated file: " << filePath;
+
+    } catch (const std::exception &e) {
+        result.errorMessage = "Failed to update file: " + std::string(e.what());
+        LOG_ERROR << result.errorMessage;
+    }
+
+    return result;
+}
+
+FileOperationResult FileService::deleteFile(const std::string &filePath)
+{
+    FileOperationResult result;
+    result.success = false;
+
+    if (!validateFilePath(filePath)) {
+        result.errorMessage = "Invalid file path";
+        LOG_WARN << "Invalid file path: " << filePath;
+        return result;
+    }
+
+    if (!fileExists(filePath)) {
+        result.errorMessage = "File does not exist";
+        LOG_WARN << "File does not exist: " << filePath;
+        return result;
+    }
+
+    try {
+        fs::remove(filePath);
+        result.success = true;
+
+        LOG_INFO << "Successfully deleted file: " << filePath;
+
+    } catch (const std::exception &e) {
+        result.errorMessage = "Failed to delete file: " + std::string(e.what());
+        LOG_ERROR << result.errorMessage;
+    }
 
     return result;
 }

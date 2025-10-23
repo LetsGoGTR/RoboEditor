@@ -1,44 +1,40 @@
 #pragma once
 
 #include <drogon/drogon.h>
-#include <optional>
 #include <string>
-#include <vector>
 
 using namespace drogon;
 
 namespace services
 {
 
-    struct ExtractResult
+    struct FileOperationResult
     {
-        bool                     success;
-        std::string              extractPath;
-        std::vector<std::string> extractedFiles;
-        std::string              errorMessage;
+        bool        success;
+        std::string errorMessage;
+        Json::Value data;
     };
 
     class FileService
     {
       public:
-        // 압축 파일 업로드 및 압축 해제
-        static ExtractResult extractArchive(const std::string &archivePath,
-                                            const std::string &extractTo);
+        // File CRUD operations
+        static FileOperationResult readFile(const std::string &filePath);
+        static FileOperationResult createFile(const std::string &filePath,
+                                              const std::string &content);
+        static FileOperationResult updateFile(const std::string &filePath,
+                                              const std::string &content);
+        static FileOperationResult deleteFile(const std::string &filePath);
 
-        // 지원 압축 형식 확인
-        static bool isSupportedArchive(const std::string &filename);
-
-        // 디렉토리 생성
-        static bool createDirectory(const std::string &path);
-
-        // 파일 삭제
-        static bool removeFile(const std::string &path);
-
-        // 디렉토리 삭제
-        static bool removeDirectory(const std::string &path);
+        // File utility operations
+        static bool        fileExists(const std::string &filePath);
+        static bool        isDirectory(const std::string &filePath);
+        static std::string getFileExtension(const std::string &filePath);
+        static int64_t     getFileSize(const std::string &filePath);
+        static Json::Value getFileInfo(const std::string &filePath);
 
       private:
-        static const std::vector<std::string> supportedFormats_;
+        static bool validateFilePath(const std::string &filePath);
     };
 
 }  // namespace services

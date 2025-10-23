@@ -54,6 +54,7 @@ aux_source_directory(src/filters FILTER_SRC)
 aux_source_directory(src/plugins PLUGIN_SRC)
 aux_source_directory(src/models MODEL_SRC)
 aux_source_directory(src/services SERVICE_SRC)
+aux_source_directory(src/utils/diff UTILS_DIFF_SRC)
 
 drogon_create_views(${PROJECT_NAME} ${CMAKE_CURRENT_SOURCE_DIR}/views
                     ${CMAKE_CURRENT_BINARY_DIR})
@@ -79,6 +80,7 @@ target_sources(${PROJECT_NAME}
                ${PLUGIN_SRC}
                ${MODEL_SRC}
                ${SERVICE_SRC}
+               ${UTILS_DIFF_SRC}
 )
 # ##############################################################################
 # uncomment the following line for dynamically loading views 
