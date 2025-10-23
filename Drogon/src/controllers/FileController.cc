@@ -1,6 +1,9 @@
 #include "FileController.h"
 
 #include <filesystem>
+#include <fstream>
+#include <sstream>
+#include <yaml-cpp/yaml.h>
 
 #include "../services/FileService.h"
 
@@ -133,6 +136,74 @@ void File::listWorkspace(const HttpRequestPtr                          &req,
         Json::Value error;
         error["error"] = "Failed to list extracts";
         auto resp      = HttpResponse::newHttpJsonResponse(error);
+        resp->setStatusCode(k500InternalServerError);
+        callback(resp);
+    }
+}
+
+void File::openFile(const HttpRequestPtr                          &req,
+                    std::function<void(const HttpResponsePtr &)> &&callback)
+{
+    auto json = req->getJsonObject();
+
+    if (!json) {
+        Json::Value error;
+        error["error"] = "Invalid JSON";
+        auto resp      = HttpResponse::newHttpJsonResponse(error);
+        resp->setStatusCode(k400BadRequest);
+        callback(resp);
+        return;
+    }
+
+    if (!json->isMember("filePath") || !(*json)["filePath"].isString()) {
+        Json::Value error;
+        error["error"] = "Missing or invalid 'filePath' field";
+        auto resp      = HttpResponse::newHttpJsonResponse(error);
+        resp->setStatusCode(k400BadRequest);
+        callback(resp);
+        return;
+    }
+
+    std::string filePath = (*json)["filePath"].asString();
+
+    // 파일 확인
+    if (!fs::exists(filePath)) {
+        Json::Value error;
+        error["error"] = "filePath not found";
+        error["path"]  = filePath;
+        auto resp      = HttpResponse::newHttpJsonResponse(error);
+        resp->setStatusCode(k404NotFound);
+        callback(resp);
+        return;
+    }
+
+    try {
+        // YAML 파일 읽기
+        std::ifstream file(filePath);
+
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+
+        std::string fileContent = buffer.str();
+
+        file.close();
+
+        // 응답 생성
+        Json::Value ret;
+        ret["data"] = fileContent;
+
+        auto resp = HttpResponse::newHttpJsonResponse(ret);
+        callback(resp);
+
+        LOG_INFO << "Successfully read YAML files";
+
+    } catch (const std::exception &e) {
+        LOG_ERROR << "Error reading YAML files: " << e.what();
+
+        Json::Value error;
+        error["error"]   = "Failed to read YAML files";
+        error["message"] = e.what();
+        auto resp        = HttpResponse::newHttpJsonResponse(error);
         resp->setStatusCode(k500InternalServerError);
         callback(resp);
     }
