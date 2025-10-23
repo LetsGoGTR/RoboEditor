@@ -5,7 +5,7 @@
 using namespace api::v1;
 using namespace services;
 
-std::string baseDir = "/tmp/drogon-app/temp/";
+static std::string baseDir = "/tmp/drogon-app/temp/";
 
 void File::fileRead(const HttpRequestPtr                          &req,
                     std::function<void(const HttpResponsePtr &)> &&callback)

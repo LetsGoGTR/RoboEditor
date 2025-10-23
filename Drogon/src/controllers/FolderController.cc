@@ -5,12 +5,12 @@
 using namespace api::v1;
 using namespace services;
 
-std::string baseDirFolder = "/tmp/drogon-app/temp/";
+static std::string baseDir = "/tmp/drogon-app/temp/";
 
 void Folder::folderRead(const HttpRequestPtr                          &req,
                         std::function<void(const HttpResponsePtr &)> &&callback)
 {
-    auto path = baseDirFolder + req->getParameter("path");
+    auto path = baseDir + req->getParameter("path");
 
     if (path.empty()) {
         Json::Value error;
@@ -47,7 +47,7 @@ void Folder::folderRead(const HttpRequestPtr                          &req,
 void Folder::folderCreate(const HttpRequestPtr                          &req,
                           std::function<void(const HttpResponsePtr &)> &&callback)
 {
-    auto path = baseDirFolder + req->getParameter("path");
+    auto path = baseDir + req->getParameter("path");
 
     if (path.empty()) {
         Json::Value error;
@@ -85,7 +85,7 @@ void Folder::folderCreate(const HttpRequestPtr                          &req,
 void Folder::folderUpdate(const HttpRequestPtr                          &req,
                           std::function<void(const HttpResponsePtr &)> &&callback)
 {
-    auto oldPath = baseDirFolder + req->getParameter("path");
+    auto oldPath = baseDir + req->getParameter("path");
 
     if (oldPath.empty()) {
         Json::Value error;
@@ -106,7 +106,7 @@ void Folder::folderUpdate(const HttpRequestPtr                          &req,
         return;
     }
 
-    std::string newPath = baseDirFolder + (*json)["newPath"].asString();
+    std::string newPath = baseDir + (*json)["newPath"].asString();
 
     auto result = FolderService::updateFolder(oldPath, newPath);
 
@@ -135,7 +135,7 @@ void Folder::folderUpdate(const HttpRequestPtr                          &req,
 void Folder::folderDelete(const HttpRequestPtr                          &req,
                           std::function<void(const HttpResponsePtr &)> &&callback)
 {
-    auto path = baseDirFolder + req->getParameter("path");
+    auto path = baseDir + req->getParameter("path");
 
     if (path.empty()) {
         Json::Value error;
