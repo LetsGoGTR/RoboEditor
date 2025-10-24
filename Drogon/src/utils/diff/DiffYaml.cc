@@ -6,8 +6,6 @@
 #include <set>
 #include <yaml-cpp/yaml.h>
 
-using namespace diff_utils;
-
 namespace
 {
     // Constants
@@ -32,10 +30,10 @@ namespace
 
     // Forward declarations
     Json::Value convertMapToJson(const YAML::Node &node);
-    void        compareNodes(const YAML::Node       &nodeA,
-                             const YAML::Node       &nodeB,
-                             const std::string      &path,
-                             std::vector<DiffEntry> &diffs);
+    void        compareNodes(const YAML::Node                    &nodeA,
+                             const YAML::Node                    &nodeB,
+                             const std::string                   &path,
+                             std::vector<diff_utils::DiffEntry> &diffs);
 
     // Calculate line count for a YAML node
     int calculateLineCount(const YAML::Node &node)
@@ -131,17 +129,17 @@ namespace
     }
 
     // Helper functions for adding diffs
-    void addAddedDiff(const YAML::Node       &node,
-                      const std::string      &key,
-                      const std::string      &path,
-                      std::vector<DiffEntry> &diffs)
+    void addAddedDiff(const YAML::Node                    &node,
+                      const std::string                   &key,
+                      const std::string                   &path,
+                      std::vector<diff_utils::DiffEntry> &diffs)
     {
         int         lineNumber   = findKeyLineNumber(node, key);
         int         newLineCount = calculateLineCount(node[key]);
         Json::Value addedItem(Json::objectValue);
         addedItem[key] = nodeToJson(node[key]);
 
-        DiffEntry entry;
+        diff_utils::DiffEntry entry;
         entry.type          = "added";
         entry.path          = path;
         entry.oldValue      = Json::Value(Json::nullValue);
@@ -153,17 +151,17 @@ namespace
         diffs.push_back(entry);
     }
 
-    void addRemovedDiff(const YAML::Node       &node,
-                        const std::string      &key,
-                        const std::string      &path,
-                        std::vector<DiffEntry> &diffs)
+    void addRemovedDiff(const YAML::Node                    &node,
+                        const std::string                   &key,
+                        const std::string                   &path,
+                        std::vector<diff_utils::DiffEntry> &diffs)
     {
         int         oldLineCount = calculateLineCount(node[key]);
         int         lineNumber   = findKeyLineNumber(node, key);
         Json::Value removedItem(Json::objectValue);
         removedItem[key] = nodeToJson(node[key]);
 
-        DiffEntry entry;
+        diff_utils::DiffEntry entry;
         entry.type          = "removed";
         entry.path          = path;
         entry.oldValue      = removedItem;
@@ -175,15 +173,15 @@ namespace
         diffs.push_back(entry);
     }
 
-    void addModifiedDiff(const YAML::Node       &nodeA,
-                         const YAML::Node       &nodeB,
-                         const std::string      &path,
-                         std::vector<DiffEntry> &diffs)
+    void addModifiedDiff(const YAML::Node                    &nodeA,
+                         const YAML::Node                    &nodeB,
+                         const std::string                   &path,
+                         std::vector<diff_utils::DiffEntry> &diffs)
     {
         int oldLineCount = calculateLineCount(nodeA);
         int newLineCount = calculateLineCount(nodeB);
 
-        DiffEntry entry;
+        diff_utils::DiffEntry entry;
         entry.type          = "modified";
         entry.path          = path;
         entry.oldValue      = nodeToJson(nodeA);
@@ -196,15 +194,15 @@ namespace
     }
 
     // Comparison functions
-    void compareScalars(const YAML::Node       &nodeA,
-                        const YAML::Node       &nodeB,
-                        const std::string      &path,
-                        std::vector<DiffEntry> &diffs)
+    void compareScalars(const YAML::Node                    &nodeA,
+                        const YAML::Node                    &nodeB,
+                        const std::string                   &path,
+                        std::vector<diff_utils::DiffEntry> &diffs)
     {
         Json::Value valA = nodeToJson(nodeA);
         Json::Value valB = nodeToJson(nodeB);
         if (valA != valB) {
-            DiffEntry entry;
+            diff_utils::DiffEntry entry;
             entry.type          = "modified";
             entry.path          = path;
             entry.oldValue      = valA;
@@ -217,10 +215,10 @@ namespace
         }
     }
 
-    void compareMaps(const YAML::Node       &nodeA,
-                     const YAML::Node       &nodeB,
-                     const std::string      &path,
-                     std::vector<DiffEntry> &diffs)
+    void compareMaps(const YAML::Node                    &nodeA,
+                     const YAML::Node                    &nodeB,
+                     const std::string                   &path,
+                     std::vector<diff_utils::DiffEntry> &diffs)
     {
         std::set<std::string> keys;
         for (auto it = nodeA.begin(); it != nodeA.end(); ++it)
@@ -243,10 +241,10 @@ namespace
         }
     }
 
-    void compareSequences(const YAML::Node       &nodeA,
-                          const YAML::Node       &nodeB,
-                          const std::string      &path,
-                          std::vector<DiffEntry> &diffs)
+    void compareSequences(const YAML::Node                    &nodeA,
+                          const YAML::Node                    &nodeB,
+                          const std::string                   &path,
+                          std::vector<diff_utils::DiffEntry> &diffs)
     {
         size_t maxSize = std::max(nodeA.size(), nodeB.size());
         for (size_t i = 0; i < maxSize; ++i) {
@@ -254,7 +252,7 @@ namespace
             if (i >= nodeA.size()) {
                 int newLineCount = calculateLineCount(nodeB[i]);
 
-                DiffEntry entry;
+                diff_utils::DiffEntry entry;
                 entry.type          = "added";
                 entry.path          = currentPath;
                 entry.oldValue      = Json::Value(Json::nullValue);
@@ -267,7 +265,7 @@ namespace
             } else if (i >= nodeB.size()) {
                 int oldLineCount = calculateLineCount(nodeA[i]);
 
-                DiffEntry entry;
+                diff_utils::DiffEntry entry;
                 entry.type          = "removed";
                 entry.path          = currentPath;
                 entry.oldValue      = nodeToJson(nodeA[i]);
@@ -283,10 +281,10 @@ namespace
         }
     }
 
-    void compareNodes(const YAML::Node       &nodeA,
-                      const YAML::Node       &nodeB,
-                      const std::string      &path,
-                      std::vector<DiffEntry> &diffs)
+    void compareNodes(const YAML::Node                    &nodeA,
+                      const YAML::Node                    &nodeB,
+                      const std::string                   &path,
+                      std::vector<diff_utils::DiffEntry> &diffs)
     {
         if (nodeA.Type() != nodeB.Type()) {
             addModifiedDiff(nodeA, nodeB, path, diffs);
@@ -317,7 +315,7 @@ namespace
 
 }  // anonymous namespace
 
-Json::Value DiffEntry::toJson() const
+Json::Value diff_utils::DiffEntry::toJson() const
 {
     Json::Value result(Json::objectValue);
     result["type"]     = type;
@@ -341,21 +339,21 @@ Json::Value DiffEntry::toJson() const
     return result;
 }
 
-std::vector<DiffEntry> DiffYaml::compareFiles(const std::string &contentA,
-                                              const std::string &contentB)
+std::vector<diff_utils::DiffEntry> diff_utils::DiffYaml::compareFiles(const std::string &contentA,
+                                                                       const std::string &contentB)
 {
     YAML::Node yaml1 = YAML::Load(contentA);
     YAML::Node yaml2 = YAML::Load(contentB);
 
-    std::vector<DiffEntry> diffs;
+    std::vector<diff_utils::DiffEntry> diffs;
     compareNodes(yaml1, yaml2, "", diffs);
 
     return diffs;
 }
 
-Json::Value DiffYaml::generateResult(const std::vector<DiffEntry> &diffs,
-                                     const std::string            &nameA,
-                                     const std::string            &nameB)
+Json::Value diff_utils::DiffYaml::generateResult(const std::vector<diff_utils::DiffEntry> &diffs,
+                                                 const std::string                        &nameA,
+                                                 const std::string                        &nameB)
 {
     Json::Value result(Json::objectValue);
 

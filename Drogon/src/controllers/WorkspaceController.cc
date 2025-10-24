@@ -6,21 +6,19 @@
 
 #include "../services/WorkspaceService.h"
 
-using namespace api::v1;
-using namespace services;
 namespace fs = std::filesystem;
 
 static std::string baseDir = "/tmp/drogon-app/temp/";
 
-void Workspace::workspaceImport(const HttpRequestPtr                          &req,
-                                std::function<void(const HttpResponsePtr &)> &&callback)
+void api::v1::Workspace::workspaceImport(const drogon::HttpRequestPtr                          &req,
+                                          std::function<void(const drogon::HttpResponsePtr &)> &&callback)
 {
-    MultiPartParser fileUpload;
+    drogon::MultiPartParser fileUpload;
     if (fileUpload.parse(req) != 0) {
         Json::Value error;
         error["error"] = "Failed to parse multipart data";
-        auto resp      = HttpResponse::newHttpJsonResponse(error);
-        resp->setStatusCode(k400BadRequest);
+        auto resp      = drogon::HttpResponse::newHttpJsonResponse(error);
+        resp->setStatusCode(drogon::k400BadRequest);
         callback(resp);
         return;
     }
@@ -29,8 +27,8 @@ void Workspace::workspaceImport(const HttpRequestPtr                          &r
     if (files.empty()) {
         Json::Value error;
         error["error"] = "No file uploaded";
-        auto resp      = HttpResponse::newHttpJsonResponse(error);
-        resp->setStatusCode(k400BadRequest);
+        auto resp      = drogon::HttpResponse::newHttpJsonResponse(error);
+        resp->setStatusCode(drogon::k400BadRequest);
         callback(resp);
         return;
     }
@@ -39,11 +37,11 @@ void Workspace::workspaceImport(const HttpRequestPtr                          &r
     std::string originalFilename = file.getFileName();
 
     // Check if archive format is supported
-    if (!WorkspaceService::isSupportedArchive(originalFilename)) {
+    if (!services::WorkspaceService::isSupportedArchive(originalFilename)) {
         Json::Value error;
         error["error"] = "Unsupported file format. Supported: .zip, .tar, .tar.gz, .tgz, etc.";
-        auto resp      = HttpResponse::newHttpJsonResponse(error);
-        resp->setStatusCode(k400BadRequest);
+        auto resp      = drogon::HttpResponse::newHttpJsonResponse(error);
+        resp->setStatusCode(drogon::k400BadRequest);
         callback(resp);
         return;
     }
@@ -62,8 +60,8 @@ void Workspace::workspaceImport(const HttpRequestPtr                          &r
         Json::Value error;
         error["error"]   = "Workspace already exists";
         error["message"] = "Workspace with name '" + workspaceName + "' already exists";
-        auto resp        = HttpResponse::newHttpJsonResponse(error);
-        resp->setStatusCode(k409Conflict);
+        auto resp        = drogon::HttpResponse::newHttpJsonResponse(error);
+        resp->setStatusCode(drogon::k409Conflict);
         callback(resp);
         return;
     }
@@ -82,7 +80,7 @@ void Workspace::workspaceImport(const HttpRequestPtr                          &r
         LOG_INFO << "File saved to: " << tempFilePath;
 
         // Extract archive using WorkspaceService
-        auto result = WorkspaceService::importWorkspace(tempFilePath, workspacePath);
+        auto result = services::WorkspaceService::importWorkspace(tempFilePath, workspacePath);
 
         // Remove temporary file
         fs::remove(tempFilePath);
@@ -96,8 +94,8 @@ void Workspace::workspaceImport(const HttpRequestPtr                          &r
             Json::Value error;
             error["error"]   = "Failed to import workspace";
             error["message"] = result.errorMessage;
-            auto resp        = HttpResponse::newHttpJsonResponse(error);
-            resp->setStatusCode(k500InternalServerError);
+            auto resp        = drogon::HttpResponse::newHttpJsonResponse(error);
+            resp->setStatusCode(drogon::k500InternalServerError);
             callback(resp);
             return;
         }
@@ -108,8 +106,8 @@ void Workspace::workspaceImport(const HttpRequestPtr                          &r
         response["message"] = "Workspace imported successfully";
         response["data"]    = result.data;
 
-        auto resp = HttpResponse::newHttpJsonResponse(response);
-        resp->setStatusCode(k201Created);
+        auto resp = drogon::HttpResponse::newHttpJsonResponse(response);
+        resp->setStatusCode(drogon::k201Created);
         callback(resp);
 
         LOG_INFO << "Workspace imported: " << workspaceName;
@@ -125,21 +123,21 @@ void Workspace::workspaceImport(const HttpRequestPtr                          &r
         Json::Value error;
         error["error"]   = "Internal server error";
         error["message"] = e.what();
-        auto resp        = HttpResponse::newHttpJsonResponse(error);
-        resp->setStatusCode(k500InternalServerError);
+        auto resp        = drogon::HttpResponse::newHttpJsonResponse(error);
+        resp->setStatusCode(drogon::k500InternalServerError);
         callback(resp);
     }
 }
 
-void Workspace::workspaceExport(const HttpRequestPtr                          &req,
-                                std::function<void(const HttpResponsePtr &)> &&callback)
+void api::v1::Workspace::workspaceExport(const drogon::HttpRequestPtr                          &req,
+                                          std::function<void(const drogon::HttpResponsePtr &)> &&callback)
 {
     auto json = req->getJsonObject();
     if (!json || !json->isMember("name")) {
         Json::Value error;
         error["error"] = "Missing 'name' field in request body";
-        auto resp      = HttpResponse::newHttpJsonResponse(error);
-        resp->setStatusCode(k400BadRequest);
+        auto resp      = drogon::HttpResponse::newHttpJsonResponse(error);
+        resp->setStatusCode(drogon::k400BadRequest);
         callback(resp);
         return;
     }
@@ -152,8 +150,8 @@ void Workspace::workspaceExport(const HttpRequestPtr                          &r
         Json::Value error;
         error["error"]   = "Workspace not found";
         error["message"] = "Workspace '" + workspaceName + "' does not exist";
-        auto resp        = HttpResponse::newHttpJsonResponse(error);
-        resp->setStatusCode(k404NotFound);
+        auto resp        = drogon::HttpResponse::newHttpJsonResponse(error);
+        resp->setStatusCode(drogon::k404NotFound);
         callback(resp);
         return;
     }
@@ -169,14 +167,14 @@ void Workspace::workspaceExport(const HttpRequestPtr                          &r
         std::string outputPath     = tempDir + outputFilename;
 
         // Export workspace using WorkspaceService
-        auto result = WorkspaceService::exportWorkspace(workspacePath, outputPath);
+        auto result = services::WorkspaceService::exportWorkspace(workspacePath, outputPath);
 
         if (!result.success) {
             Json::Value error;
             error["error"]   = "Failed to export workspace";
             error["message"] = result.errorMessage;
-            auto resp        = HttpResponse::newHttpJsonResponse(error);
-            resp->setStatusCode(k500InternalServerError);
+            auto resp        = drogon::HttpResponse::newHttpJsonResponse(error);
+            resp->setStatusCode(drogon::k500InternalServerError);
             callback(resp);
             return;
         }
@@ -186,8 +184,8 @@ void Workspace::workspaceExport(const HttpRequestPtr                          &r
         if (!file) {
             Json::Value error;
             error["error"] = "Failed to read exported file";
-            auto resp      = HttpResponse::newHttpJsonResponse(error);
-            resp->setStatusCode(k500InternalServerError);
+            auto resp      = drogon::HttpResponse::newHttpJsonResponse(error);
+            resp->setStatusCode(drogon::k500InternalServerError);
             callback(resp);
             return;
         }
@@ -200,11 +198,11 @@ void Workspace::workspaceExport(const HttpRequestPtr                          &r
         fs::remove(outputPath);
 
         // Return file as download
-        auto resp = HttpResponse::newHttpResponse();
+        auto resp = drogon::HttpResponse::newHttpResponse();
         resp->setBody(fileContent);
-        resp->setContentTypeCode(CT_APPLICATION_OCTET_STREAM);
+        resp->setContentTypeCode(drogon::CT_APPLICATION_OCTET_STREAM);
         resp->addHeader("Content-Disposition", "attachment; filename=\"" + outputFilename + "\"");
-        resp->setStatusCode(k200OK);
+        resp->setStatusCode(drogon::k200OK);
         callback(resp);
 
         LOG_INFO << "Workspace exported: " << workspaceName;
@@ -215,23 +213,23 @@ void Workspace::workspaceExport(const HttpRequestPtr                          &r
         Json::Value error;
         error["error"]   = "Internal server error";
         error["message"] = e.what();
-        auto resp        = HttpResponse::newHttpJsonResponse(error);
-        resp->setStatusCode(k500InternalServerError);
+        auto resp        = drogon::HttpResponse::newHttpJsonResponse(error);
+        resp->setStatusCode(drogon::k500InternalServerError);
         callback(resp);
     }
 }
 
-void Workspace::workspaceList(const HttpRequestPtr                          &req,
-                              std::function<void(const HttpResponsePtr &)> &&callback)
+void api::v1::Workspace::workspaceList(const drogon::HttpRequestPtr                          &req,
+                                        std::function<void(const drogon::HttpResponsePtr &)> &&callback)
 {
-    auto result = WorkspaceService::listWorkspaces(baseDir);
+    auto result = services::WorkspaceService::listWorkspaces(baseDir);
 
     if (!result.success) {
         Json::Value error;
         error["error"]   = "Failed to list workspaces";
         error["message"] = result.errorMessage;
-        auto resp        = HttpResponse::newHttpJsonResponse(error);
-        resp->setStatusCode(k500InternalServerError);
+        auto resp        = drogon::HttpResponse::newHttpJsonResponse(error);
+        resp->setStatusCode(drogon::k500InternalServerError);
         callback(resp);
         return;
     }
@@ -240,8 +238,8 @@ void Workspace::workspaceList(const HttpRequestPtr                          &req
     response["success"] = true;
     response["data"]    = result.data;
 
-    auto resp = HttpResponse::newHttpJsonResponse(response);
-    resp->setStatusCode(k200OK);
+    auto resp = drogon::HttpResponse::newHttpJsonResponse(response);
+    resp->setStatusCode(drogon::k200OK);
     callback(resp);
 
     LOG_INFO << "Listed workspaces: " << result.data["count"].asInt() << " workspaces found";

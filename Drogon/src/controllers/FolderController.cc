@@ -2,33 +2,30 @@
 
 #include "../services/FolderService.h"
 
-using namespace api::v1;
-using namespace services;
-
 static std::string baseDir = "/tmp/drogon-app/temp/";
 
-void Folder::folderRead(const HttpRequestPtr                          &req,
-                        std::function<void(const HttpResponsePtr &)> &&callback)
+void api::v1::Folder::folderRead(const drogon::HttpRequestPtr                          &req,
+                                  std::function<void(const drogon::HttpResponsePtr &)> &&callback)
 {
     auto path = baseDir + req->getParameter("path");
 
     if (path.empty()) {
         Json::Value error;
         error["error"] = "Missing 'path' query parameter";
-        auto resp      = HttpResponse::newHttpJsonResponse(error);
-        resp->setStatusCode(k400BadRequest);
+        auto resp      = drogon::HttpResponse::newHttpJsonResponse(error);
+        resp->setStatusCode(drogon::k400BadRequest);
         callback(resp);
         return;
     }
 
-    auto result = FolderService::readFolder(path);
+    auto result = services::FolderService::readFolder(path);
 
     if (!result.success) {
         Json::Value error;
         error["error"]   = "Failed to list folder";
         error["message"] = result.errorMessage;
-        auto resp        = HttpResponse::newHttpJsonResponse(error);
-        resp->setStatusCode(k404NotFound);
+        auto resp        = drogon::HttpResponse::newHttpJsonResponse(error);
+        resp->setStatusCode(drogon::k404NotFound);
         callback(resp);
         return;
     }
@@ -37,35 +34,35 @@ void Folder::folderRead(const HttpRequestPtr                          &req,
     response["success"] = true;
     response["data"]    = result.data;
 
-    auto resp = HttpResponse::newHttpJsonResponse(response);
-    resp->setStatusCode(k200OK);
+    auto resp = drogon::HttpResponse::newHttpJsonResponse(response);
+    resp->setStatusCode(drogon::k200OK);
     callback(resp);
 
     LOG_INFO << "Folder listed: " << path;
 }
 
-void Folder::folderCreate(const HttpRequestPtr                          &req,
-                          std::function<void(const HttpResponsePtr &)> &&callback)
+void api::v1::Folder::folderCreate(const drogon::HttpRequestPtr                          &req,
+                                    std::function<void(const drogon::HttpResponsePtr &)> &&callback)
 {
     auto path = baseDir + req->getParameter("path");
 
     if (path.empty()) {
         Json::Value error;
         error["error"] = "Missing 'path' query parameter";
-        auto resp      = HttpResponse::newHttpJsonResponse(error);
-        resp->setStatusCode(k400BadRequest);
+        auto resp      = drogon::HttpResponse::newHttpJsonResponse(error);
+        resp->setStatusCode(drogon::k400BadRequest);
         callback(resp);
         return;
     }
 
-    auto result = FolderService::createFolder(path);
+    auto result = services::FolderService::createFolder(path);
 
     if (!result.success) {
         Json::Value error;
         error["error"]   = "Failed to create folder";
         error["message"] = result.errorMessage;
-        auto resp        = HttpResponse::newHttpJsonResponse(error);
-        resp->setStatusCode(k409Conflict);
+        auto resp        = drogon::HttpResponse::newHttpJsonResponse(error);
+        resp->setStatusCode(drogon::k409Conflict);
         callback(resp);
         return;
     }
@@ -75,23 +72,23 @@ void Folder::folderCreate(const HttpRequestPtr                          &req,
     response["message"] = "Folder created successfully";
     response["data"]    = result.data;
 
-    auto resp = HttpResponse::newHttpJsonResponse(response);
-    resp->setStatusCode(k201Created);
+    auto resp = drogon::HttpResponse::newHttpJsonResponse(response);
+    resp->setStatusCode(drogon::k201Created);
     callback(resp);
 
     LOG_INFO << "Folder created: " << path;
 }
 
-void Folder::folderUpdate(const HttpRequestPtr                          &req,
-                          std::function<void(const HttpResponsePtr &)> &&callback)
+void api::v1::Folder::folderUpdate(const drogon::HttpRequestPtr                          &req,
+                                    std::function<void(const drogon::HttpResponsePtr &)> &&callback)
 {
     auto oldPath = baseDir + req->getParameter("path");
 
     if (oldPath.empty()) {
         Json::Value error;
         error["error"] = "Missing 'path' query parameter";
-        auto resp      = HttpResponse::newHttpJsonResponse(error);
-        resp->setStatusCode(k400BadRequest);
+        auto resp      = drogon::HttpResponse::newHttpJsonResponse(error);
+        resp->setStatusCode(drogon::k400BadRequest);
         callback(resp);
         return;
     }
@@ -100,22 +97,22 @@ void Folder::folderUpdate(const HttpRequestPtr                          &req,
     if (!json || !json->isMember("newPath")) {
         Json::Value error;
         error["error"] = "Missing 'newPath' field in request body";
-        auto resp      = HttpResponse::newHttpJsonResponse(error);
-        resp->setStatusCode(k400BadRequest);
+        auto resp      = drogon::HttpResponse::newHttpJsonResponse(error);
+        resp->setStatusCode(drogon::k400BadRequest);
         callback(resp);
         return;
     }
 
     std::string newPath = baseDir + (*json)["newPath"].asString();
 
-    auto result = FolderService::updateFolder(oldPath, newPath);
+    auto result = services::FolderService::updateFolder(oldPath, newPath);
 
     if (!result.success) {
         Json::Value error;
         error["error"]   = "Failed to rename folder";
         error["message"] = result.errorMessage;
-        auto resp        = HttpResponse::newHttpJsonResponse(error);
-        resp->setStatusCode(k404NotFound);
+        auto resp        = drogon::HttpResponse::newHttpJsonResponse(error);
+        resp->setStatusCode(drogon::k404NotFound);
         callback(resp);
         return;
     }
@@ -125,35 +122,35 @@ void Folder::folderUpdate(const HttpRequestPtr                          &req,
     response["message"] = "Folder renamed successfully";
     response["data"]    = result.data;
 
-    auto resp = HttpResponse::newHttpJsonResponse(response);
-    resp->setStatusCode(k200OK);
+    auto resp = drogon::HttpResponse::newHttpJsonResponse(response);
+    resp->setStatusCode(drogon::k200OK);
     callback(resp);
 
     LOG_INFO << "Folder renamed from: " << oldPath << " to: " << newPath;
 }
 
-void Folder::folderDelete(const HttpRequestPtr                          &req,
-                          std::function<void(const HttpResponsePtr &)> &&callback)
+void api::v1::Folder::folderDelete(const drogon::HttpRequestPtr                          &req,
+                                    std::function<void(const drogon::HttpResponsePtr &)> &&callback)
 {
     auto path = baseDir + req->getParameter("path");
 
     if (path.empty()) {
         Json::Value error;
         error["error"] = "Missing 'path' query parameter";
-        auto resp      = HttpResponse::newHttpJsonResponse(error);
-        resp->setStatusCode(k400BadRequest);
+        auto resp      = drogon::HttpResponse::newHttpJsonResponse(error);
+        resp->setStatusCode(drogon::k400BadRequest);
         callback(resp);
         return;
     }
 
-    auto result = FolderService::deleteFolder(path);
+    auto result = services::FolderService::deleteFolder(path);
 
     if (!result.success) {
         Json::Value error;
         error["error"]   = "Failed to delete folder";
         error["message"] = result.errorMessage;
-        auto resp        = HttpResponse::newHttpJsonResponse(error);
-        resp->setStatusCode(k404NotFound);
+        auto resp        = drogon::HttpResponse::newHttpJsonResponse(error);
+        resp->setStatusCode(drogon::k404NotFound);
         callback(resp);
         return;
     }
@@ -162,8 +159,8 @@ void Folder::folderDelete(const HttpRequestPtr                          &req,
     response["success"] = true;
     response["message"] = "Folder deleted successfully";
 
-    auto resp = HttpResponse::newHttpJsonResponse(response);
-    resp->setStatusCode(k200OK);
+    auto resp = drogon::HttpResponse::newHttpJsonResponse(response);
+    resp->setStatusCode(drogon::k200OK);
     callback(resp);
 
     LOG_INFO << "Folder deleted: " << path;

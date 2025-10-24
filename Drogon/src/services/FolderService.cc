@@ -3,9 +3,8 @@
 #include <filesystem>
 
 namespace fs = std::filesystem;
-using namespace services;
 
-bool FolderService::validateFolderPath(const std::string &folderPath)
+bool services::FolderService::validateFolderPath(const std::string &folderPath)
 {
     if (folderPath.empty()) {
         return false;
@@ -19,7 +18,7 @@ bool FolderService::validateFolderPath(const std::string &folderPath)
     return true;
 }
 
-bool FolderService::folderExists(const std::string &folderPath)
+bool services::FolderService::folderExists(const std::string &folderPath)
 {
     try {
         return fs::exists(folderPath) && fs::is_directory(folderPath);
@@ -29,7 +28,7 @@ bool FolderService::folderExists(const std::string &folderPath)
     }
 }
 
-Json::Value FolderService::getFolderInfo(const std::string &folderPath)
+Json::Value services::FolderService::getFolderInfo(const std::string &folderPath)
 {
     Json::Value info;
 
@@ -65,9 +64,9 @@ Json::Value FolderService::getFolderInfo(const std::string &folderPath)
     return info;
 }
 
-FolderOperationResult FolderService::createFolder(const std::string &folderPath)
+services::FolderOperationResult services::FolderService::createFolder(const std::string &folderPath)
 {
-    FolderOperationResult result;
+    services::FolderOperationResult result;
     result.success = false;
 
     if (!validateFolderPath(folderPath)) {
@@ -97,10 +96,10 @@ FolderOperationResult FolderService::createFolder(const std::string &folderPath)
     return result;
 }
 
-FolderOperationResult FolderService::updateFolder(const std::string &oldPath,
-                                                  const std::string &newPath)
+services::FolderOperationResult services::FolderService::updateFolder(const std::string &oldPath,
+                                                                      const std::string &newPath)
 {
-    FolderOperationResult result;
+    services::FolderOperationResult result;
     result.success = false;
 
     if (!validateFolderPath(oldPath) || !validateFolderPath(newPath)) {
@@ -136,9 +135,9 @@ FolderOperationResult FolderService::updateFolder(const std::string &oldPath,
     return result;
 }
 
-FolderOperationResult FolderService::deleteFolder(const std::string &folderPath)
+services::FolderOperationResult services::FolderService::deleteFolder(const std::string &folderPath)
 {
-    FolderOperationResult result;
+    services::FolderOperationResult result;
     result.success = false;
 
     if (!validateFolderPath(folderPath)) {
@@ -167,9 +166,9 @@ FolderOperationResult FolderService::deleteFolder(const std::string &folderPath)
     return result;
 }
 
-FolderOperationResult FolderService::readFolder(const std::string &folderPath)
+services::FolderOperationResult services::FolderService::readFolder(const std::string &folderPath)
 {
-    FolderOperationResult result;
+    services::FolderOperationResult result;
     result.success = false;
 
     if (!validateFolderPath(folderPath)) {

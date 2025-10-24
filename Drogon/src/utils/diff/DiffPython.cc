@@ -7,8 +7,6 @@
 #include <sstream>
 #include <vector>
 
-using namespace diff_utils;
-
 namespace
 {
     // Structure to hold line with context information
@@ -161,7 +159,7 @@ namespace
 
 }  // anonymous namespace
 
-Json::Value PythonDiffEntry::toJson() const
+Json::Value diff_utils::PythonDiffEntry::toJson() const
 {
     Json::Value result(Json::objectValue);
     result["type"]       = type;
@@ -172,8 +170,8 @@ Json::Value PythonDiffEntry::toJson() const
     return result;
 }
 
-std::vector<PythonDiffEntry> DiffPython::compareFiles(const std::string &contentA,
-                                                      const std::string &contentB)
+std::vector<diff_utils::PythonDiffEntry> diff_utils::DiffPython::compareFiles(const std::string &contentA,
+                                                                               const std::string &contentB)
 {
     auto linesA = parsePythonContent(contentA);
     auto linesB = parsePythonContent(contentB);
@@ -187,7 +185,7 @@ std::vector<PythonDiffEntry> DiffPython::compareFiles(const std::string &content
             continue;  // Skip equal lines
         }
 
-        PythonDiffEntry entry;
+        diff_utils::PythonDiffEntry entry;
         if (op.type == "insert") {
             entry.type       = "added";
             entry.lineNumber = op.newIdx;
@@ -214,9 +212,9 @@ std::vector<PythonDiffEntry> DiffPython::compareFiles(const std::string &content
     return diffs;
 }
 
-Json::Value DiffPython::generateResult(const std::vector<PythonDiffEntry> &diffs,
-                                       const std::string                  &nameA,
-                                       const std::string                  &nameB)
+Json::Value diff_utils::DiffPython::generateResult(const std::vector<diff_utils::PythonDiffEntry> &diffs,
+                                                   const std::string                              &nameA,
+                                                   const std::string                              &nameB)
 {
     Json::Value result(Json::objectValue);
 

@@ -8,12 +8,11 @@
 #include <sstream>
 
 namespace fs = std::filesystem;
-using namespace services;
 
-const std::vector<std::string> WorkspaceService::supportedFormats_ = {
+const std::vector<std::string> services::WorkspaceService::supportedFormats_ = {
         ".zip", ".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tbz2", ".tar.xz"};
 
-bool WorkspaceService::isSupportedArchive(const std::string &filename)
+bool services::WorkspaceService::isSupportedArchive(const std::string &filename)
 {
     std::string lower = filename;
     std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
@@ -27,10 +26,10 @@ bool WorkspaceService::isSupportedArchive(const std::string &filename)
     return false;
 }
 
-WorkspaceOperationResult WorkspaceService::importWorkspace(const std::string &archivePath,
-                                                           const std::string &workspaceName)
+services::WorkspaceOperationResult services::WorkspaceService::importWorkspace(const std::string &archivePath,
+                                                                               const std::string &workspaceName)
 {
-    WorkspaceOperationResult result;
+    services::WorkspaceOperationResult result;
     result.success = false;
 
     // Check if archive exists
@@ -137,10 +136,10 @@ WorkspaceOperationResult WorkspaceService::importWorkspace(const std::string &ar
     return result;
 }
 
-WorkspaceOperationResult WorkspaceService::exportWorkspace(const std::string &workspacePath,
-                                                           const std::string &outputPath)
+services::WorkspaceOperationResult services::WorkspaceService::exportWorkspace(const std::string &workspacePath,
+                                                                               const std::string &outputPath)
 {
-    WorkspaceOperationResult result;
+    services::WorkspaceOperationResult result;
     result.success = false;
 
     // Check if workspace exists
@@ -219,9 +218,9 @@ WorkspaceOperationResult WorkspaceService::exportWorkspace(const std::string &wo
     return result;
 }
 
-WorkspaceOperationResult WorkspaceService::listWorkspaces(const std::string &baseDir)
+services::WorkspaceOperationResult services::WorkspaceService::listWorkspaces(const std::string &baseDir)
 {
-    WorkspaceOperationResult result;
+    services::WorkspaceOperationResult result;
     result.success = false;
 
     // Check if baseDir exists

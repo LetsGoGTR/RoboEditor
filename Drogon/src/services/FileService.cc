@@ -5,9 +5,8 @@
 #include <sstream>
 
 namespace fs = std::filesystem;
-using namespace services;
 
-bool FileService::validateFilePath(const std::string &filePath)
+bool services::FileService::validateFilePath(const std::string &filePath)
 {
     if (filePath.empty()) {
         return false;
@@ -21,7 +20,7 @@ bool FileService::validateFilePath(const std::string &filePath)
     return true;
 }
 
-bool FileService::fileExists(const std::string &filePath)
+bool services::FileService::fileExists(const std::string &filePath)
 {
     try {
         return fs::exists(filePath) && fs::is_regular_file(filePath);
@@ -31,7 +30,7 @@ bool FileService::fileExists(const std::string &filePath)
     }
 }
 
-bool FileService::isDirectory(const std::string &filePath)
+bool services::FileService::isDirectory(const std::string &filePath)
 {
     try {
         return fs::exists(filePath) && fs::is_directory(filePath);
@@ -41,12 +40,12 @@ bool FileService::isDirectory(const std::string &filePath)
     }
 }
 
-std::string FileService::getFileExtension(const std::string &filePath)
+std::string services::FileService::getFileExtension(const std::string &filePath)
 {
     return fs::path(filePath).extension().string();
 }
 
-int64_t FileService::getFileSize(const std::string &filePath)
+int64_t services::FileService::getFileSize(const std::string &filePath)
 {
     try {
         if (fileExists(filePath)) {
@@ -59,7 +58,7 @@ int64_t FileService::getFileSize(const std::string &filePath)
     }
 }
 
-Json::Value FileService::getFileInfo(const std::string &filePath)
+Json::Value services::FileService::getFileInfo(const std::string &filePath)
 {
     Json::Value info;
 
@@ -88,9 +87,9 @@ Json::Value FileService::getFileInfo(const std::string &filePath)
     return info;
 }
 
-FileOperationResult FileService::readFile(const std::string &filePath)
+services::FileOperationResult services::FileService::readFile(const std::string &filePath)
 {
-    FileOperationResult result;
+    services::FileOperationResult result;
     result.success = false;
 
     if (!validateFilePath(filePath)) {
@@ -124,10 +123,10 @@ FileOperationResult FileService::readFile(const std::string &filePath)
     return result;
 }
 
-FileOperationResult FileService::createFile(const std::string &filePath,
-                                            const std::string &content)
+services::FileOperationResult services::FileService::createFile(const std::string &filePath,
+                                                                const std::string &content)
 {
-    FileOperationResult result;
+    services::FileOperationResult result;
     result.success = false;
 
     if (!validateFilePath(filePath)) {
@@ -172,10 +171,10 @@ FileOperationResult FileService::createFile(const std::string &filePath,
     return result;
 }
 
-FileOperationResult FileService::updateFile(const std::string &filePath,
-                                            const std::string &content)
+services::FileOperationResult services::FileService::updateFile(const std::string &filePath,
+                                                                const std::string &content)
 {
-    FileOperationResult result;
+    services::FileOperationResult result;
     result.success = false;
 
     if (!validateFilePath(filePath)) {
@@ -214,9 +213,9 @@ FileOperationResult FileService::updateFile(const std::string &filePath,
     return result;
 }
 
-FileOperationResult FileService::deleteFile(const std::string &filePath)
+services::FileOperationResult services::FileService::deleteFile(const std::string &filePath)
 {
-    FileOperationResult result;
+    services::FileOperationResult result;
     result.success = false;
 
     if (!validateFilePath(filePath)) {

@@ -2,30 +2,28 @@
 
 #include <drogon/HttpController.h>
 
-using namespace drogon;
-
 namespace api
 {
     namespace v1
     {
-        class Folder : public HttpController<Folder>
+        class Folder : public drogon::HttpController<Folder>
         {
           public:
             METHOD_LIST_BEGIN
-            METHOD_ADD(Folder::folderCreate, "", Post);
-            METHOD_ADD(Folder::folderRead, "", Get);
-            METHOD_ADD(Folder::folderUpdate, "", Put);
-            METHOD_ADD(Folder::folderDelete, "", Delete);
+            METHOD_ADD(Folder::folderCreate, "", drogon::Post);
+            METHOD_ADD(Folder::folderRead, "", drogon::Get);
+            METHOD_ADD(Folder::folderUpdate, "", drogon::Put);
+            METHOD_ADD(Folder::folderDelete, "", drogon::Delete);
             METHOD_LIST_END
 
-            void folderCreate(const HttpRequestPtr                          &req,
-                              std::function<void(const HttpResponsePtr &)> &&callback);
-            void folderRead(const HttpRequestPtr                          &req,
-                            std::function<void(const HttpResponsePtr &)> &&callback);
-            void folderUpdate(const HttpRequestPtr                          &req,
-                              std::function<void(const HttpResponsePtr &)> &&callback);
-            void folderDelete(const HttpRequestPtr                          &req,
-                              std::function<void(const HttpResponsePtr &)> &&callback);
+            void folderCreate(const drogon::HttpRequestPtr                          &req,
+                              std::function<void(const drogon::HttpResponsePtr &)> &&callback);
+            void folderRead(const drogon::HttpRequestPtr                          &req,
+                            std::function<void(const drogon::HttpResponsePtr &)> &&callback);
+            void folderUpdate(const drogon::HttpRequestPtr                          &req,
+                              std::function<void(const drogon::HttpResponsePtr &)> &&callback);
+            void folderDelete(const drogon::HttpRequestPtr                          &req,
+                              std::function<void(const drogon::HttpResponsePtr &)> &&callback);
         };
     }  // namespace v1
 }  // namespace api

@@ -3,8 +3,6 @@
 #include <drogon/drogon.h>
 #include <string>
 
-using namespace drogon;
-
 namespace services
 {
 

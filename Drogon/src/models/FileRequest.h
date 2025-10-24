@@ -4,8 +4,6 @@
 #include <optional>
 #include <string>
 
-using namespace drogon;
-
 namespace drogon_model
 {
 

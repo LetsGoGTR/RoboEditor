@@ -5,8 +5,6 @@
 #include <fstream>
 #include <vector>
 
-using namespace diff_utils;
-
 namespace
 {
     // Split content into lines
@@ -93,7 +91,7 @@ namespace
 
 }  // anonymous namespace
 
-Json::Value TextDiffEntry::toJson() const
+Json::Value diff_utils::TextDiffEntry::toJson() const
 {
     Json::Value result(Json::objectValue);
     result["type"]       = type;
@@ -103,8 +101,8 @@ Json::Value TextDiffEntry::toJson() const
     return result;
 }
 
-std::vector<TextDiffEntry> DiffText::compareFiles(const std::string &contentA,
-                                                  const std::string &contentB)
+std::vector<diff_utils::TextDiffEntry> diff_utils::DiffText::compareFiles(const std::string &contentA,
+                                                                           const std::string &contentB)
 {
     auto linesA = splitLines(contentA);
     auto linesB = splitLines(contentB);
@@ -118,7 +116,7 @@ std::vector<TextDiffEntry> DiffText::compareFiles(const std::string &contentA,
             continue;  // Skip equal lines
         }
 
-        TextDiffEntry entry;
+        diff_utils::TextDiffEntry entry;
         if (op.type == "insert") {
             entry.type       = "added";
             entry.lineNumber = op.newIdx;
@@ -142,9 +140,9 @@ std::vector<TextDiffEntry> DiffText::compareFiles(const std::string &contentA,
     return diffs;
 }
 
-Json::Value DiffText::generateResult(const std::vector<TextDiffEntry> &diffs,
-                                     const std::string                &nameA,
-                                     const std::string                &nameB)
+Json::Value diff_utils::DiffText::generateResult(const std::vector<diff_utils::TextDiffEntry> &diffs,
+                                                 const std::string                            &nameA,
+                                                 const std::string                            &nameB)
 {
     Json::Value result(Json::objectValue);
 

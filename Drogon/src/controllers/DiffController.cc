@@ -6,32 +6,29 @@
 #include "../services/DiffService.h"
 #include "../services/FileService.h"
 
-using namespace api::v1;
-using namespace drogon_model;
-using namespace services;
 namespace fs = std::filesystem;
 
-std::string baseDir = "/tmp/drogon-app/temp/";
+static std::string baseDir = "/tmp/drogon-app/temp/";
 
-void Diff::diffFiles(const HttpRequestPtr                          &req,
-                     std::function<void(const HttpResponsePtr &)> &&callback)
+void api::v1::Diff::diffFiles(const drogon::HttpRequestPtr                          &req,
+                               std::function<void(const drogon::HttpResponsePtr &)> &&callback)
 {
     auto json = req->getJsonObject();
     if (!json) {
         Json::Value error;
         error["error"] = "Invalid JSON";
-        auto resp      = HttpResponse::newHttpJsonResponse(error);
-        resp->setStatusCode(k400BadRequest);
+        auto resp      = drogon::HttpResponse::newHttpJsonResponse(error);
+        resp->setStatusCode(drogon::k400BadRequest);
         callback(resp);
         return;
     }
 
-    auto fileReq = FileRequest::fromJson(*json);
+    auto fileReq = drogon_model::FileRequest::fromJson(*json);
     if (!fileReq.has_value() || !fileReq->isValid()) {
         Json::Value error;
         error["error"] = "Missing or invalid fields: filePathA, filePathB";
-        auto resp      = HttpResponse::newHttpJsonResponse(error);
-        resp->setStatusCode(k400BadRequest);
+        auto resp      = drogon::HttpResponse::newHttpJsonResponse(error);
+        resp->setStatusCode(drogon::k400BadRequest);
         callback(resp);
         return;
     }
@@ -43,26 +40,26 @@ void Diff::diffFiles(const HttpRequestPtr                          &req,
     LOG_DEBUG << "filePathA: " << fullPathA;
     LOG_DEBUG << "filePathB: " << fullPathB;
 
-    auto resultA = FileService::readFile(fullPathA);
+    auto resultA = services::FileService::readFile(fullPathA);
     if (!resultA.success) {
         Json::Value error;
         error["error"]   = "Failed to read file A";
         error["message"] = resultA.errorMessage;
         error["path"]    = fileReq->filePathA;
-        auto resp        = HttpResponse::newHttpJsonResponse(error);
-        resp->setStatusCode(k404NotFound);
+        auto resp        = drogon::HttpResponse::newHttpJsonResponse(error);
+        resp->setStatusCode(drogon::k404NotFound);
         callback(resp);
         return;
     }
 
-    auto resultB = FileService::readFile(fullPathB);
+    auto resultB = services::FileService::readFile(fullPathB);
     if (!resultB.success) {
         Json::Value error;
         error["error"]   = "Failed to read file B";
         error["message"] = resultB.errorMessage;
         error["path"]    = fileReq->filePathB;
-        auto resp        = HttpResponse::newHttpJsonResponse(error);
-        resp->setStatusCode(k404NotFound);
+        auto resp        = drogon::HttpResponse::newHttpJsonResponse(error);
+        resp->setStatusCode(drogon::k404NotFound);
         callback(resp);
         return;
     }
@@ -76,14 +73,14 @@ void Diff::diffFiles(const HttpRequestPtr                          &req,
     std::string nameB = fs::path(fullPathB).filename().string();
 
     // Perform diff using DiffService
-    auto diffResult = DiffService::diff(contentA, contentB, nameA, nameB);
+    auto diffResult = services::DiffService::diff(contentA, contentB, nameA, nameB);
 
     if (!diffResult.success) {
         Json::Value error;
         error["error"]   = "Failed to perform diff";
         error["message"] = diffResult.errorMessage;
-        auto resp        = HttpResponse::newHttpJsonResponse(error);
-        resp->setStatusCode(k400BadRequest);
+        auto resp        = drogon::HttpResponse::newHttpJsonResponse(error);
+        resp->setStatusCode(drogon::k400BadRequest);
         callback(resp);
         return;
     }
@@ -92,14 +89,14 @@ void Diff::diffFiles(const HttpRequestPtr                          &req,
     response["success"] = true;
     response["data"]    = diffResult.data;
 
-    auto resp = HttpResponse::newHttpJsonResponse(response);
-    resp->setStatusCode(k200OK);
+    auto resp = drogon::HttpResponse::newHttpJsonResponse(response);
+    resp->setStatusCode(drogon::k200OK);
     callback(resp);
 
     LOG_INFO << "Successfully performed diff between " << nameA << " and " << nameB;
 }
 
-void Diff::diffWorkspaces(const HttpRequestPtr                          &req,
-                          std::function<void(const HttpResponsePtr &)> &&callback)
+void api::v1::Diff::diffWorkspaces(const drogon::HttpRequestPtr                          &req,
+                                    std::function<void(const drogon::HttpResponsePtr &)> &&callback)
 {
 }
