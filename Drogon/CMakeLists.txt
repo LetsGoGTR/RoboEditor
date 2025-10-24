@@ -29,7 +29,15 @@ add_executable(${PROJECT_NAME} ./src/main.cc)
 #
 # and comment out the following lines
 find_package(Drogon CONFIG REQUIRED)
-target_link_libraries(${PROJECT_NAME} PRIVATE Drogon::Drogon)
+find_package(LibArchive REQUIRED)
+find_package(yaml-cpp REQUIRED)
+target_link_libraries(
+    ${PROJECT_NAME} 
+    PRIVATE 
+    Drogon::Drogon
+    yaml-cpp
+    ${LibArchive_LIBRARIES}
+)
 
 # ##############################################################################
 
@@ -41,10 +49,12 @@ else ()
     message(STATUS "use c++20")
 endif ()
 
-aux_source_directory(controllers CTL_SRC)
-aux_source_directory(filters FILTER_SRC)
-aux_source_directory(plugins PLUGIN_SRC)
-aux_source_directory(models MODEL_SRC)
+aux_source_directory(src/controllers CTL_SRC)
+aux_source_directory(src/filters FILTER_SRC)
+aux_source_directory(src/plugins PLUGIN_SRC)
+aux_source_directory(src/models MODEL_SRC)
+aux_source_directory(src/services SERVICE_SRC)
+aux_source_directory(src/utils/diff UTILS_DIFF_SRC)
 
 drogon_create_views(${PROJECT_NAME} ${CMAKE_CURRENT_SOURCE_DIR}/views
                     ${CMAKE_CURRENT_BINARY_DIR})
@@ -57,15 +67,21 @@ drogon_create_views(${PROJECT_NAME} ${CMAKE_CURRENT_SOURCE_DIR}/views
 #                     ${CMAKE_CURRENT_BINARY_DIR} TRUE CHANGE_ME)
 
 target_include_directories(${PROJECT_NAME}
-                           PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}
-                                   ${CMAKE_CURRENT_SOURCE_DIR}/models)
+                           PRIVATE 
+                           ${CMAKE_CURRENT_SOURCE_DIR}
+                           ${CMAKE_CURRENT_SOURCE_DIR}/src
+                           ${CMAKE_CURRENT_SOURCE_DIR}/models
+                           ${LibArchive_INCLUDE_DIRS})
 target_sources(${PROJECT_NAME}
                PRIVATE
                ${SRC_DIR}
                ${CTL_SRC}
                ${FILTER_SRC}
                ${PLUGIN_SRC}
-               ${MODEL_SRC})
+               ${MODEL_SRC}
+               ${SERVICE_SRC}
+               ${UTILS_DIFF_SRC}
+)
 # ##############################################################################
 # uncomment the following line for dynamically loading views 
 # set_property(TARGET ${PROJECT_NAME} PROPERTY ENABLE_EXPORTS ON)
