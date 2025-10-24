@@ -15,7 +15,7 @@ const std::vector<std::string> services::DiffService::supportedFormats_ = {
 
 std::string services::DiffService::detectFileType(const std::string &fileName)
 {
-    std::string ext = fs::path(fileName).extension().string();
+    std::string ext = std::filesystem::path(fileName).extension().string();
 
     // Convert to lowercase for case-insensitive comparison
     std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
@@ -32,7 +32,7 @@ std::string services::DiffService::detectFileType(const std::string &fileName)
 
 bool services::DiffService::isSupportedFormat(const std::string &fileName)
 {
-    std::string ext = fs::path(fileName).extension().string();
+    std::string ext = std::filesystem::path(fileName).extension().string();
     std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
 
     return std::find(supportedFormats_.begin(), supportedFormats_.end(), ext) !=
@@ -115,8 +115,8 @@ services::DiffResult services::DiffService::diff(const std::string &contentA,
     }
 
     // Validate both files have same extension
-    std::string extA = fs::path(nameA).extension().string();
-    std::string extB = fs::path(nameB).extension().string();
+    std::string extA = std::filesystem::path(nameA).extension().string();
+    std::string extB = std::filesystem::path(nameB).extension().string();
     std::transform(extA.begin(), extA.end(), extA.begin(), ::tolower);
     std::transform(extB.begin(), extB.end(), extB.begin(), ::tolower);
 

@@ -23,7 +23,7 @@ bool services::FileService::validateFilePath(const std::string &filePath)
 bool services::FileService::fileExists(const std::string &filePath)
 {
     try {
-        return fs::exists(filePath) && fs::is_regular_file(filePath);
+        return std::filesystem::exists(filePath) && std::filesystem::is_regular_file(filePath);
     } catch (const std::exception &e) {
         LOG_ERROR << "Error checking file existence: " << e.what();
         return false;
@@ -33,7 +33,7 @@ bool services::FileService::fileExists(const std::string &filePath)
 bool services::FileService::isDirectory(const std::string &filePath)
 {
     try {
-        return fs::exists(filePath) && fs::is_directory(filePath);
+        return std::filesystem::exists(filePath) && std::filesystem::is_directory(filePath);
     } catch (const std::exception &e) {
         LOG_ERROR << "Error checking if directory: " << e.what();
         return false;
@@ -42,14 +42,14 @@ bool services::FileService::isDirectory(const std::string &filePath)
 
 std::string services::FileService::getFileExtension(const std::string &filePath)
 {
-    return fs::path(filePath).extension().string();
+    return std::filesystem::path(filePath).extension().string();
 }
 
 int64_t services::FileService::getFileSize(const std::string &filePath)
 {
     try {
         if (fileExists(filePath)) {
-            return fs::file_size(filePath);
+            return std::filesystem::file_size(filePath);
         }
         return -1;
     } catch (const std::exception &e) {
@@ -67,16 +67,17 @@ Json::Value services::FileService::getFileInfo(const std::string &filePath)
     }
 
     try {
-        fs::path path(filePath);
+        std::filesystem::path path(filePath);
 
         info["path"]      = filePath;
         info["name"]      = path.filename().string();
         info["extension"] = path.extension().string();
-        info["size"]      = (Json::Int64)fs::file_size(filePath);
+        info["size"]      = (Json::Int64)std::filesystem::file_size(filePath);
 
-        auto ftime       = fs::last_write_time(filePath);
-        auto sctp        = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
-                ftime - fs::file_time_type::clock::now() + std::chrono::system_clock::now());
+        auto ftime = std::filesystem::last_write_time(filePath);
+        auto sctp  = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
+                ftime - std::filesystem::file_time_type::clock::now() +
+                std::chrono::system_clock::now());
         auto time_t_val  = std::chrono::system_clock::to_time_t(sctp);
         info["modified"] = (Json::Int64)time_t_val;
 
@@ -143,9 +144,9 @@ services::FileOperationResult services::FileService::createFile(const std::strin
 
     try {
         // Create parent directories if they don't exist
-        fs::path path(filePath);
+        std::filesystem::path path(filePath);
         if (path.has_parent_path()) {
-            fs::create_directories(path.parent_path());
+            std::filesystem::create_directories(path.parent_path());
         }
 
         std::ofstream file(filePath, std::ios::binary);
@@ -231,7 +232,7 @@ services::FileOperationResult services::FileService::deleteFile(const std::strin
     }
 
     try {
-        fs::remove(filePath);
+        std::filesystem::remove(filePath);
         result.success = true;
 
         LOG_INFO << "Successfully deleted file: " << filePath;

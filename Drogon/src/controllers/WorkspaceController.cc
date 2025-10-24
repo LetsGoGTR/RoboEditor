@@ -10,8 +10,9 @@ namespace fs = std::filesystem;
 
 static std::string baseDir = "/tmp/drogon-app/temp/";
 
-void api::v1::Workspace::workspaceImport(const drogon::HttpRequestPtr                          &req,
-                                          std::function<void(const drogon::HttpResponsePtr &)> &&callback)
+void api::v1::Workspace::workspaceImport(
+        const drogon::HttpRequestPtr                          &req,
+        std::function<void(const drogon::HttpResponsePtr &)> &&callback)
 {
     drogon::MultiPartParser fileUpload;
     if (fileUpload.parse(req) != 0) {
@@ -50,13 +51,13 @@ void api::v1::Workspace::workspaceImport(const drogon::HttpRequestPtr           
     std::string workspaceName = req->getParameter("name");
     if (workspaceName.empty()) {
         // Use original filename without extension as workspace name
-        workspaceName = fs::path(originalFilename).stem().string();
+        workspaceName = std::filesystem::path(originalFilename).stem().string();
     }
 
     std::string workspacePath = baseDir + workspaceName;
 
     // Check if workspace already exists
-    if (fs::exists(workspacePath)) {
+    if (std::filesystem::exists(workspacePath)) {
         Json::Value error;
         error["error"]   = "Workspace already exists";
         error["message"] = "Workspace with name '" + workspaceName + "' already exists";
@@ -69,8 +70,8 @@ void api::v1::Workspace::workspaceImport(const drogon::HttpRequestPtr           
     try {
         // Create temporary directory for uploaded file
         std::string tempDir = "/tmp/drogon-upload/";
-        if (!fs::exists(tempDir)) {
-            fs::create_directories(tempDir);
+        if (!std::filesystem::exists(tempDir)) {
+            std::filesystem::create_directories(tempDir);
         }
 
         std::string tempFilePath = tempDir + drogon::utils::getUuid() + "_" + originalFilename;
@@ -83,12 +84,12 @@ void api::v1::Workspace::workspaceImport(const drogon::HttpRequestPtr           
         auto result = services::WorkspaceService::importWorkspace(tempFilePath, workspacePath);
 
         // Remove temporary file
-        fs::remove(tempFilePath);
+        std::filesystem::remove(tempFilePath);
 
         if (!result.success) {
             // Clean up workspace directory if extraction failed
-            if (fs::exists(workspacePath)) {
-                fs::remove_all(workspacePath);
+            if (std::filesystem::exists(workspacePath)) {
+                std::filesystem::remove_all(workspacePath);
             }
 
             Json::Value error;
@@ -116,8 +117,8 @@ void api::v1::Workspace::workspaceImport(const drogon::HttpRequestPtr           
         LOG_ERROR << "Exception during import: " << e.what();
 
         // Clean up
-        if (fs::exists(workspacePath)) {
-            fs::remove_all(workspacePath);
+        if (std::filesystem::exists(workspacePath)) {
+            std::filesystem::remove_all(workspacePath);
         }
 
         Json::Value error;
@@ -129,8 +130,9 @@ void api::v1::Workspace::workspaceImport(const drogon::HttpRequestPtr           
     }
 }
 
-void api::v1::Workspace::workspaceExport(const drogon::HttpRequestPtr                          &req,
-                                          std::function<void(const drogon::HttpResponsePtr &)> &&callback)
+void api::v1::Workspace::workspaceExport(
+        const drogon::HttpRequestPtr                          &req,
+        std::function<void(const drogon::HttpResponsePtr &)> &&callback)
 {
     auto json = req->getJsonObject();
     if (!json || !json->isMember("name")) {
@@ -146,7 +148,7 @@ void api::v1::Workspace::workspaceExport(const drogon::HttpRequestPtr           
     std::string workspacePath = baseDir + workspaceName;
 
     // Check if workspace exists
-    if (!fs::exists(workspacePath) || !fs::is_directory(workspacePath)) {
+    if (!std::filesystem::exists(workspacePath) || !std::filesystem::is_directory(workspacePath)) {
         Json::Value error;
         error["error"]   = "Workspace not found";
         error["message"] = "Workspace '" + workspaceName + "' does not exist";
@@ -159,8 +161,8 @@ void api::v1::Workspace::workspaceExport(const drogon::HttpRequestPtr           
     try {
         // Create temporary directory for export
         std::string tempDir = "/tmp/drogon-export/";
-        if (!fs::exists(tempDir)) {
-            fs::create_directories(tempDir);
+        if (!std::filesystem::exists(tempDir)) {
+            std::filesystem::create_directories(tempDir);
         }
 
         std::string outputFilename = workspaceName + ".tar.gz";
@@ -195,7 +197,7 @@ void api::v1::Workspace::workspaceExport(const drogon::HttpRequestPtr           
         file.close();
 
         // Remove temporary file
-        fs::remove(outputPath);
+        std::filesystem::remove(outputPath);
 
         // Return file as download
         auto resp = drogon::HttpResponse::newHttpResponse();
@@ -219,8 +221,9 @@ void api::v1::Workspace::workspaceExport(const drogon::HttpRequestPtr           
     }
 }
 
-void api::v1::Workspace::workspaceList(const drogon::HttpRequestPtr                          &req,
-                                        std::function<void(const drogon::HttpResponsePtr &)> &&callback)
+void api::v1::Workspace::workspaceList(
+        const drogon::HttpRequestPtr                          &req,
+        std::function<void(const drogon::HttpResponsePtr &)> &&callback)
 {
     auto result = services::WorkspaceService::listWorkspaces(baseDir);
 

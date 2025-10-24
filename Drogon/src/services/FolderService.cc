@@ -21,7 +21,7 @@ bool services::FolderService::validateFolderPath(const std::string &folderPath)
 bool services::FolderService::folderExists(const std::string &folderPath)
 {
     try {
-        return fs::exists(folderPath) && fs::is_directory(folderPath);
+        return std::filesystem::exists(folderPath) && std::filesystem::is_directory(folderPath);
     } catch (const std::exception &e) {
         LOG_ERROR << "Error checking folder existence: " << e.what();
         return false;
@@ -37,7 +37,7 @@ Json::Value services::FolderService::getFolderInfo(const std::string &folderPath
     }
 
     try {
-        fs::path path(folderPath);
+        std::filesystem::path path(folderPath);
 
         info["path"] = folderPath;
         info["name"] = path.filename().string();
@@ -46,7 +46,7 @@ Json::Value services::FolderService::getFolderInfo(const std::string &folderPath
         int fileCount = 0;
         int dirCount  = 0;
 
-        for (const auto &entry : fs::directory_iterator(folderPath)) {
+        for (const auto &entry : std::filesystem::directory_iterator(folderPath)) {
             if (entry.is_regular_file()) {
                 fileCount++;
             } else if (entry.is_directory()) {
@@ -82,7 +82,7 @@ services::FolderOperationResult services::FolderService::createFolder(const std:
     }
 
     try {
-        fs::create_directories(folderPath);
+        std::filesystem::create_directories(folderPath);
         result.data["info"] = getFolderInfo(folderPath);
         result.success      = true;
 
@@ -121,7 +121,7 @@ services::FolderOperationResult services::FolderService::updateFolder(const std:
     }
 
     try {
-        fs::rename(oldPath, newPath);
+        std::filesystem::rename(oldPath, newPath);
         result.data["info"] = getFolderInfo(newPath);
         result.success      = true;
 
@@ -153,7 +153,7 @@ services::FolderOperationResult services::FolderService::deleteFolder(const std:
     }
 
     try {
-        fs::remove_all(folderPath);
+        std::filesystem::remove_all(folderPath);
         result.success = true;
 
         LOG_INFO << "Successfully deleted folder: " << folderPath;
@@ -187,7 +187,7 @@ services::FolderOperationResult services::FolderService::readFolder(const std::s
         Json::Value files(Json::arrayValue);
         Json::Value directories(Json::arrayValue);
 
-        for (const auto &entry : fs::directory_iterator(folderPath)) {
+        for (const auto &entry : std::filesystem::directory_iterator(folderPath)) {
             Json::Value item;
             item["name"] = entry.path().filename().string();
             item["path"] = entry.path().string();

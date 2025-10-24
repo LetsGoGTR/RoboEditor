@@ -11,7 +11,7 @@ namespace fs = std::filesystem;
 static std::string baseDir = "/tmp/drogon-app/temp/";
 
 void api::v1::Diff::diffFiles(const drogon::HttpRequestPtr                          &req,
-                               std::function<void(const drogon::HttpResponsePtr &)> &&callback)
+                              std::function<void(const drogon::HttpResponsePtr &)> &&callback)
 {
     auto json = req->getJsonObject();
     if (!json) {
@@ -69,8 +69,8 @@ void api::v1::Diff::diffFiles(const drogon::HttpRequestPtr                      
     std::string contentB = resultB.data["content"].asString();
 
     // Get file names
-    std::string nameA = fs::path(fullPathA).filename().string();
-    std::string nameB = fs::path(fullPathB).filename().string();
+    std::string nameA = std::filesystem::path(fullPathA).filename().string();
+    std::string nameB = std::filesystem::path(fullPathB).filename().string();
 
     // Perform diff using DiffService
     auto diffResult = services::DiffService::diff(contentA, contentB, nameA, nameB);
@@ -97,6 +97,6 @@ void api::v1::Diff::diffFiles(const drogon::HttpRequestPtr                      
 }
 
 void api::v1::Diff::diffWorkspaces(const drogon::HttpRequestPtr                          &req,
-                                    std::function<void(const drogon::HttpResponsePtr &)> &&callback)
+                                   std::function<void(const drogon::HttpResponsePtr &)> &&callback)
 {
 }

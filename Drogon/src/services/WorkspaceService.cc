@@ -26,14 +26,15 @@ bool services::WorkspaceService::isSupportedArchive(const std::string &filename)
     return false;
 }
 
-services::WorkspaceOperationResult services::WorkspaceService::importWorkspace(const std::string &archivePath,
-                                                                               const std::string &workspaceName)
+services::WorkspaceOperationResult
+services::WorkspaceService::importWorkspace(const std::string &archivePath,
+                                            const std::string &workspaceName)
 {
     services::WorkspaceOperationResult result;
     result.success = false;
 
     // Check if archive exists
-    if (!fs::exists(archivePath)) {
+    if (!std::filesystem::exists(archivePath)) {
         result.errorMessage = "Archive file does not exist";
         LOG_ERROR << result.errorMessage << ": " << archivePath;
         return result;
@@ -48,8 +49,8 @@ services::WorkspaceOperationResult services::WorkspaceService::importWorkspace(c
 
     try {
         // Create extraction directory
-        if (!fs::exists(workspaceName)) {
-            fs::create_directories(workspaceName);
+        if (!std::filesystem::exists(workspaceName)) {
+            std::filesystem::create_directories(workspaceName);
         }
 
         struct archive       *a;
@@ -136,14 +137,15 @@ services::WorkspaceOperationResult services::WorkspaceService::importWorkspace(c
     return result;
 }
 
-services::WorkspaceOperationResult services::WorkspaceService::exportWorkspace(const std::string &workspacePath,
-                                                                               const std::string &outputPath)
+services::WorkspaceOperationResult
+services::WorkspaceService::exportWorkspace(const std::string &workspacePath,
+                                            const std::string &outputPath)
 {
     services::WorkspaceOperationResult result;
     result.success = false;
 
     // Check if workspace exists
-    if (!fs::exists(workspacePath) || !fs::is_directory(workspacePath)) {
+    if (!std::filesystem::exists(workspacePath) || !std::filesystem::is_directory(workspacePath)) {
         result.errorMessage = "Workspace directory does not exist";
         LOG_ERROR << result.errorMessage << ": " << workspacePath;
         return result;
@@ -168,19 +170,20 @@ services::WorkspaceOperationResult services::WorkspaceService::exportWorkspace(c
         Json::Value compressedFiles(Json::arrayValue);
 
         // Iterate through all files in workspace
-        for (const auto &dirEntry : fs::recursive_directory_iterator(workspacePath)) {
+        for (const auto &dirEntry : std::filesystem::recursive_directory_iterator(workspacePath)) {
             if (!dirEntry.is_regular_file()) {
                 continue;
             }
 
-            std::string filePath     = dirEntry.path().string();
-            std::string relativePath = fs::relative(dirEntry.path(), workspacePath).string();
+            std::string filePath = dirEntry.path().string();
+            std::string relativePath =
+                    std::filesystem::relative(dirEntry.path(), workspacePath).string();
 
             LOG_DEBUG << "Adding to archive: " << relativePath;
 
             entry = archive_entry_new();
             archive_entry_set_pathname(entry, relativePath.c_str());
-            archive_entry_set_size(entry, fs::file_size(filePath));
+            archive_entry_set_size(entry, std::filesystem::file_size(filePath));
             archive_entry_set_filetype(entry, AE_IFREG);
             archive_entry_set_perm(entry, 0644);
 
@@ -218,15 +221,16 @@ services::WorkspaceOperationResult services::WorkspaceService::exportWorkspace(c
     return result;
 }
 
-services::WorkspaceOperationResult services::WorkspaceService::listWorkspaces(const std::string &baseDir)
+services::WorkspaceOperationResult
+services::WorkspaceService::listWorkspaces(const std::string &baseDir)
 {
     services::WorkspaceOperationResult result;
     result.success = false;
 
     // Check if baseDir exists
-    if (!fs::exists(baseDir)) {
+    if (!std::filesystem::exists(baseDir)) {
         try {
-            fs::create_directories(baseDir);
+            std::filesystem::create_directories(baseDir);
         } catch (const std::exception &e) {
             result.errorMessage = "Failed to create base directory: " + std::string(e.what());
             LOG_ERROR << result.errorMessage;
@@ -237,7 +241,7 @@ services::WorkspaceOperationResult services::WorkspaceService::listWorkspaces(co
     try {
         Json::Value workspaces(Json::arrayValue);
 
-        for (const auto &entry : fs::directory_iterator(baseDir)) {
+        for (const auto &entry : std::filesystem::directory_iterator(baseDir)) {
             if (entry.is_directory()) {
                 Json::Value workspace(Json::objectValue);
                 workspace["name"] = entry.path().filename().string();
@@ -247,7 +251,8 @@ services::WorkspaceOperationResult services::WorkspaceService::listWorkspaces(co
                 int fileCount = 0;
                 int dirCount  = 0;
 
-                for (const auto &subEntry : fs::recursive_directory_iterator(entry.path())) {
+                for (const auto &subEntry :
+                     std::filesystem::recursive_directory_iterator(entry.path())) {
                     if (subEntry.is_regular_file()) {
                         fileCount++;
                     } else if (subEntry.is_directory()) {
