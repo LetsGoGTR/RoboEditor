@@ -8,7 +8,7 @@
 
 namespace fs = std::filesystem;
 
-static std::string baseDir = "/tmp/drogon-app/temp/";
+static std::string baseDir = "/tmp/drogon-app/storage/";
 
 void api::v1::Diff::diffFiles(
     const drogon::HttpRequestPtr& req,
