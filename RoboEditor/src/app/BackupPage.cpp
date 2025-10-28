@@ -15,10 +15,17 @@ BackupPage::BackupPage(QWidget *parent) : QWidget(parent)
 
     // Signal Connection
     connect(backupCreate, &QPushButton::clicked, this, &BackupPage::onBackupCreateClicked);
-
     connect(backupDelete, &QPushButton::clicked, this, &BackupPage::onBackupDeleteClicked);
-
     connect(radioGroup, &QButtonGroup::idClicked, this, &BackupPage::onRadioSelected);
+
+    // 디렉토리 선택 시 동작 연결
+    connect(dirTree, &QTreeView::doubleClicked, this, [=](const QModelIndex &index) {
+        QString path = dirModel->filePath(index);
+        if (QFileInfo(path).isDir()) {
+            dirTree->setRootIndex(index);  // 실제 탐색 위치를 이 폴더로 전환
+            qDebug() << "📂 Entered folder:" << path;
+        }
+    });
 
     connect(backupCreate, &QPushButton::clicked, this, [=] {
         emit uiBackupClicked(backupComment->toPlainText());
@@ -27,6 +34,24 @@ BackupPage::BackupPage(QWidget *parent) : QWidget(parent)
 
 void BackupPage::setupUi()
 {
+    // Directory Explorer
+    dirTitle = new QLabel("file directory", this);
+
+    dirModel = new QFileSystemModel(this);
+    dirModel->setRootPath(QDir::homePath());
+    dirModel->setFilter(QDir::NoDotAndDotDot | QDir::AllDirs);
+
+    dirTree = new QTreeView(this);
+    dirTree->setModel(dirModel);
+    dirTree->setRootIndex(dirModel->index(QDir::homePath()));
+    dirTree->setHeaderHidden(true);
+    dirTree->setMinimumWidth(250);  // 좌측 탐색기 폭 확보
+    dirTree->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+
+    dirLayout = new QVBoxLayout();
+    dirLayout->addWidget(dirTitle);
+    dirLayout->addWidget(dirTree);
+
     // Backup List
     backupTableTitle = new QLabel("backup folder directory", this);
 
@@ -52,29 +77,27 @@ void BackupPage::setupUi()
     radioGroup->setExclusive(true);
 
     // Left Layout
-    leftLayout = new QVBoxLayout();
-    leftLayout->addWidget(backupTableTitle);
-    leftLayout->addWidget(backupList);
-    leftLayout->addWidget(backupDelete);
+    workspaceLayout = new QVBoxLayout();
+    workspaceLayout->addWidget(backupTableTitle);
+    workspaceLayout->addWidget(backupList);
+    workspaceLayout->addWidget(backupDelete);
 
     // WorkDir Backup
     backupActionTitle = new QLabel("작업 폴더 백업하기", this);
-
-    QGroupBox *workGroup = new QGroupBox("작업 폴더 정보", this);
-    sizeLabel            = new QLabel("size : 1.5 GB", this);
-    commentLabel         = new QLabel("comment", this);
-    backupComment        = new QTextEdit(this);
-    backupCreate         = new QPushButton("Backup", this);
+    sizeLabel         = new QLabel("size : 1.5 GB", this);
+    commentLabel      = new QLabel("comment", this);
+    backupComment     = new QTextEdit(this);
+    backupCreate      = new QPushButton("Backup", this);
 
     QVBoxLayout *workLayout = new QVBoxLayout();
     workLayout->addWidget(sizeLabel);
     workLayout->setContentsMargins(8, 8, 8, 8);
-    workGroup->setLayout(workLayout);
 
     // ✅ 오른쪽 레이아웃 비율 1:2로 조정
     QVBoxLayout *rightTopLayout = new QVBoxLayout();
-    rightTopLayout->addWidget(workGroup);
-    rightTopLayout->setStretch(0, 1);  // 상단 영역
+    rightTopLayout->addWidget(backupActionTitle);
+    rightTopLayout->addWidget(sizeLabel);
+    rightTopLayout->setStretch(1, 1);  // 상단 영역
 
     QVBoxLayout *rightBottomLayout = new QVBoxLayout();
     rightBottomLayout->addWidget(commentLabel);
@@ -82,18 +105,19 @@ void BackupPage::setupUi()
     rightBottomLayout->addWidget(backupCreate);
     rightBottomLayout->setStretch(1, 2);  // comment 영역 비중 2
 
-    rightLayout = new QVBoxLayout();
-    rightLayout->addWidget(backupActionTitle);
-    rightLayout->addLayout(rightTopLayout);
-    rightLayout->addLayout(rightBottomLayout);
-    rightLayout->setStretch(1, 1);
-    rightLayout->setStretch(2, 2);
-    rightLayout->setContentsMargins(5, 5, 5, 5);
+    infoLayout = new QVBoxLayout();
+    infoLayout->addWidget(backupActionTitle);
+    infoLayout->addLayout(rightTopLayout);
+    infoLayout->addLayout(rightBottomLayout);
+    infoLayout->setStretch(1, 1);
+    infoLayout->setStretch(2, 2);
+    infoLayout->setContentsMargins(5, 5, 5, 5);
 
     // Overall Layout
     contentLayout = new QHBoxLayout();
-    contentLayout->addLayout(leftLayout, 2);
-    contentLayout->addLayout(rightLayout, 1);
+    contentLayout->addLayout(dirLayout, 1);
+    contentLayout->addLayout(workspaceLayout, 2);
+    contentLayout->addLayout(infoLayout, 1);
 
     mainLayout = new QVBoxLayout(this);
     mainLayout->addLayout(contentLayout);
@@ -206,6 +230,24 @@ void BackupPage::onRadioSelected(int id)
         backupDelete->setEnabled(true);
         qDebug() << "선택된 백업 인덱스:" << id;
     }
+}
+
+// Directory 선택 slot
+void BackupPage::onDirectorySelected(const QModelIndex &index)
+{
+    QString path = dirModel->filePath(index);
+    qint64  size = 0;
+
+    QDir          dir(path);
+    QFileInfoList files = dir.entryInfoList(QDir::Files | QDir::NoDotAndDotDot);
+    for (const QFileInfo &info : files)
+        size += info.size();
+
+    double sizeGB = size / (1024.0 * 1024 * 1024);
+    sizeLabel->setText(
+            QString("선택된 폴더: %1\nsize: %2 GB").arg(path).arg(QString::number(sizeGB, 'f', 2)));
+
+    qDebug() << "폴더 선택됨:" << path;
 }
 
 BackupPage::~BackupPage() = default;

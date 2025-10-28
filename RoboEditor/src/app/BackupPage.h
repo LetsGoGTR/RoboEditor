@@ -4,8 +4,10 @@
 
 #include <QTableWidget>
 #include <QTextEdit>
+#include <QTreeView>
 
 #include <QButtonGroup>
+#include <QFileSystemModel>
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -27,9 +29,15 @@ class BackupPage : public QWidget
         // Layouts
         QVBoxLayout *mainLayout;
         QHBoxLayout *contentLayout;
-        QVBoxLayout *leftLayout;
-        QVBoxLayout *rightLayout;
+        QVBoxLayout *dirLayout;
+        QVBoxLayout *workspaceLayout;
+        QVBoxLayout *infoLayout;
 
+        // File system
+        QLabel           *dirTitle;
+        QFileSystemModel *dirModel;
+        QTreeView        *dirTree;
+        QPushButton      *goUpButton;
         // Backup List
         QLabel       *backupTableTitle;
         QTableWidget *backupList;
@@ -48,13 +56,14 @@ class BackupPage : public QWidget
         void setupUi();
         void populateDummyData();
 
+      signals:
+        void uiBackupClicked(const QString &target);
+
       private slots:
         void onBackupCreateClicked();
         void onBackupDeleteClicked();
         void onRadioSelected(int id);
-
-      signals:
-        void uiBackupClicked(const QString &target);
+        void onDirectorySelected(const QModelIndex &index);  // 🔹 폴더 선택 슬롯 추가
 };
 
 #endif  // BACKUPPAGE_H
