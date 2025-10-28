@@ -8,7 +8,7 @@
 
 namespace fs = std::filesystem;
 
-const std::string services::DeviceService::metadataFilename_ = "metadata.json";
+const std::string services::DeviceService::metadataFilename_ = ".metadata.json";
 
 // Helper functions
 services::DeviceOperationResult services::DeviceService::createError(
@@ -164,8 +164,8 @@ services::DeviceOperationResult services::DeviceService::createDevice(
     result.success = true;
     result.data = newMetadata.toJson();
 
-    LOG_INFO << "Created device: " << metadata.name
-             << " (ID: " << metadata.id << ")";
+    LOG_INFO << "Created device: " << metadata.name << " (ID: " << metadata.id
+             << ")";
     return result;
 
   } catch (const std::exception& e) {
