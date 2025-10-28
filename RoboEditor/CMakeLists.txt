@@ -27,7 +27,6 @@ set(PROJECT_SOURCES
         src/app/mainwindow.cpp
         src/app/NavDock.cpp
         src/app/TopMenu.cpp
-        src/app/BackupForm.cpp
 
         src/app/BackupPage.h
         src/app/CenterStack.h
@@ -36,13 +35,14 @@ set(PROJECT_SOURCES
         src/app/mainwindow.h
         src/app/NavDock.h
         src/app/TopMenu.h
-        src/app/BackupForm.h
 
         src/ui/mainwindow.ui
         ${TS_FILES}
 )
 
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
+    find_package(Qt6 REQUIRED COMPONENTS Widgets)
+
     qt_add_executable(RoboEditor
         MANUAL_FINALIZATION
         ${PROJECT_SOURCES}
@@ -70,6 +70,7 @@ else()
 endif()
 
 target_link_libraries(RoboEditor PRIVATE Qt${QT_VERSION_MAJOR}::Widgets)
+target_link_libraries(RoboEditor PRIVATE Qt6::Widgets)
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
 # If you are developing for iOS or macOS you should consider setting an
