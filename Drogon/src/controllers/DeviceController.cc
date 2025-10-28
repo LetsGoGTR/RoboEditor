@@ -180,9 +180,22 @@ void api::v1::Device::apply(const drogon::HttpRequestPtr                        
                             std::function<void(const drogon::HttpResponsePtr &)> &&callback,
                             const std::string                                     &deviceId)
 {
-    // Get workspaceId from request body
     auto json = req->getJsonObject();
-    if (!json || !json->isMember("workspaceId")) {
+    if (!json) {
+        return sendError(callback, drogon::k400BadRequest, "Invalid JSON body");
+    }
+
+    // Validate password
+    if (!json->isMember("password")) {
+        return sendError(callback, drogon::k400BadRequest, "Missing password");
+    }
+    std::string password = (*json)["password"].asString();
+    if (password != "6363") {
+        return sendError(callback, drogon::k401Unauthorized, "Invalid password");
+    }
+
+    // Get workspaceId
+    if (!json->isMember("workspaceId")) {
         return sendError(callback, drogon::k400BadRequest, "Missing workspaceId");
     }
     std::string workspaceId = (*json)["workspaceId"].asString();
