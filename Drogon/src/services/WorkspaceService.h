@@ -1,64 +1,79 @@
 #pragma once
 
 #include <drogon/drogon.h>
-
 #include <string>
 #include <vector>
 
-namespace services {
+namespace services
+{
 
-struct WorkspaceMetadata {
-  std::string id;
-  std::string target;
-  std::string name;
-  std::string description;
-  std::string createdAt;
-  std::string updatedAt;
+    struct WorkspaceMetadata
+    {
+        std::string id;
+        std::string target;
+        std::string name;
+        std::string description;
+        std::string createdAt;
+        std::string updatedAt;
 
-  Json::Value toJson() const;
-  static WorkspaceMetadata fromJson(const Json::Value& json);
-};
+        Json::Value              toJson() const;
+        static WorkspaceMetadata fromJson(const Json::Value &json);
+    };
 
-struct WorkspaceOperationResult {
-  bool success;
-  std::string errorMessage;
-  Json::Value data;
-};
+    struct WorkspaceOperationResult
+    {
+        bool        success;
+        std::string errorMessage;
+        Json::Value data;
+    };
 
-class WorkspaceService {
- public:
-  // Extract archive to UUID-based directory and create metadata
-  static WorkspaceOperationResult importWorkspace(
-      const std::string& archivePath, const std::string& baseDir,
-      const WorkspaceMetadata& metadata);
+    class WorkspaceService
+    {
+      public:
+        // Workspace CRUD operations
+        static WorkspaceOperationResult createWorkspace(const std::string       &baseDir,
+                                                        const WorkspaceMetadata &metadata);
+        static WorkspaceOperationResult readWorkspace(const std::string &baseDir,
+                                                      const std::string &workspaceId);
+        static WorkspaceOperationResult updateWorkspaceMetadata(const std::string &baseDir,
+                                                                const std::string &workspaceId,
+                                                                const WorkspaceMetadata &metadata);
+        static WorkspaceOperationResult deleteWorkspace(const std::string &baseDir,
+                                                        const std::string &workspaceId);
 
-  // Compress workspace directory to archive
-  static WorkspaceOperationResult exportWorkspace(
-      const std::string& workspaceId, const std::string& baseDir,
-      const std::string& outputPath);
+        // Extract archive to UUID-based directory and create metadata
+        static WorkspaceOperationResult importWorkspace(const std::string       &archivePath,
+                                                        const std::string       &baseDir,
+                                                        const WorkspaceMetadata &metadata);
 
-  // List all workspaces in baseDir (reads .workspace.json files)
-  static WorkspaceOperationResult listWorkspaces(const std::string& baseDir);
+        // Compress workspace directory to archive
+        static WorkspaceOperationResult exportWorkspace(const std::string &workspaceId,
+                                                        const std::string &baseDir,
+                                                        const std::string &outputPath);
 
-  // Check if archive format is supported
-  static bool isSupportedArchive(const std::string& filename);
+        // List all workspaces in baseDir (reads .workspace.json files)
+        static WorkspaceOperationResult listWorkspaces(const std::string &baseDir);
 
-  // Save workspace metadata to .workspace.json
-  static bool saveMetadata(const std::string& workspacePath,
-                           const WorkspaceMetadata& metadata);
+        // Check if archive format is supported
+        static bool isSupportedArchive(const std::string &filename);
 
-  // Load workspace metadata from .workspace.json
-  static WorkspaceMetadata loadMetadata(const std::string& workspacePath);
+        // Save workspace metadata to .workspace.json
+        static bool saveMetadata(const std::string       &workspacePath,
+                                 const WorkspaceMetadata &metadata);
 
-  // Generate current timestamp in ISO 8601 format
-  static std::string getCurrentTimestamp();
+        // Load workspace metadata from .workspace.json
+        static WorkspaceMetadata loadMetadata(const std::string &workspacePath);
 
- private:
-  static const std::vector<std::string> supportedFormats_;
-  static const std::string metadataFilename_;
+        // Generate current timestamp in ISO 8601 format
+        static std::string getCurrentTimestamp();
 
-  // Helper functions
-  static WorkspaceOperationResult createError(const std::string& message);
-};
+      private:
+        static const std::vector<std::string> supportedFormats_;
+        static const std::string              metadataFilename_;
+
+        // Helper functions
+        static WorkspaceOperationResult createError(const std::string &message);
+        static Json::Value              getDirectoryTree(const std::string &path);
+    };
 
 }  // namespace services
