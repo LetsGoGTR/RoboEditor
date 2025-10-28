@@ -20,8 +20,20 @@ set(TS_FILES RoboEditor_ko_KR.ts)
 
 set(PROJECT_SOURCES
         src/main.cpp
+        src/app/BackupPage.cpp
+        src/app/CenterStack.cpp
+        src/app/ComparePage.cpp
+        src/app/LogManager.cpp
         src/app/mainwindow.cpp
+        src/app/NavDock.cpp
+        src/app/TopMenu.cpp
+        src/app/BackupPage.h
+        src/app/CenterStack.h
+        src/app/ComparePage.h
+        src/app/LogManager.h
         src/app/mainwindow.h
+        src/app/NavDock.h
+        src/app/TopMenu.h
         src/ui/mainwindow.ui
         ${TS_FILES}
 )

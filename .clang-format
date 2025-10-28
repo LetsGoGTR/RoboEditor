@@ -1,0 +1,99 @@
+# ==========================================================
+# Qt / C++17 기반 코드 스타일
+# ==========================================================
+BasedOnStyle: LLVM
+Language: Cpp
+
+# --- [기본 서식] ------------------------------------------------------
+IndentWidth: 4                  # Qt 권장 들여쓰기
+UseTab: Never                   # 탭 대신 공백 사용
+TabWidth: 4
+ColumnLimit: 100                # 한 줄 최대 길이
+ContinuationIndentWidth: 8      # 줄 길어질 때 추가 들여쓰기 폭
+
+# --- [중괄호 및 공백] -------------------------------------------------
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterClass: true              # 클래스 선언 시 새 줄에서 여는 괄호
+  AfterStruct: true
+  AfterFunction: true           # 함수 정의 시 새 줄에서 여는 괄호
+  AfterNamespace: true
+  AfterControlStatement: false  # if, else 등은 같은 줄
+  BeforeElse: false
+  IndentBraces: false
+
+SpaceBeforeParens: ControlStatements
+SpacesBeforeTrailingComments: 2
+SpaceInEmptyParentheses: false
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+SpacesInAngles: false
+SpacesInCStyleCastParentheses: false
+SpaceAfterCStyleCast: false
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeRangeBasedForLoopColon: true
+SpaceAroundPointerQualifiers: Default
+
+# --- [포인터 및 참조] -------------------------------------------------
+PointerAlignment: Right          # int* ptr;
+ReferenceAlignment: Right
+
+# --- [라인 및 블록 처리] ----------------------------------------------
+KeepEmptyLinesAtTheStartOfBlocks: false
+MaxEmptyLinesToKeep: 1
+AllowShortBlocksOnASingleLine: false
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
+
+# --- [Include 및 헤더 순서] -------------------------------------------
+IncludeBlocks: Regroup
+IncludeCategories:
+  - Regex: '^<Qt.*>'
+    Priority: 1
+  - Regex: '^<Q.*>'
+    Priority: 2
+  - Regex: '^<.*>'
+    Priority: 3
+  - Regex: '.*'
+    Priority: 4
+SortIncludes: true
+IncludeIsMainRegex: '([-_](test|unittest))?$'
+
+# --- [함수 선언 및 인자 정렬] ----------------------------------------
+AlignAfterOpenBracket: Align
+AlignConsecutiveAssignments: true
+AlignConsecutiveDeclarations: true
+AlignConsecutiveMacros: true
+AlignOperands: true
+AlignTrailingComments: true
+BreakConstructorInitializers: AfterColon
+ConstructorInitializerAllOnOneLineOrOnePerLine: true
+AllowAllConstructorInitializersOnNextLine: false
+
+# --- [Switch / Case] --------------------------------------------------
+IndentCaseLabels: false
+AllowShortCaseLabelsOnASingleLine: false
+
+# --- [Namespace / Access Specifier] -----------------------------------
+IndentAccessModifiers: false
+NamespaceIndentation: All        # namespace 내부 들여쓰기 허용
+AccessModifierOffset: -2
+
+# --- [리스트 및 배열 서식] --------------------------------------------
+Cpp11BracedListStyle: true
+BinPackParameters: false
+BinPackArguments: false
+
+# --- [매크로 및 Qt 특수문법] ------------------------------------------
+IndentPPDirectives: AfterHash
+MacroBlockBegin: '^Q_OBJECT'
+MacroBlockEnd: '^Q_SIGNALS|^Q_SLOTS|^Q_PROPERTY'
+
+# --- [기타 옵션] ------------------------------------------------------
+SortUsingDeclarations: true
+ReflowComments: false
+FixNamespaceComments: true
+InsertTrailingCommas: None
+AllowAllArgumentsOnNextLine: true
+DerivePointerAlignment: false
