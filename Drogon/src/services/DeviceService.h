@@ -29,20 +29,14 @@ namespace services
     class DeviceService
     {
       public:
-        // Create device directory with metadata
+        // // Device CRUD operations
         static DeviceOperationResult createDevice(const std::string    &baseDir,
                                                   const DeviceMetadata &metadata);
-
-        // Get device metadata
-        static DeviceOperationResult getDeviceInfo(const std::string &baseDir,
-                                                   const std::string &deviceId);
-
-        // Update device metadata
+        static DeviceOperationResult readDevice(const std::string &baseDir,
+                                                const std::string &deviceId);
         static DeviceOperationResult updateDevice(const std::string    &baseDir,
                                                   const std::string    &deviceId,
                                                   const DeviceMetadata &metadata);
-
-        // Delete device directory
         static DeviceOperationResult deleteDevice(const std::string &baseDir,
                                                   const std::string &deviceId);
 

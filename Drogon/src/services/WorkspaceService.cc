@@ -9,6 +9,8 @@
 #include <iomanip>
 #include <sstream>
 
+#include "FolderService.h"
+
 namespace fs = std::filesystem;
 
 const std::vector<std::string> services::WorkspaceService::supportedFormats_ = {
@@ -328,5 +330,210 @@ services::WorkspaceService::listWorkspaces(const std::string &baseDir)
 
     } catch (const std::exception &e) {
         return createError("List failed: " + std::string(e.what()));
+    }
+}
+
+// Get recursive directory tree structure
+Json::Value services::WorkspaceService::getDirectoryTree(const std::string &path)
+{
+    Json::Value tree;
+
+    try {
+        if (!fs::exists(path) || !fs::is_directory(path)) {
+            return tree;
+        }
+
+        tree["name"] = fs::path(path).filename().string();
+        tree["path"] = path;
+        tree["type"] = "directory";
+
+        Json::Value children(Json::arrayValue);
+
+        for (const auto &entry : fs::directory_iterator(path)) {
+            // Skip metadata file
+            if (entry.path().filename() == metadataFilename_) {
+                continue;
+            }
+
+            Json::Value child;
+            child["name"] = entry.path().filename().string();
+            child["path"] = entry.path().string();
+
+            if (entry.is_regular_file()) {
+                child["type"] = "file";
+                child["size"] = (Json::Int64)entry.file_size();
+            } else if (entry.is_directory()) {
+                child["type"] = "directory";
+                // Recursive call for subdirectories
+                Json::Value subtree = getDirectoryTree(entry.path().string());
+                if (subtree.isMember("children")) {
+                    child["children"] = subtree["children"];
+                }
+            }
+
+            children.append(child);
+        }
+
+        tree["children"] = children;
+
+    } catch (const std::exception &e) {
+        LOG_ERROR << "Failed to build directory tree: " << e.what();
+    }
+
+    return tree;
+}
+
+// Create empty workspace with metadata
+services::WorkspaceOperationResult
+services::WorkspaceService::createWorkspace(const std::string       &baseDir,
+                                            const WorkspaceMetadata &metadata)
+{
+    // Validation
+    if (metadata.id.empty()) {
+        return createError("Workspace ID cannot be empty");
+    }
+
+    std::string workspacePath = baseDir + metadata.id;
+
+    // Check if workspace already exists
+    if (fs::exists(workspacePath)) {
+        return createError("Workspace already exists: " + metadata.id);
+    }
+
+    try {
+        // Create workspace directory using FolderService
+        auto folderResult = services::FolderService::createFolder(workspacePath);
+        if (!folderResult.success) {
+            return createError("Failed to create workspace directory: " +
+                               folderResult.errorMessage);
+        }
+
+        // Prepare metadata with timestamps
+        WorkspaceMetadata newMetadata = metadata;
+        std::string       timestamp   = getCurrentTimestamp();
+        newMetadata.createdAt         = timestamp;
+        newMetadata.updatedAt         = timestamp;
+
+        // Save metadata
+        if (!saveMetadata(workspacePath, newMetadata)) {
+            fs::remove_all(workspacePath);
+            return createError("Failed to save metadata");
+        }
+
+        WorkspaceOperationResult result;
+        result.success = true;
+        result.data    = newMetadata.toJson();
+
+        LOG_INFO << "Created workspace: " << metadata.name << " (ID: " << metadata.id << ")";
+        return result;
+
+    } catch (const std::exception &e) {
+        if (fs::exists(workspacePath))
+            fs::remove_all(workspacePath);
+        return createError("Create failed: " + std::string(e.what()));
+    }
+}
+
+// Get workspace metadata and tree structure
+services::WorkspaceOperationResult
+services::WorkspaceService::readWorkspace(const std::string &baseDir,
+                                          const std::string &workspaceId)
+{
+    std::string workspacePath = baseDir + workspaceId;
+
+    // Validation
+    if (!fs::exists(workspacePath) || !fs::is_directory(workspacePath)) {
+        return createError("Workspace not found: " + workspaceId);
+    }
+
+    WorkspaceMetadata metadata = loadMetadata(workspacePath);
+    if (metadata.id.empty()) {
+        return createError("Invalid workspace metadata: " + workspaceId);
+    }
+
+    WorkspaceOperationResult result;
+    result.success          = true;
+    result.data["metadata"] = metadata.toJson();
+    result.data["tree"]     = getDirectoryTree(workspacePath);
+
+    LOG_INFO << "Retrieved workspace: " << workspaceId;
+    return result;
+}
+
+// Update workspace metadata
+services::WorkspaceOperationResult
+services::WorkspaceService::updateWorkspaceMetadata(const std::string       &baseDir,
+                                                    const std::string       &workspaceId,
+                                                    const WorkspaceMetadata &metadata)
+{
+    std::string workspacePath = baseDir + workspaceId;
+
+    // Validation
+    if (!fs::exists(workspacePath) || !fs::is_directory(workspacePath)) {
+        return createError("Workspace not found: " + workspaceId);
+    }
+
+    // Load existing metadata to preserve createdAt and id
+    WorkspaceMetadata existingMetadata = loadMetadata(workspacePath);
+    if (existingMetadata.id.empty()) {
+        return createError("Invalid workspace metadata: " + workspaceId);
+    }
+
+    try {
+        // Prepare updated metadata
+        WorkspaceMetadata updatedMetadata = metadata;
+        updatedMetadata.id                = workspaceId;  // Ensure ID doesn't change
+        updatedMetadata.createdAt         = existingMetadata.createdAt;
+        updatedMetadata.updatedAt         = getCurrentTimestamp();
+
+        // Save metadata
+        if (!saveMetadata(workspacePath, updatedMetadata)) {
+            return createError("Failed to save metadata");
+        }
+
+        WorkspaceOperationResult result;
+        result.success = true;
+        result.data    = updatedMetadata.toJson();
+
+        LOG_INFO << "Updated workspace: " << workspaceId;
+        return result;
+
+    } catch (const std::exception &e) {
+        return createError("Update failed: " + std::string(e.what()));
+    }
+}
+
+// Delete workspace directory
+services::WorkspaceOperationResult
+services::WorkspaceService::deleteWorkspace(const std::string &baseDir,
+                                            const std::string &workspaceId)
+{
+    std::string workspacePath = baseDir + workspaceId;
+
+    // Validation
+    if (!fs::exists(workspacePath) || !fs::is_directory(workspacePath)) {
+        return createError("Workspace not found: " + workspaceId);
+    }
+
+    try {
+        // Load metadata before deletion for response
+        WorkspaceMetadata metadata = loadMetadata(workspacePath);
+
+        // Delete workspace directory using FolderService
+        auto folderResult = services::FolderService::deleteFolder(workspacePath);
+        if (!folderResult.success) {
+            return createError("Failed to delete workspace directory: " +
+                               folderResult.errorMessage);
+        }
+
+        WorkspaceOperationResult result;
+        result.success = true;
+        result.data    = metadata.toJson();
+
+        LOG_INFO << "Deleted workspace: " << workspaceId;
+        return result;
+
+    } catch (const std::exception &e) {
+        return createError("Delete failed: " + std::string(e.what()));
     }
 }

@@ -179,8 +179,8 @@ services::DeviceService::createDevice(const std::string &baseDir, const DeviceMe
     }
 }
 
-services::DeviceOperationResult services::DeviceService::getDeviceInfo(const std::string &baseDir,
-                                                                       const std::string &deviceId)
+services::DeviceOperationResult services::DeviceService::readDevice(const std::string &baseDir,
+                                                                    const std::string &deviceId)
 {
     std::string devicePath = baseDir + deviceId;
 

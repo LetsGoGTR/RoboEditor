@@ -78,7 +78,7 @@ void api::v1::Device::info(const drogon::HttpRequestPtr                         
                            const std::string                                     &target)
 {
     try {
-        auto result = services::DeviceService::getDeviceInfo(baseDir, target);
+        auto result = services::DeviceService::readDevice(baseDir, target);
 
         if (!result.success)
             return sendError(
@@ -110,7 +110,7 @@ void api::v1::Device::update(const drogon::HttpRequestPtr                       
 
     try {
         // Load existing metadata first
-        auto existingResult = services::DeviceService::getDeviceInfo(baseDir, target);
+        auto existingResult = services::DeviceService::readDevice(baseDir, target);
         if (!existingResult.success) {
             return sendError(callback, drogon::k404NotFound, "Device not found", target);
         }
@@ -199,7 +199,7 @@ void api::v1::Device::backup(const drogon::HttpRequestPtr                       
                              const std::string                                     &target)
 {
     // Check if device exists
-    auto deviceResult = services::DeviceService::getDeviceInfo(baseDir, target);
+    auto deviceResult = services::DeviceService::readDevice(baseDir, target);
     if (!deviceResult.success) {
         return sendError(callback, drogon::k404NotFound, "Device not found", target);
     }

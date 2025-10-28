@@ -30,6 +30,17 @@ namespace services
     class WorkspaceService
     {
       public:
+        // Workspace CRUD operations
+        static WorkspaceOperationResult createWorkspace(const std::string       &baseDir,
+                                                        const WorkspaceMetadata &metadata);
+        static WorkspaceOperationResult readWorkspace(const std::string &baseDir,
+                                                      const std::string &workspaceId);
+        static WorkspaceOperationResult updateWorkspaceMetadata(const std::string &baseDir,
+                                                                const std::string &workspaceId,
+                                                                const WorkspaceMetadata &metadata);
+        static WorkspaceOperationResult deleteWorkspace(const std::string &baseDir,
+                                                        const std::string &workspaceId);
+
         // Extract archive to UUID-based directory and create metadata
         static WorkspaceOperationResult importWorkspace(const std::string       &archivePath,
                                                         const std::string       &baseDir,
@@ -62,6 +73,7 @@ namespace services
 
         // Helper functions
         static WorkspaceOperationResult createError(const std::string &message);
+        static Json::Value              getDirectoryTree(const std::string &path);
     };
 
 }  // namespace services
