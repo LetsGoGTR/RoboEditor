@@ -75,10 +75,10 @@ void api::v1::Device::create(const drogon::HttpRequestPtr                       
 
 void api::v1::Device::info(const drogon::HttpRequestPtr                          &req,
                            std::function<void(const drogon::HttpResponsePtr &)> &&callback,
-                           const std::string                                     &target)
+                           const std::string                                     &deviceId)
 {
     try {
-        auto result = services::DeviceService::readDevice(baseDir, target);
+        auto result = services::DeviceService::readDevice(baseDir, deviceId);
 
         if (!result.success)
             return sendError(
@@ -92,7 +92,7 @@ void api::v1::Device::info(const drogon::HttpRequestPtr                         
         resp->setStatusCode(drogon::k200OK);
         callback(resp);
 
-        LOG_INFO << "Retrieved device info: " << target;
+        LOG_INFO << "Retrieved device info: " << deviceId;
 
     } catch (const std::exception &e) {
         LOG_ERROR << "Info exception: " << e.what();
@@ -102,7 +102,7 @@ void api::v1::Device::info(const drogon::HttpRequestPtr                         
 
 void api::v1::Device::update(const drogon::HttpRequestPtr                          &req,
                              std::function<void(const drogon::HttpResponsePtr &)> &&callback,
-                             const std::string                                     &target)
+                             const std::string                                     &deviceId)
 {
     auto json = req->getJsonObject();
     if (!json)
@@ -110,9 +110,9 @@ void api::v1::Device::update(const drogon::HttpRequestPtr                       
 
     try {
         // Load existing metadata first
-        auto existingResult = services::DeviceService::readDevice(baseDir, target);
+        auto existingResult = services::DeviceService::readDevice(baseDir, deviceId);
         if (!existingResult.success) {
-            return sendError(callback, drogon::k404NotFound, "Device not found", target);
+            return sendError(callback, drogon::k404NotFound, "Device not found", deviceId);
         }
 
         // Prepare updated metadata, keeping existing values if not provided
@@ -125,7 +125,7 @@ void api::v1::Device::update(const drogon::HttpRequestPtr                       
         metadata.ip          = json->isMember("ip") ? (*json)["ip"].asString()
                                                     : existingResult.data["ip"].asString();
 
-        auto result = services::DeviceService::updateDevice(baseDir, target, metadata);
+        auto result = services::DeviceService::updateDevice(baseDir, deviceId, metadata);
 
         if (!result.success)
             return sendError(
@@ -140,7 +140,7 @@ void api::v1::Device::update(const drogon::HttpRequestPtr                       
         resp->setStatusCode(drogon::k200OK);
         callback(resp);
 
-        LOG_INFO << "Updated device: " << target;
+        LOG_INFO << "Updated device: " << deviceId;
 
     } catch (const std::exception &e) {
         LOG_ERROR << "Update exception: " << e.what();
@@ -150,10 +150,10 @@ void api::v1::Device::update(const drogon::HttpRequestPtr                       
 
 void api::v1::Device::remove(const drogon::HttpRequestPtr                          &req,
                              std::function<void(const drogon::HttpResponsePtr &)> &&callback,
-                             const std::string                                     &target)
+                             const std::string                                     &deviceId)
 {
     try {
-        auto result = services::DeviceService::deleteDevice(baseDir, target);
+        auto result = services::DeviceService::deleteDevice(baseDir, deviceId);
 
         if (!result.success)
             return sendError(
@@ -168,7 +168,7 @@ void api::v1::Device::remove(const drogon::HttpRequestPtr                       
         resp->setStatusCode(drogon::k200OK);
         callback(resp);
 
-        LOG_INFO << "Deleted device: " << target;
+        LOG_INFO << "Deleted device: " << deviceId;
 
     } catch (const std::exception &e) {
         LOG_ERROR << "Delete exception: " << e.what();
@@ -176,32 +176,173 @@ void api::v1::Device::remove(const drogon::HttpRequestPtr                       
     }
 }
 
-void api::v1::Device::upload(const drogon::HttpRequestPtr                          &req,
-                             std::function<void(const drogon::HttpResponsePtr &)> &&callback,
-                             const std::string                                     &target)
+void api::v1::Device::apply(const drogon::HttpRequestPtr                          &req,
+                            std::function<void(const drogon::HttpResponsePtr &)> &&callback,
+                            const std::string                                     &deviceId)
 {
-}
+    // Get workspaceId from request body
+    auto json = req->getJsonObject();
+    if (!json || !json->isMember("workspaceId")) {
+        return sendError(callback, drogon::k400BadRequest, "Missing workspaceId");
+    }
+    std::string workspaceId = (*json)["workspaceId"].asString();
 
-void api::v1::Device::download(const drogon::HttpRequestPtr                          &req,
-                               std::function<void(const drogon::HttpResponsePtr &)> &&callback,
-                               const std::string                                     &target)
-{
-}
+    // Check if device exists
+    auto deviceResult = services::DeviceService::readDevice(baseDir, deviceId);
+    if (!deviceResult.success) {
+        return sendError(callback, drogon::k404NotFound, "Device not found", deviceId);
+    }
 
-void api::v1::Device::restore(const drogon::HttpRequestPtr                          &req,
-                              std::function<void(const drogon::HttpResponsePtr &)> &&callback,
-                              const std::string                                     &target)
-{
+    // Get IP from device metadata
+    std::string ip = deviceResult.data["ip"].asString();
+    if (ip.empty()) {
+        ip = "localhost:80";
+    }
+
+    // Wrap callback in shared_ptr for lambda capture
+    auto callbackPtr = std::make_shared<std::function<void(const drogon::HttpResponsePtr &)>>(
+            std::move(callback));
+
+    // Check if robot is running
+    auto runningClient = drogon::HttpClient::newHttpClient("http://" + ip);
+    auto runningReq    = drogon::HttpRequest::newHttpRequest();
+    runningReq->setPath("/api/v1/robot/running");
+    runningReq->setMethod(drogon::Get);
+
+    runningClient->sendRequest(
+            runningReq,
+            [callbackPtr, ip, deviceId, workspaceId, this](
+                    drogon::ReqResult result, const drogon::HttpResponsePtr &response) {
+                if (result != drogon::ReqResult::Ok) {
+                    return sendError(*callbackPtr,
+                                     drogon::k500InternalServerError,
+                                     "Failed to connect to robot",
+                                     ip);
+                }
+
+                auto json = response->getJsonObject();
+                if (!json || !json->isMember("data")) {
+                    return sendError(*callbackPtr,
+                                     drogon::k500InternalServerError,
+                                     "Invalid response from robot");
+                }
+
+                bool isRunning = (*json)["data"].asBool();
+                if (isRunning) {
+                    return sendError(*callbackPtr,
+                                     drogon::k409Conflict,
+                                     "Robot is running",
+                                     "Cannot apply while robot is running");
+                }
+
+                try {
+                    // Export workspace to temp file
+                    std::string tempDir = "/tmp/drogon-apply/";
+                    if (!fs::exists(tempDir))
+                        fs::create_directories(tempDir);
+
+                    std::string tempFile      = tempDir + drogon::utils::getUuid() + ".tar.gz";
+                    std::string deviceBaseDir = baseDir + deviceId + "/";
+
+                    // Export workspace
+                    auto exportResult = services::WorkspaceService::exportWorkspace(
+                            workspaceId, deviceBaseDir, tempFile);
+
+                    if (!exportResult.success) {
+                        fs::remove(tempFile);
+                        return sendError(*callbackPtr,
+                                         drogon::k404NotFound,
+                                         "Failed to export workspace",
+                                         exportResult.errorMessage);
+                    }
+
+                    // Read file content
+                    std::ifstream file(tempFile, std::ios::binary);
+                    if (!file.is_open()) {
+                        fs::remove(tempFile);
+                        return sendError(*callbackPtr,
+                                         drogon::k500InternalServerError,
+                                         "Failed to read exported file");
+                    }
+
+                    std::ostringstream fileBuffer;
+                    fileBuffer << file.rdbuf();
+                    std::string fileContent = fileBuffer.str();
+                    file.close();
+
+                    // Build multipart/form-data body
+                    std::string boundary = "----WebKitFormBoundary" + drogon::utils::getUuid();
+                    std::ostringstream multipartBody;
+
+                    multipartBody << "--" << boundary << "\r\n";
+                    multipartBody << "Content-Disposition: form-data; name=\"file\"; "
+                                  << "filename=\"workspace.tar.gz\"\r\n";
+                    multipartBody << "Content-Type: application/gzip\r\n\r\n";
+                    multipartBody << fileContent;
+                    multipartBody << "\r\n--" << boundary << "--\r\n";
+
+                    // Upload to robot
+                    auto uploadClient = drogon::HttpClient::newHttpClient("http://" + ip);
+                    auto uploadReq    = drogon::HttpRequest::newHttpRequest();
+                    uploadReq->setPath("/api/v1/robot/import");
+                    uploadReq->setMethod(drogon::Post);
+                    uploadReq->setContentTypeString("multipart/form-data; boundary=" + boundary);
+                    uploadReq->setBody(multipartBody.str());
+
+                    uploadClient->sendRequest(
+                            uploadReq,
+                            [callbackPtr, tempFile, deviceId, workspaceId](
+                                    drogon::ReqResult              result,
+                                    const drogon::HttpResponsePtr &response) {
+                                // Clean up temp file
+                                fs::remove(tempFile);
+
+                                if (result != drogon::ReqResult::Ok) {
+                                    return sendError(*callbackPtr,
+                                                     drogon::k500InternalServerError,
+                                                     "Failed to upload to robot");
+                                }
+
+                                if (response->getStatusCode() != drogon::k200OK &&
+                                    response->getStatusCode() != drogon::k201Created) {
+                                    return sendError(*callbackPtr,
+                                                     drogon::k500InternalServerError,
+                                                     "Robot import failed",
+                                                     std::string(response->getBody()));
+                                }
+
+                                Json::Value responseJson;
+                                responseJson["success"]        = true;
+                                responseJson["message"]        = "Apply completed successfully";
+                                responseJson["data"]["target"] = deviceId;
+                                responseJson["data"]["workspaceId"] = workspaceId;
+
+                                auto resp = drogon::HttpResponse::newHttpJsonResponse(responseJson);
+                                resp->setStatusCode(drogon::k200OK);
+                                (*callbackPtr)(resp);
+
+                                LOG_INFO << "Apply completed: " << deviceId
+                                         << " (Workspace: " << workspaceId << ")";
+                            });
+
+                } catch (const std::exception &e) {
+                    LOG_ERROR << "Apply exception: " << e.what();
+                    sendError(*callbackPtr,
+                              drogon::k500InternalServerError,
+                              "Internal server error",
+                              e.what());
+                }
+            });
 }
 
 void api::v1::Device::backup(const drogon::HttpRequestPtr                          &req,
                              std::function<void(const drogon::HttpResponsePtr &)> &&callback,
-                             const std::string                                     &target)
+                             const std::string                                     &deviceId)
 {
     // Check if device exists
-    auto deviceResult = services::DeviceService::readDevice(baseDir, target);
+    auto deviceResult = services::DeviceService::readDevice(baseDir, deviceId);
     if (!deviceResult.success) {
-        return sendError(callback, drogon::k404NotFound, "Device not found", target);
+        return sendError(callback, drogon::k404NotFound, "Device not found", deviceId);
     }
 
     // Get IP from device metadata (default: localhost:80)
@@ -222,8 +363,8 @@ void api::v1::Device::backup(const drogon::HttpRequestPtr                       
 
     runningClient->sendRequest(
             runningReq,
-            [callbackPtr, ip, target, this](drogon::ReqResult              result,
-                                            const drogon::HttpResponsePtr &response) {
+            [callbackPtr, ip, deviceId, this](drogon::ReqResult              result,
+                                              const drogon::HttpResponsePtr &response) {
                 if (result != drogon::ReqResult::Ok) {
                     return sendError(*callbackPtr,
                                      drogon::k500InternalServerError,
@@ -254,8 +395,8 @@ void api::v1::Device::backup(const drogon::HttpRequestPtr                       
 
                 exportClient->sendRequest(
                         exportReq,
-                        [callbackPtr, target, this](drogon::ReqResult              result,
-                                                    const drogon::HttpResponsePtr &response) {
+                        [callbackPtr, deviceId, this](drogon::ReqResult              result,
+                                                      const drogon::HttpResponsePtr &response) {
                             if (result != drogon::ReqResult::Ok) {
                                 return sendError(*callbackPtr,
                                                  drogon::k500InternalServerError,
@@ -282,19 +423,19 @@ void api::v1::Device::backup(const drogon::HttpRequestPtr                       
                                         timestamp.substr(0, 19);  // YYYY-MM-DDTHH:MM:SS
                                 std::replace(timestampStr.begin(), timestampStr.end(), 'T', '_');
                                 std::replace(timestampStr.begin(), timestampStr.end(), ':', '-');
-                                std::string workspaceName = target + "_" + timestampStr;
+                                std::string workspaceName = deviceId + "_" + timestampStr;
 
                                 // Create workspace metadata
                                 services::WorkspaceMetadata metadata;
                                 metadata.id          = workspaceId;
-                                metadata.target      = target;
+                                metadata.target      = deviceId;
                                 metadata.name        = workspaceName;
-                                metadata.description = "backup from " + target;
+                                metadata.description = "backup from " + deviceId;
                                 metadata.createdAt   = timestamp;
                                 metadata.updatedAt   = timestamp;
 
                                 // Import workspace into device folder
-                                std::string deviceBaseDir = baseDir + target + "/";
+                                std::string deviceBaseDir = baseDir + deviceId + "/";
                                 auto importResult = services::WorkspaceService::importWorkspace(
                                         tempFile, deviceBaseDir, metadata);
 
@@ -316,7 +457,7 @@ void api::v1::Device::backup(const drogon::HttpRequestPtr                       
                                 resp->setStatusCode(drogon::k200OK);
                                 (*callbackPtr)(resp);
 
-                                LOG_INFO << "Backup completed: " << target
+                                LOG_INFO << "Backup completed: " << deviceId
                                          << " (Workspace: " << workspaceId << ")";
 
                             } catch (const std::exception &e) {

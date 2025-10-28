@@ -12,9 +12,9 @@ namespace api
             METHOD_LIST_BEGIN
             // use METHOD_ADD to add your custom processing function here;
             METHOD_ADD(Workspace::create, "", drogon::Post);
-            METHOD_ADD(Workspace::info, "/{id}", drogon::Get);
-            METHOD_ADD(Workspace::update, "/{id}", drogon::Put);
-            METHOD_ADD(Workspace::remove, "/{id}", drogon::Delete);
+            METHOD_ADD(Workspace::info, "/{workspaceId}", drogon::Get);
+            METHOD_ADD(Workspace::update, "/{workspaceId}", drogon::Put);
+            METHOD_ADD(Workspace::remove, "/{workspaceId}", drogon::Delete);
             METHOD_ADD(Workspace::workspaceImport, "/import", drogon::Post);
             METHOD_ADD(Workspace::workspaceExport, "/export", drogon::Post);
             METHOD_ADD(Workspace::workspaceList, "/list", drogon::Post);
@@ -24,13 +24,13 @@ namespace api
                         std::function<void(const drogon::HttpResponsePtr &)> &&callback);
             void info(const drogon::HttpRequestPtr                          &req,
                       std::function<void(const drogon::HttpResponsePtr &)> &&callback,
-                      const std::string                                     &id);
+                      const std::string                                     &workspaceId);
             void update(const drogon::HttpRequestPtr                          &req,
                         std::function<void(const drogon::HttpResponsePtr &)> &&callback,
-                        const std::string                                     &id);
+                        const std::string                                     &workspaceId);
             void remove(const drogon::HttpRequestPtr                          &req,
                         std::function<void(const drogon::HttpResponsePtr &)> &&callback,
-                        const std::string                                     &id);
+                        const std::string                                     &workspaceId);
             void workspaceImport(const drogon::HttpRequestPtr                          &req,
                                  std::function<void(const drogon::HttpResponsePtr &)> &&callback);
             void workspaceExport(const drogon::HttpRequestPtr                          &req,

@@ -211,10 +211,10 @@ void api::v1::Workspace::create(const drogon::HttpRequestPtr                    
 
 void api::v1::Workspace::info(const drogon::HttpRequestPtr                          &req,
                               std::function<void(const drogon::HttpResponsePtr &)> &&callback,
-                              const std::string                                     &id)
+                              const std::string                                     &workspaceId)
 {
     try {
-        auto result = services::WorkspaceService::readWorkspace(baseDir, id);
+        auto result = services::WorkspaceService::readWorkspace(baseDir, workspaceId);
 
         if (!result.success)
             return sendError(
@@ -228,7 +228,7 @@ void api::v1::Workspace::info(const drogon::HttpRequestPtr                      
         resp->setStatusCode(drogon::k200OK);
         callback(resp);
 
-        LOG_INFO << "Retrieved workspace: " << id;
+        LOG_INFO << "Retrieved workspace: " << workspaceId;
 
     } catch (const std::exception &e) {
         LOG_ERROR << "Get exception: " << e.what();
@@ -238,7 +238,7 @@ void api::v1::Workspace::info(const drogon::HttpRequestPtr                      
 
 void api::v1::Workspace::update(const drogon::HttpRequestPtr                          &req,
                                 std::function<void(const drogon::HttpResponsePtr &)> &&callback,
-                                const std::string                                     &id)
+                                const std::string                                     &workspaceId)
 {
     auto json = req->getJsonObject();
     if (!json)
@@ -246,9 +246,9 @@ void api::v1::Workspace::update(const drogon::HttpRequestPtr                    
 
     try {
         // Load existing metadata first
-        auto existingResult = services::WorkspaceService::readWorkspace(baseDir, id);
+        auto existingResult = services::WorkspaceService::readWorkspace(baseDir, workspaceId);
         if (!existingResult.success) {
-            return sendError(callback, drogon::k404NotFound, "Workspace not found", id);
+            return sendError(callback, drogon::k404NotFound, "Workspace not found", workspaceId);
         }
 
         // Prepare updated metadata, keeping existing values if not provided
@@ -262,7 +262,8 @@ void api::v1::Workspace::update(const drogon::HttpRequestPtr                    
                                        ? (*json)["description"].asString()
                                        : existingResult.data["metadata"]["description"].asString();
 
-        auto result = services::WorkspaceService::updateWorkspaceMetadata(baseDir, id, metadata);
+        auto result =
+                services::WorkspaceService::updateWorkspaceMetadata(baseDir, workspaceId, metadata);
 
         if (!result.success)
             return sendError(
@@ -277,7 +278,7 @@ void api::v1::Workspace::update(const drogon::HttpRequestPtr                    
         resp->setStatusCode(drogon::k200OK);
         callback(resp);
 
-        LOG_INFO << "Updated workspace: " << id;
+        LOG_INFO << "Updated workspace: " << workspaceId;
 
     } catch (const std::exception &e) {
         LOG_ERROR << "Update exception: " << e.what();
@@ -287,10 +288,10 @@ void api::v1::Workspace::update(const drogon::HttpRequestPtr                    
 
 void api::v1::Workspace::remove(const drogon::HttpRequestPtr                          &req,
                                 std::function<void(const drogon::HttpResponsePtr &)> &&callback,
-                                const std::string                                     &id)
+                                const std::string                                     &workspaceId)
 {
     try {
-        auto result = services::WorkspaceService::deleteWorkspace(baseDir, id);
+        auto result = services::WorkspaceService::deleteWorkspace(baseDir, workspaceId);
 
         if (!result.success)
             return sendError(
@@ -305,7 +306,7 @@ void api::v1::Workspace::remove(const drogon::HttpRequestPtr                    
         resp->setStatusCode(drogon::k200OK);
         callback(resp);
 
-        LOG_INFO << "Deleted workspace: " << id;
+        LOG_INFO << "Deleted workspace: " << workspaceId;
 
     } catch (const std::exception &e) {
         LOG_ERROR << "Delete exception: " << e.what();
