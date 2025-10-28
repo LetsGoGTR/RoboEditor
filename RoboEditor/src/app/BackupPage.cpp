@@ -35,7 +35,7 @@ void BackupPage::setupUi()
     backupList->setHorizontalHeaderLabels({"index", "date", "size", "comment", ""});
     backupList->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
     backupList->horizontalHeader()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
-    backupList->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
+    backupList->horizontalHeader()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
     backupList->horizontalHeader()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
     backupList->horizontalHeader()->setSectionResizeMode(3, QHeaderView::Stretch);
     backupList->horizontalHeader()->setSectionResizeMode(4, QHeaderView::ResizeToContents);
@@ -97,7 +97,7 @@ void BackupPage::setupUi()
 
     mainLayout = new QVBoxLayout(this);
     mainLayout->addLayout(contentLayout);
-    mainLayout->setContentsMargins(10, 10, 10, 10);
+    // mainLayout->setContentsMargins(10, 10, 10, 10);
 
     setLayout(mainLayout);
 
