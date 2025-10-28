@@ -101,8 +101,8 @@ Json::Value diff_utils::TextDiffEntry::toJson() const
     return result;
 }
 
-std::vector<diff_utils::TextDiffEntry> diff_utils::DiffText::compareFiles(const std::string &contentA,
-                                                                           const std::string &contentB)
+std::vector<diff_utils::TextDiffEntry>
+diff_utils::DiffText::compareFiles(const std::string &contentA, const std::string &contentB)
 {
     auto linesA = splitLines(contentA);
     auto linesB = splitLines(contentB);
@@ -140,9 +140,10 @@ std::vector<diff_utils::TextDiffEntry> diff_utils::DiffText::compareFiles(const 
     return diffs;
 }
 
-Json::Value diff_utils::DiffText::generateResult(const std::vector<diff_utils::TextDiffEntry> &diffs,
-                                                 const std::string                            &nameA,
-                                                 const std::string                            &nameB)
+Json::Value
+diff_utils::DiffText::generateResult(const std::vector<diff_utils::TextDiffEntry> &diffs,
+                                     const std::string                            &nameA,
+                                     const std::string                            &nameB)
 {
     Json::Value result(Json::objectValue);
 

@@ -22,10 +22,10 @@ namespace diff_utils
     {
       public:
         static std::vector<PythonDiffEntry> compareFiles(const std::string &contentA,
-                                                          const std::string &contentB);
-        static Json::Value                  generateResult(const std::vector<PythonDiffEntry> &diffs,
-                                                            const std::string                  &nameA,
-                                                            const std::string                  &nameB);
+                                                         const std::string &contentB);
+        static Json::Value generateResult(const std::vector<PythonDiffEntry> &diffs,
+                                          const std::string                  &nameA,
+                                          const std::string                  &nameB);
     };
 
 }  // namespace diff_utils
