@@ -243,3 +243,52 @@ services::FileOperationResult services::FileService::deleteFile(const std::strin
 
     return result;
 }
+
+services::FileOperationResult services::FileService::moveFile(const std::string &oldPath,
+                                                              const std::string &newPath)
+{
+    services::FileOperationResult result;
+    result.success = false;
+
+    if (!validateFilePath(oldPath) || !validateFilePath(newPath)) {
+        result.errorMessage = "Invalid file path";
+        LOG_WARN << "Invalid file path - old: " << oldPath << ", new: " << newPath;
+        return result;
+    }
+
+    if (!fileExists(oldPath)) {
+        result.errorMessage = "Source file does not exist";
+        LOG_WARN << "Source file does not exist: " << oldPath;
+        return result;
+    }
+
+    if (fileExists(newPath)) {
+        result.errorMessage = "Destination file already exists";
+        LOG_WARN << "Destination file already exists: " << newPath;
+        return result;
+    }
+
+    try {
+        // Create parent directories if they don't exist
+        fs::path path(newPath);
+        if (path.has_parent_path()) {
+            fs::create_directories(path.parent_path());
+        }
+
+        // Move/rename the file
+        fs::rename(oldPath, newPath);
+
+        result.data["oldPath"] = oldPath;
+        result.data["newPath"] = newPath;
+        result.data["info"]    = getFileInfo(newPath);
+        result.success         = true;
+
+        LOG_INFO << "Successfully moved file from: " << oldPath << " to: " << newPath;
+
+    } catch (const std::exception &e) {
+        result.errorMessage = "Failed to move file: " + std::string(e.what());
+        LOG_ERROR << result.errorMessage;
+    }
+
+    return result;
+}

@@ -105,41 +105,78 @@ void api::v1::File::fileUpdate(const drogon::HttpRequestPtr                     
         return;
     }
 
-    // Get content from request body
     auto json = req->getJsonObject();
-    if (!json || !json->isMember("content")) {
+    if (!json) {
         Json::Value error;
-        error["error"] = "Missing 'content' field in request body";
+        error["error"] = "Invalid JSON body";
         auto resp      = drogon::HttpResponse::newHttpJsonResponse(error);
         resp->setStatusCode(drogon::k400BadRequest);
         callback(resp);
         return;
     }
 
-    std::string content = (*json)["content"].asString();
+    bool hasContent = json->isMember("content");
+    bool hasNewPath = json->isMember("newPath");
 
-    auto result = services::FileService::updateFile(path, content);
-
-    if (!result.success) {
+    if (!hasContent && !hasNewPath) {
         Json::Value error;
-        error["error"]   = "Failed to update file";
-        error["message"] = result.errorMessage;
-        auto resp        = drogon::HttpResponse::newHttpJsonResponse(error);
-        resp->setStatusCode(drogon::k404NotFound);
+        error["error"] = "Either 'content' or 'newPath' must be provided";
+        auto resp      = drogon::HttpResponse::newHttpJsonResponse(error);
+        resp->setStatusCode(drogon::k400BadRequest);
         callback(resp);
         return;
     }
 
+    std::string currentPath = path;
+
+    // Move file if newPath is provided
+    if (hasNewPath) {
+        std::string newPath = baseDir + (*json)["newPath"].asString();
+        auto        result  = services::FileService::moveFile(currentPath, newPath);
+
+        if (!result.success) {
+            Json::Value error;
+            error["error"]   = "Failed to move file";
+            error["message"] = result.errorMessage;
+            auto resp        = drogon::HttpResponse::newHttpJsonResponse(error);
+            resp->setStatusCode(drogon::k404NotFound);
+            callback(resp);
+            return;
+        }
+
+        currentPath = newPath;  // Update path for content update
+    }
+
+    // Update content if provided
+    if (hasContent) {
+        std::string content = (*json)["content"].asString();
+        auto        result  = services::FileService::updateFile(currentPath, content);
+
+        if (!result.success) {
+            Json::Value error;
+            error["error"]   = "Failed to update file content";
+            error["message"] = result.errorMessage;
+            auto resp        = drogon::HttpResponse::newHttpJsonResponse(error);
+            resp->setStatusCode(drogon::k500InternalServerError);
+            callback(resp);
+            return;
+        }
+    }
+
+    // Success response
     Json::Value response;
     response["success"] = true;
     response["message"] = "File updated successfully";
-    response["data"]    = result.data;
+
+    auto result              = services::FileService::getFileInfo(currentPath);
+    response["data"]["path"] = currentPath;
+    response["data"]["info"] = result;
 
     auto resp = drogon::HttpResponse::newHttpJsonResponse(response);
     resp->setStatusCode(drogon::k200OK);
     callback(resp);
 
-    LOG_INFO << "File updated: " << path;
+    LOG_INFO << "File updated: " << path << (hasNewPath ? " -> " + currentPath : "");
 }
 
 void api::v1::File::fileDelete(const drogon::HttpRequestPtr                          &req,

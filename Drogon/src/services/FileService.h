@@ -23,6 +23,8 @@ namespace services
         static FileOperationResult updateFile(const std::string &filePath,
                                               const std::string &content);
         static FileOperationResult deleteFile(const std::string &filePath);
+        static FileOperationResult moveFile(const std::string &oldPath,
+                                            const std::string &newPath);
 
         // File utility operations
         static bool        fileExists(const std::string &filePath);
