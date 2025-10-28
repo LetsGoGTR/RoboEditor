@@ -2,22 +2,25 @@
 #define NAVDOCK_H
 #pragma once
 #include <QObject>
-class QMainWindow; class QDockWidget;
+
+class QMainWindow;
+class QDockWidget;
+
 class NavDock : public QObject {
     Q_OBJECT
-public:
+  public:
     explicit NavDock(QMainWindow* mw);
-    QDockWidget* dock() const { return dock_; }
 
-signals:
+  signals:
     void clickCompare();
     void clickBackup();
     void clickApply();
     void clickModify();
 
-private:
-    QMainWindow* mw_; QDockWidget* dock_=nullptr;
+  private:
     void build();
+    QMainWindow* mw_;
+    QDockWidget* dock_;
 };
 
 #endif // NAVDOCK_H

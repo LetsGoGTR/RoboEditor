@@ -8,7 +8,7 @@ BackupPage::BackupPage(QWidget* parent): QWidget(parent) {
     auto* target = new QLineEdit; target->setPlaceholderText("Controller IP or Robot ID");
     auto* btn = new QPushButton("Backup (UI only)");
     connect(btn, &QPushButton::clicked, this, [=]{
-        emit uiBackupClicked(target->text());
+        emit requestBackup(target->text());
     });
 
     auto* ly = new QVBoxLayout(this);

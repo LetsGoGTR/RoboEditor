@@ -9,7 +9,7 @@ class BackupPage : public QWidget {
 public:
     explicit BackupPage(QWidget* parent=nullptr);
 signals:
-    void uiBackupClicked(const QString& target);
+    void requestBackup(const QString& target);
 };
 
 #endif // BACKUPPAGE_H

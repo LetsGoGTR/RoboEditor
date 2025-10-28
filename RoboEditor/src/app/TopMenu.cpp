@@ -15,7 +15,7 @@ void TopMenu::build() {
     view_ = mb->addMenu("View");
     help_ = mb->addMenu("Help");
 
-    // View > Show Log ▶
+    // View > Show Log
     showLogMenu_ = view_->addMenu("Show Log");
 
     actLogVisible_ = new QAction("Visible", this);
