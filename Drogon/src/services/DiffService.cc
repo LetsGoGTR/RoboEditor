@@ -47,7 +47,7 @@ services::DiffResult services::DiffService::diffYaml(const std::string &contentA
     services::DiffResult result;
     try {
         auto diffs     = diff_utils::DiffYaml::compareFiles(contentA, contentB);
-        result.data    = diff_utils::DiffYaml::generateResult(diffs, nameA, nameB);
+        result.data    = diff_utils::DiffYaml::generateResult(diffs, "Yaml", nameA, nameB);
         result.success = true;
     } catch (const std::exception &e) {
         result.success      = false;
