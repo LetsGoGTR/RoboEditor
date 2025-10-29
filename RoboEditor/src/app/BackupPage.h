@@ -4,13 +4,17 @@
 
 #include <QTableWidget>
 #include <QTextEdit>
+#include <QToolButton>
+#include <QTreeView>
 
 #include <QButtonGroup>
+#include <QFileSystemModel>
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPushButton>
 #include <QRadioButton>
+#include <QSettings>
 #include <QVBoxLayout>
 #include <QWidget>
 
@@ -19,24 +23,35 @@ class QLineEdit;
 class BackupPage : public QWidget
 {
     Q_OBJECT
+
       public:
         explicit BackupPage(QWidget *parent = nullptr);
         ~BackupPage() override;
 
       private:
-        // Layouts
+        // ===== Layouts =====
         QVBoxLayout *mainLayout;
         QHBoxLayout *contentLayout;
-        QVBoxLayout *leftLayout;
-        QVBoxLayout *rightLayout;
+        QVBoxLayout *dirLayout;
+        QVBoxLayout *workspaceLayout;
+        QVBoxLayout *infoLayout;
 
-        // Backup List
+        // ===== File system =====
+        QLabel           *dirTitle;
+        QFileSystemModel *dirModel;
+        QTreeView        *dirTree;
+        QToolButton      *upButton;
+        QToolButton      *homeButton;
+        QToolButton      *setHomeButton;
+        QToolButton      *refreshButton;  // 🔹 새로고침 버튼 추가
+
+        // ===== Backup List =====
         QLabel       *backupTableTitle;
         QTableWidget *backupList;
         QPushButton  *backupDelete;
         QButtonGroup *radioGroup;
 
-        // WorkDir Backup
+        // ===== WorkDir Backup =====
         QLabel      *backupActionTitle;
         QLabel      *workDirInfo;
         QLabel      *sizeLabel;
@@ -44,17 +59,30 @@ class BackupPage : public QWidget
         QTextEdit   *backupComment;
         QPushButton *backupCreate;
 
-        // Function for Responsibility Principle
+        // ===== Utility =====
+        QSettings settings;  // Store App settings
+        QString   customHomePath;
+
+        // ===== Setup Functions =====
         void setupUi();
         void populateDummyData();
-
-      private slots:
-        void onBackupCreateClicked();
-        void onBackupDeleteClicked();
-        void onRadioSelected(int id);
+        void setupConnections();
 
       signals:
         void uiBackupClicked(const QString &target);
+
+      private slots:
+        // --- Directory control ---
+        void onDirUpClicked();
+        void onDirHomeClicked();
+        void onSetHomeClicked();
+        void onDirRefreshClicked();
+        void onDirectorySelected(const QModelIndex &index);
+
+        // --- Backup actions ---
+        void onBackupCreateClicked();
+        void onBackupDeleteClicked();
+        void onRadioSelected(int id);
 };
 
 #endif  // BACKUPPAGE_H
