@@ -5,21 +5,26 @@
 #include <QStackedWidget>
 #include <QVBoxLayout>
 
+#include "ApplyPage.h"
 #include "BackupPage.h"
 #include "ComparePage.h"
+#include "ModifyPage.h"
 #include "OpenFilePage.h"
-
 CenterStack::CenterStack(QMainWindow *mw) : QObject(mw)
 {
     stack_ = new QStackedWidget;
     cmp_   = new ComparePage;
     bkp_   = new BackupPage;
     ofp_   = new OpenFilePage;
+    alp_   = new ApplyPage;
+    mfp_   = new ModifyPage;
 
     mw->setCentralWidget(stack_);
     idxC_ = stack_->addWidget(cmp_);
     idxB_ = stack_->addWidget(bkp_);
     idxO_ = stack_->addWidget(ofp_);
+    idxA_ = stack_->addWidget(alp_);
+    idxM_ = stack_->addWidget(mfp_);
 
     connect(cmp_, &ComparePage::uiCompareClicked, this, [=](const QString &L, const QString &R) {
         emit compareRequested(L, R);
@@ -27,6 +32,8 @@ CenterStack::CenterStack(QMainWindow *mw) : QObject(mw)
     });
     connect(bkp_, &BackupPage::uiBackupClicked, this, &CenterStack::backupRequested);
     connect(ofp_, &OpenFilePage::uiOpenFileClicked, this, &CenterStack::openFileRequested);
+    connect(alp_, &ApplyPage::uiApplyClicked, this, &CenterStack::applyRequested);
+    connect(mfp_, &ModifyPage::uiModifyClicked, this, &CenterStack::modifyRequested);
 }
 
 void CenterStack::openCompareResult(const QString &left, const QString &right)
@@ -50,4 +57,12 @@ void CenterStack::showBackup()
 void CenterStack::showOpenFile()
 {
     stack_->setCurrentIndex(idxO_);
+}
+void CenterStack::showModify()
+{
+    stack_->setCurrentIndex(idxM_);
+}
+void CenterStack::showApply()
+{
+    stack_->setCurrentIndex(idxA_);
 }

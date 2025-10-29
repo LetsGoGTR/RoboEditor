@@ -63,6 +63,8 @@ void MainWindow::wire()
     connect(nav_.get(), &NavDock::clickCompare, this, [=] { center_->showCompare(); });
     connect(nav_.get(), &NavDock::clickBackup, this, [=] { center_->showBackup(); });
     connect(nav_.get(), &NavDock::clickOpenFile, this, [=] { center_->showOpenFile(); });
+    connect(nav_.get(), &NavDock::clickApply, this, [=] { center_->showApply(); });
+    connect(nav_.get(), &NavDock::clickModify, this, [=] { center_->showModify(); });
 
     connect(center_.get(),
             &CenterStack::compareRequested,
