@@ -26,6 +26,16 @@ void DropTextEdit::dragEnterEvent(QDragEnterEvent* e) {
     }
 }
 
+void DropTextEdit::dragMoveEvent(QDragMoveEvent* e) {
+    // 마우스를 위에서 움직이고 있는 동안도 계속 허용해줘야
+    // 커서가 "드롭 가능" 상태로 유지된다.
+    if (e->mimeData()->hasUrls()) {
+        e->acceptProposedAction();
+    } else {
+        e->ignore();
+    }
+}
+
 void DropTextEdit::dropEvent(QDropEvent* e) {
     if (!e->mimeData()->hasUrls()) {
         e->ignore();

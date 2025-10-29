@@ -4,6 +4,7 @@
 #include <QPlainTextEdit>
 
 class QDragEnterEvent;
+class QDragMoveEvent;
 class QDropEvent;
 
 // 텍스트 비교 영역(왼쪽/오른쪽)에 쓰는 드롭 가능한 에디터
@@ -27,6 +28,7 @@ class DropTextEdit : public QPlainTextEdit {
 
   protected:
     void dragEnterEvent(QDragEnterEvent* e) override;
+    void dragMoveEvent(QDragMoveEvent* e) override;
     void dropEvent(QDropEvent* e) override;
 
   private:

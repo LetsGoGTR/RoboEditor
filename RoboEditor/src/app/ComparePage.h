@@ -39,6 +39,8 @@ class ComparePage : public QWidget {
     void onOpenLeftFolderClicked();
     void onOpenRightFolderClicked();
     void onCompareClicked();
+    void onLeftTreeDoubleClicked(const QModelIndex& idx);
+    void onRightTreeDoubleClicked(const QModelIndex& idx);
 
   private:
     // 현재 선택된 루트 경로
@@ -100,6 +102,9 @@ class ComparePage : public QWidget {
                                  const QString& basePathHint);
     void fetchCompareFromApiDummy(const QString& leftFilePath,
                                   const QString& rightFilePath);
+    void loadLocalFolder(const QString& side, const QString& path);
+    void refreshTreeView(const QString& side, const QString& path);
+    void loadFileIntoEditor(const QString& fullPath, bool isLeft);
 };
 
 #endif // COMPAREPAGE_H
