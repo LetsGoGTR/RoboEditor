@@ -147,11 +147,13 @@ void api::v1::Workspace::workspaceExport(
     }
 }
 
-void api::v1::Workspace::workspaceList(
-        const drogon::HttpRequestPtr                          &req,
-        std::function<void(const drogon::HttpResponsePtr &)> &&callback)
+void api::v1::Workspace::list(const drogon::HttpRequestPtr                          &req,
+                              std::function<void(const drogon::HttpResponsePtr &)> &&callback)
 {
-    auto result = services::WorkspaceService::listWorkspaces(baseDir);
+    // Get optional deviceId query parameter
+    std::string deviceId = req->getParameter("id");
+
+    auto result = services::WorkspaceService::listWorkspaces(baseDir, deviceId);
 
     if (!result.success)
         return sendError(callback,
@@ -167,7 +169,12 @@ void api::v1::Workspace::workspaceList(
     resp->setStatusCode(drogon::k200OK);
     callback(resp);
 
-    LOG_INFO << "Listed " << result.data["count"].asInt() << " workspaces";
+    if (deviceId.empty()) {
+        LOG_INFO << "Listed " << result.data["count"].asInt() << " workspaces from all devices";
+    } else {
+        LOG_INFO << "Listed " << result.data["count"].asInt() << " workspaces from device: "
+                 << deviceId;
+    }
 }
 
 void api::v1::Workspace::create(const drogon::HttpRequestPtr                          &req,

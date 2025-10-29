@@ -40,6 +40,9 @@ namespace services
         static DeviceOperationResult deleteDevice(const std::string &baseDir,
                                                   const std::string &deviceId);
 
+        // List all devices in baseDir
+        static DeviceOperationResult listDevices(const std::string &baseDir);
+
       private:
         static const std::string metadataFilename_;
 

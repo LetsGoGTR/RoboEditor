@@ -270,3 +270,40 @@ services::DeviceOperationResult services::DeviceService::deleteDevice(const std:
         return createError("Delete failed: " + std::string(e.what()));
     }
 }
+
+services::DeviceOperationResult services::DeviceService::listDevices(const std::string &baseDir)
+{
+    if (!fs::exists(baseDir)) {
+        try {
+            fs::create_directories(baseDir);
+        } catch (const std::exception &e) {
+            return createError("Failed to create base directory: " + std::string(e.what()));
+        }
+    }
+
+    try {
+        Json::Value devices(Json::arrayValue);
+
+        for (const auto &entry : fs::directory_iterator(baseDir)) {
+            if (!entry.is_directory())
+                continue;
+
+            DeviceMetadata metadata = loadMetadata(entry.path().string());
+            if (metadata.id.empty())
+                continue;  // Skip invalid
+
+            devices.append(metadata.toJson());
+        }
+
+        DeviceOperationResult result;
+        result.success        = true;
+        result.data["devices"] = devices;
+        result.data["count"]   = (int)devices.size();
+
+        LOG_INFO << "Listed " << devices.size() << " devices";
+        return result;
+
+    } catch (const std::exception &e) {
+        return createError("List failed: " + std::string(e.what()));
+    }
+}

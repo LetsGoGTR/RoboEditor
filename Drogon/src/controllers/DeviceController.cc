@@ -26,6 +26,32 @@ static void sendError(std::function<void(const drogon::HttpResponsePtr &)> &call
     callback(resp);
 }
 
+void api::v1::Device::list(const drogon::HttpRequestPtr                          &req,
+                           std::function<void(const drogon::HttpResponsePtr &)> &&callback)
+{
+    try {
+        auto result = services::DeviceService::listDevices(baseDir);
+
+        if (!result.success)
+            return sendError(
+                    callback, drogon::k500InternalServerError, "Failed to list devices", result.errorMessage);
+
+        Json::Value response;
+        response["success"] = true;
+        response["data"]    = result.data;
+
+        auto resp = drogon::HttpResponse::newHttpJsonResponse(response);
+        resp->setStatusCode(drogon::k200OK);
+        callback(resp);
+
+        LOG_INFO << "Listed " << result.data["count"].asInt() << " devices";
+
+    } catch (const std::exception &e) {
+        LOG_ERROR << "List exception: " << e.what();
+        sendError(callback, drogon::k500InternalServerError, "Internal server error", e.what());
+    }
+}
+
 void api::v1::Device::create(const drogon::HttpRequestPtr                          &req,
                              std::function<void(const drogon::HttpResponsePtr &)> &&callback)
 {
