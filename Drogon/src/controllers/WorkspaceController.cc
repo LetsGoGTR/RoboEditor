@@ -5,25 +5,14 @@
 #include <sstream>
 
 #include "../services/WorkspaceService.h"
+#include "ControllerHelper.h"
 
 namespace fs = std::filesystem;
 
 static std::string baseDir = "/tmp/drogon-app/storage/";
 
-// Helper functions
-static void sendError(std::function<void(const drogon::HttpResponsePtr &)> &callback,
-                      drogon::HttpStatusCode                                status,
-                      const std::string                                    &error,
-                      const std::string                                    &message = "")
-{
-    Json::Value json;
-    json["error"] = error;
-    if (!message.empty())
-        json["message"] = message;
-    auto resp = drogon::HttpResponse::newHttpJsonResponse(json);
-    resp->setStatusCode(status);
-    callback(resp);
-}
+using helpers::sendError;
+using helpers::sendSuccess;
 
 void api::v1::Workspace::workspaceImport(
         const drogon::HttpRequestPtr                          &req,

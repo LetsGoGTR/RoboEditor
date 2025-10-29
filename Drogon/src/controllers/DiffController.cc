@@ -5,32 +5,26 @@
 #include "../models/FileRequest.h"
 #include "../services/DiffService.h"
 #include "../services/FileService.h"
+#include "ControllerHelper.h"
 
 namespace fs = std::filesystem;
 
 static std::string baseDir = "/tmp/drogon-app/storage/";
+
+using helpers::sendError;
+using helpers::sendSuccess;
 
 void api::v1::Diff::diffFiles(const drogon::HttpRequestPtr                          &req,
                               std::function<void(const drogon::HttpResponsePtr &)> &&callback)
 {
     auto json = req->getJsonObject();
     if (!json) {
-        Json::Value error;
-        error["error"] = "Invalid JSON";
-        auto resp      = drogon::HttpResponse::newHttpJsonResponse(error);
-        resp->setStatusCode(drogon::k400BadRequest);
-        callback(resp);
-        return;
+        return sendError(callback, drogon::k400BadRequest, "Invalid JSON");
     }
 
     auto fileReq = drogon_model::FileRequest::fromJson(*json);
     if (!fileReq.has_value() || !fileReq->isValid()) {
-        Json::Value error;
-        error["error"] = "Missing or invalid fields: filePathA, filePathB";
-        auto resp      = drogon::HttpResponse::newHttpJsonResponse(error);
-        resp->setStatusCode(drogon::k400BadRequest);
-        callback(resp);
-        return;
+        return sendError(callback, drogon::k400BadRequest, "Missing or invalid fields: filePathA, filePathB");
     }
 
     std::string fullPathA = baseDir + fileReq->filePathA;
@@ -42,26 +36,12 @@ void api::v1::Diff::diffFiles(const drogon::HttpRequestPtr                      
 
     auto resultA = services::FileService::readFile(fullPathA);
     if (!resultA.success) {
-        Json::Value error;
-        error["error"]   = "Failed to read file A";
-        error["message"] = resultA.errorMessage;
-        error["path"]    = fileReq->filePathA;
-        auto resp        = drogon::HttpResponse::newHttpJsonResponse(error);
-        resp->setStatusCode(drogon::k404NotFound);
-        callback(resp);
-        return;
+        return sendError(callback, drogon::k404NotFound, "Failed to read file A", resultA.errorMessage + " (path: " + fileReq->filePathA + ")");
     }
 
     auto resultB = services::FileService::readFile(fullPathB);
     if (!resultB.success) {
-        Json::Value error;
-        error["error"]   = "Failed to read file B";
-        error["message"] = resultB.errorMessage;
-        error["path"]    = fileReq->filePathB;
-        auto resp        = drogon::HttpResponse::newHttpJsonResponse(error);
-        resp->setStatusCode(drogon::k404NotFound);
-        callback(resp);
-        return;
+        return sendError(callback, drogon::k404NotFound, "Failed to read file B", resultB.errorMessage + " (path: " + fileReq->filePathB + ")");
     }
 
     // Extract content from results
@@ -76,23 +56,10 @@ void api::v1::Diff::diffFiles(const drogon::HttpRequestPtr                      
     auto diffResult = services::DiffService::diff(contentA, contentB, nameA, nameB);
 
     if (!diffResult.success) {
-        Json::Value error;
-        error["error"]   = "Failed to perform diff";
-        error["message"] = diffResult.errorMessage;
-        auto resp        = drogon::HttpResponse::newHttpJsonResponse(error);
-        resp->setStatusCode(drogon::k400BadRequest);
-        callback(resp);
-        return;
+        return sendError(callback, drogon::k400BadRequest, "Failed to perform diff", diffResult.errorMessage);
     }
 
-    Json::Value response;
-    response["success"] = true;
-    response["data"]    = diffResult.data;
-
-    auto resp = drogon::HttpResponse::newHttpJsonResponse(response);
-    resp->setStatusCode(drogon::k200OK);
-    callback(resp);
-
+    sendSuccess(callback, drogon::k200OK, diffResult.data);
     LOG_INFO << "Successfully performed diff between " << nameA << " and " << nameB;
 }
 
