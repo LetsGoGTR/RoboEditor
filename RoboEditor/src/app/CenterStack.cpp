@@ -9,7 +9,7 @@
 #include "ComparePage.h"
 #include "OpenFilePage.h"
 
-CenterStack::CenterStack(QMainWindow *mw) : QObject(mw)
+CenterStack::CenterStack(QWidget *parent) : QWidget(parent)
 {
     stack_ = new QStackedWidget;
     cmp_   = new ComparePage;
@@ -19,6 +19,10 @@ CenterStack::CenterStack(QMainWindow *mw) : QObject(mw)
     idxC_ = stack_->addWidget(cmp_);
     idxB_ = stack_->addWidget(bkp_);
     idxO_ = stack_->addWidget(ofp_);
+
+    auto *layout = new QVBoxLayout(this);
+    layout->addWidget(stack_);
+    layout->setContentsMargins(0, 0, 0, 0);
 
     connect(cmp_, &ComparePage::uiCompareClicked, this, [=](const QString &L, const QString &R) {
         emit compareRequested(L, R);

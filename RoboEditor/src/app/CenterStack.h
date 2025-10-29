@@ -2,25 +2,22 @@
 #define CENTERSTACK_H
 #pragma once
 
-#include <QObject>
+#include <QWidget>
 class QMainWindow;
 class QStackedWidget;
 class ComparePage;
 class BackupPage;
 class OpenFilePage;
 
-class CenterStack : public QObject
+class CenterStack : public QWidget
 {
     Q_OBJECT
       public:
-        explicit CenterStack(QMainWindow * mw);
-        QStackedWidget *widget() const
-        {
-            return stack_;
-        }
+        explicit CenterStack(QWidget *parent = nullptr);
         void showCompare();
         void showBackup();
         void showOpenFile();
+        void openCompareResult(const QString &left, const QString &right);
 
         // 메인윈도우가 받을 시그널 (재발행)
       signals:
@@ -28,16 +25,12 @@ class CenterStack : public QObject
         void backupRequested(const QString &target);
         void openFileRequested(const QString &target);
 
-      public:
-        void openCompareResult(const QString &left, const QString &right);
-
       private:
-        void            build();
         QStackedWidget *stack_ = nullptr;
+        ComparePage    *cmp_   = nullptr;
+        BackupPage     *bkp_   = nullptr;
+        OpenFilePage   *ofp_   = nullptr;
         int             idxC_ = -1, idxB_ = -1, idxO_ = -1;
-        ComparePage    *cmp_ = nullptr;
-        BackupPage     *bkp_ = nullptr;
-        OpenFilePage   *ofp_ = nullptr;
 };
 
 #endif  // CENTERSTACK_H
