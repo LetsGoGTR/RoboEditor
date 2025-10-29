@@ -11,6 +11,7 @@ namespace api
           public:
             METHOD_LIST_BEGIN
             // use METHOD_ADD to add your custom processing function here;
+            METHOD_ADD(Device::list, "", drogon::Get);
             METHOD_ADD(Device::create, "", drogon::Post);
             METHOD_ADD(Device::info, "/{deviceId}", drogon::Get);
             METHOD_ADD(Device::update, "/{deviceId}", drogon::Put);
@@ -19,6 +20,8 @@ namespace api
             METHOD_ADD(Device::backup, "/{deviceId}/backup", drogon::Get);
             METHOD_LIST_END
             // your declaration of processing function maybe like this:
+            void list(const drogon::HttpRequestPtr                          &req,
+                      std::function<void(const drogon::HttpResponsePtr &)> &&callback);
             void create(const drogon::HttpRequestPtr                          &req,
                         std::function<void(const drogon::HttpResponsePtr &)> &&callback);
             void info(const drogon::HttpRequestPtr                          &req,

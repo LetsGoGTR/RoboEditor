@@ -9,6 +9,7 @@
 #include <iomanip>
 #include <sstream>
 
+#include "DeviceService.h"
 #include "FolderService.h"
 
 namespace fs = std::filesystem;
@@ -296,7 +297,7 @@ services::WorkspaceOperationResult services::WorkspaceService::exportWorkspace(
 }
 
 services::WorkspaceOperationResult
-services::WorkspaceService::listWorkspaces(const std::string &baseDir)
+services::WorkspaceService::listWorkspaces(const std::string &baseDir, const std::string &deviceId)
 {
     if (!fs::exists(baseDir)) {
         try {
@@ -309,15 +310,47 @@ services::WorkspaceService::listWorkspaces(const std::string &baseDir)
     try {
         Json::Value workspaces(Json::arrayValue);
 
-        for (const auto &entry : fs::directory_iterator(baseDir)) {
-            if (!entry.is_directory())
-                continue;
+        if (deviceId.empty()) {
+            // List workspaces from all devices
+            for (const auto &deviceEntry : fs::directory_iterator(baseDir)) {
+                if (!deviceEntry.is_directory())
+                    continue;
 
-            WorkspaceMetadata metadata = loadMetadata(entry.path().string());
-            if (metadata.id.empty())
-                continue;  // Skip invalid
+                // Check if this is a valid device (has .metadata.json)
+                std::string deviceMetadataPath = deviceEntry.path().string() + "/.metadata.json";
+                if (!fs::exists(deviceMetadataPath))
+                    continue;
 
-            workspaces.append(metadata.toJson());
+                // Iterate through workspaces in this device
+                for (const auto &workspaceEntry : fs::directory_iterator(deviceEntry.path())) {
+                    if (!workspaceEntry.is_directory())
+                        continue;
+
+                    WorkspaceMetadata metadata = loadMetadata(workspaceEntry.path().string());
+                    if (metadata.id.empty())
+                        continue;  // Skip invalid
+
+                    workspaces.append(metadata.toJson());
+                }
+            }
+        } else {
+            // List workspaces from specific device
+            std::string devicePath = baseDir + deviceId;
+
+            if (!fs::exists(devicePath) || !fs::is_directory(devicePath)) {
+                return createError("Device not found: " + deviceId);
+            }
+
+            for (const auto &workspaceEntry : fs::directory_iterator(devicePath)) {
+                if (!workspaceEntry.is_directory())
+                    continue;
+
+                WorkspaceMetadata metadata = loadMetadata(workspaceEntry.path().string());
+                if (metadata.id.empty())
+                    continue;  // Skip invalid
+
+                workspaces.append(metadata.toJson());
+            }
         }
 
         WorkspaceOperationResult result;
@@ -325,7 +358,11 @@ services::WorkspaceService::listWorkspaces(const std::string &baseDir)
         result.data["workspaces"] = workspaces;
         result.data["count"]      = (int)workspaces.size();
 
-        LOG_INFO << "Listed " << workspaces.size() << " workspaces";
+        if (deviceId.empty()) {
+            LOG_INFO << "Listed " << workspaces.size() << " workspaces from all devices";
+        } else {
+            LOG_INFO << "Listed " << workspaces.size() << " workspaces from device: " << deviceId;
+        }
         return result;
 
     } catch (const std::exception &e) {

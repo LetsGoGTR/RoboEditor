@@ -52,7 +52,10 @@ namespace services
                                                         const std::string &outputPath);
 
         // List all workspaces in baseDir (reads .workspace.json files)
-        static WorkspaceOperationResult listWorkspaces(const std::string &baseDir);
+        // If deviceId is provided, only list workspaces in that device folder
+        // If deviceId is empty, list all workspaces from all devices
+        static WorkspaceOperationResult listWorkspaces(const std::string &baseDir,
+                                                       const std::string &deviceId = "");
 
         // Check if archive format is supported
         static bool isSupportedArchive(const std::string &filename);

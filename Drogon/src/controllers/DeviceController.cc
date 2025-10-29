@@ -4,26 +4,44 @@
 #include <filesystem>
 #include <fstream>
 
+#include "../services/AuthService.h"
 #include "../services/DeviceService.h"
 #include "../services/WorkspaceService.h"
+#include "ControllerHelper.h"
 
 namespace fs = std::filesystem;
 
 static std::string baseDir = "/tmp/drogon-app/storage/";
 
-// Helper functions
-static void sendError(std::function<void(const drogon::HttpResponsePtr &)> &callback,
-                      drogon::HttpStatusCode                                status,
-                      const std::string                                    &error,
-                      const std::string                                    &message = "")
+using helpers::sendError;
+using helpers::sendSuccess;
+
+void api::v1::Device::list(const drogon::HttpRequestPtr                          &req,
+                           std::function<void(const drogon::HttpResponsePtr &)> &&callback)
 {
-    Json::Value json;
-    json["error"] = error;
-    if (!message.empty())
-        json["message"] = message;
-    auto resp = drogon::HttpResponse::newHttpJsonResponse(json);
-    resp->setStatusCode(status);
-    callback(resp);
+    try {
+        auto result = services::DeviceService::listDevices(baseDir);
+
+        if (!result.success)
+            return sendError(callback,
+                             drogon::k500InternalServerError,
+                             "Failed to list devices",
+                             result.errorMessage);
+
+        Json::Value response;
+        response["success"] = true;
+        response["data"]    = result.data;
+
+        auto resp = drogon::HttpResponse::newHttpJsonResponse(response);
+        resp->setStatusCode(drogon::k200OK);
+        callback(resp);
+
+        LOG_INFO << "Listed " << result.data["count"].asInt() << " devices";
+
+    } catch (const std::exception &e) {
+        LOG_ERROR << "List exception: " << e.what();
+        sendError(callback, drogon::k500InternalServerError, "Internal server error", e.what());
+    }
 }
 
 void api::v1::Device::create(const drogon::HttpRequestPtr                          &req,
@@ -185,12 +203,11 @@ void api::v1::Device::apply(const drogon::HttpRequestPtr                        
         return sendError(callback, drogon::k400BadRequest, "Invalid JSON body");
     }
 
-    // Validate password
     if (!json->isMember("password")) {
         return sendError(callback, drogon::k400BadRequest, "Missing password");
     }
     std::string password = (*json)["password"].asString();
-    if (password != "6363") {
+    if (!services::AuthService::verifyDevicePassword(password)) {
         return sendError(callback, drogon::k401Unauthorized, "Invalid password");
     }
 

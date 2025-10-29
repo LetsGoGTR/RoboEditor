@@ -31,12 +31,17 @@ add_executable(${PROJECT_NAME} ./src/main.cc)
 find_package(Drogon CONFIG REQUIRED)
 find_package(LibArchive REQUIRED)
 find_package(yaml-cpp REQUIRED)
+
+# Add libbcrypt as subdirectory
+add_subdirectory(external/libbcrypt)
+
 target_link_libraries(
-    ${PROJECT_NAME} 
-    PRIVATE 
+    ${PROJECT_NAME}
+    PRIVATE
     Drogon::Drogon
     yaml-cpp
-    ${LibArchive_LIBRARIES}
+    LibArchive::LibArchive
+    bcrypt
 )
 
 # ##############################################################################
@@ -67,10 +72,11 @@ drogon_create_views(${PROJECT_NAME} ${CMAKE_CURRENT_SOURCE_DIR}/views
 #                     ${CMAKE_CURRENT_BINARY_DIR} TRUE CHANGE_ME)
 
 target_include_directories(${PROJECT_NAME}
-                           PRIVATE 
+                           PRIVATE
                            ${CMAKE_CURRENT_SOURCE_DIR}
                            ${CMAKE_CURRENT_SOURCE_DIR}/src
                            ${CMAKE_CURRENT_SOURCE_DIR}/models
+                           ${CMAKE_CURRENT_SOURCE_DIR}/external/libbcrypt/include
                            ${LibArchive_INCLUDE_DIRS})
 target_sources(${PROJECT_NAME}
                PRIVATE
