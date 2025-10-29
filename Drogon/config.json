@@ -348,9 +348,6 @@
     //custom_config: custom configuration for users. This object can be get by the app().getCustomConfig() method.
     "custom_config": {
         "auth": {
-            // IMPORTANT: Replace this with your own bcrypt password hash
-            // Generate hash: python3 -c "import bcrypt; print(bcrypt.hashpw(b'your_password', bcrypt.gensalt()).decode())"
-            // Or use online tool: https://bcrypt-generator.com/
             "device_password_hash": "CHANGE_THIS_TO_YOUR_BCRYPT_HASH"
         }
     }
