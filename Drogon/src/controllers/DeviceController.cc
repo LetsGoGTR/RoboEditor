@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <fstream>
 
+#include "../services/AuthService.h"
 #include "../services/DeviceService.h"
 #include "../services/WorkspaceService.h"
 #include "ControllerHelper.h"
@@ -22,8 +23,10 @@ void api::v1::Device::list(const drogon::HttpRequestPtr                         
         auto result = services::DeviceService::listDevices(baseDir);
 
         if (!result.success)
-            return sendError(
-                    callback, drogon::k500InternalServerError, "Failed to list devices", result.errorMessage);
+            return sendError(callback,
+                             drogon::k500InternalServerError,
+                             "Failed to list devices",
+                             result.errorMessage);
 
         Json::Value response;
         response["success"] = true;
@@ -200,12 +203,11 @@ void api::v1::Device::apply(const drogon::HttpRequestPtr                        
         return sendError(callback, drogon::k400BadRequest, "Invalid JSON body");
     }
 
-    // Validate password
     if (!json->isMember("password")) {
         return sendError(callback, drogon::k400BadRequest, "Missing password");
     }
     std::string password = (*json)["password"].asString();
-    if (password != "6363") {
+    if (!services::AuthService::verifyDevicePassword(password)) {
         return sendError(callback, drogon::k401Unauthorized, "Invalid password");
     }
 
