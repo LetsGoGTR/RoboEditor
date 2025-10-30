@@ -67,6 +67,7 @@ find_package(Qt6 REQUIRED COMPONENTS Widgets)
         MANUAL_FINALIZATION
         ${PROJECT_SOURCES}
         src/app/ControllerManager.h src/app/ControllerManager.cpp
+        src/app/SettingController.ui
         # src/app/OpenFilePage.h src/app/OpenFilePage.cpp
     )
 # Define target properties for Android with Qt 6 as:
