@@ -21,6 +21,15 @@ void TopMenu::build()
     help_    = mb->addMenu("Help");
     sett_    = mb->addMenu("Setting");
 
+    // add file actions
+    newFile_    = file_->addAction("New File");
+    openFile_   = file_->addAction("Open File");
+    openFolder_ = file_->addAction("Open Folder");
+
+    // add file Shortcuts
+    newFile_->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_N));
+    openFile_->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_O));
+
     // View > Show Log ▶
     showLogMenu_ = view_->addMenu("Show Log");
 
@@ -29,6 +38,7 @@ void TopMenu::build()
     actLogVisible_->setChecked(true);
     showLogMenu_->addAction(actLogVisible_);
     showLogMenu_->addSeparator();
+
     posGroup_ = new QActionGroup(this);
     posGroup_->setExclusive(true);
     auto mk = [&](const char *t) {

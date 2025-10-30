@@ -31,8 +31,10 @@ void MainWindow::ensureMenu()
 }
 void MainWindow::ensureCenter()
 {
-    if (!center_)
+    if (!center_) {
         center_ = std::make_unique<CenterStack>(this);
+        setCentralWidget(center_.get());
+    }
 }
 void MainWindow::ensureNav()
 {

@@ -39,6 +39,12 @@ class TopMenu : public QObject
         QMainWindow *mw_;
         QMenu       *file_ = nullptr, *edit_ = nullptr, *view_ = nullptr, *help_ = nullptr,
               *sett_ = nullptr, *showLogMenu_ = nullptr;
+
+        QAction *newFile_    = nullptr;
+        QAction *openFile_   = nullptr;
+        QAction *openFolder_ = nullptr;
+
+        QMenu        *showLogMenu_    = nullptr;
         QAction      *actToggle_      = nullptr;  // Ctrl+L
         QAction      *actLogVisible_  = nullptr;  // Visible
         QAction      *changePassword_ = nullptr;

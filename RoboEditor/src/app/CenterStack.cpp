@@ -10,7 +10,8 @@
 #include "ComparePage.h"
 #include "ModifyPage.h"
 #include "OpenFilePage.h"
-CenterStack::CenterStack(QMainWindow *mw) : QObject(mw)
+
+CenterStack::CenterStack(QWidget *parent) : QWidget(parent)
 {
     stack_ = new QStackedWidget;
     cmp_   = new ComparePage;
@@ -19,12 +20,15 @@ CenterStack::CenterStack(QMainWindow *mw) : QObject(mw)
     alp_   = new ApplyPage;
     mfp_   = new ModifyPage;
 
-    mw->setCentralWidget(stack_);
     idxC_ = stack_->addWidget(cmp_);
     idxB_ = stack_->addWidget(bkp_);
     idxO_ = stack_->addWidget(ofp_);
     idxA_ = stack_->addWidget(alp_);
     idxM_ = stack_->addWidget(mfp_);
+
+    auto *layout = new QVBoxLayout(this);
+    layout->addWidget(stack_);
+    layout->setContentsMargins(0, 0, 0, 0);
 
     connect(cmp_, &ComparePage::uiCompareClicked, this, [=](const QString &L, const QString &R) {
         emit compareRequested(L, R);

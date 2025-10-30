@@ -24,6 +24,7 @@ set(PROJECT_SOURCES
         src/app/OpenFilePage.cpp
         src/app/CenterStack.cpp
         src/app/ComparePage.cpp
+        src/app/DropTextEdit.cpp
         src/app/LogManager.cpp
         src/app/mainwindow.cpp
         src/app/NavDock.cpp
@@ -39,6 +40,7 @@ set(PROJECT_SOURCES
         src/app/OpenFilePage.h
         src/app/CenterStack.h
         src/app/ComparePage.h
+        src/app/DropTextEdit.h
         src/app/LogManager.h
         src/app/mainwindow.h
         src/app/NavDock.h
