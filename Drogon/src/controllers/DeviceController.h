@@ -39,6 +39,13 @@ namespace api
             void backup(const drogon::HttpRequestPtr                          &req,
                         std::function<void(const drogon::HttpResponsePtr &)> &&callback,
                         const std::string                                     &deviceId);
+
+          private:
+            // Helper function to check if robot is running
+            void checkRobotStatus(
+                    const std::string                                                      &ip,
+                    std::function<void()>                                                   onNotRunning,
+                    std::shared_ptr<std::function<void(const drogon::HttpResponsePtr &)>>   callbackPtr);
         };
     }  // namespace v1
 }  // namespace api

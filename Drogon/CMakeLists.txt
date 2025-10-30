@@ -87,6 +87,7 @@ target_sources(${PROJECT_NAME}
                ${MODEL_SRC}
                ${SERVICE_SRC}
                ${UTILS_DIFF_SRC}
+               src/utils/RobotHttpClient.cc
 )
 # ##############################################################################
 # uncomment the following line for dynamically loading views 
