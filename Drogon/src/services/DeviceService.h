@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ServiceResult.h"
+
 #include <drogon/drogon.h>
 #include <string>
 
@@ -19,38 +21,26 @@ namespace services
         static DeviceMetadata fromJson(const Json::Value &json);
     };
 
-    struct DeviceOperationResult
-    {
-        bool        success;
-        std::string errorMessage;
-        Json::Value data;
-    };
-
     class DeviceService
     {
       public:
-        // // Device CRUD operations
-        static DeviceOperationResult createDevice(const std::string    &baseDir,
-                                                  const DeviceMetadata &metadata);
-        static DeviceOperationResult readDevice(const std::string &baseDir,
-                                                const std::string &deviceId);
-        static DeviceOperationResult updateDevice(const std::string    &baseDir,
-                                                  const std::string    &deviceId,
-                                                  const DeviceMetadata &metadata);
-        static DeviceOperationResult deleteDevice(const std::string &baseDir,
-                                                  const std::string &deviceId);
+        // Device CRUD operations
+        static ServiceResult createDevice(const std::string    &baseDir,
+                                          const DeviceMetadata &metadata);
+        static ServiceResult readDevice(const std::string &baseDir, const std::string &deviceId);
+        static ServiceResult updateDevice(const std::string    &baseDir,
+                                          const std::string    &deviceId,
+                                          const DeviceMetadata &metadata);
+        static ServiceResult deleteDevice(const std::string &baseDir, const std::string &deviceId);
 
-        // List all devices in baseDir
-        static DeviceOperationResult listDevices(const std::string &baseDir);
+        // List all devices
+        static ServiceResult listDevices(const std::string &baseDir);
 
       private:
         static const std::string metadataFilename_;
 
         // Helper functions
-        static DeviceOperationResult createError(const std::string &message);
-        static bool saveMetadata(const std::string &devicePath, const DeviceMetadata &metadata);
         static DeviceMetadata loadMetadata(const std::string &devicePath);
-        static std::string    getCurrentTimestamp();
     };
 
 }  // namespace services

@@ -7,6 +7,7 @@
 #include "../services/AuthService.h"
 #include "../services/DeviceService.h"
 #include "../services/WorkspaceService.h"
+#include "../utils/TimeUtils.h"
 #include "ControllerHelper.h"
 
 namespace fs = std::filesystem;
@@ -448,7 +449,7 @@ void api::v1::Device::backup(const drogon::HttpRequestPtr                       
                                 // Generate workspace ID and name
                                 std::string workspaceId = drogon::utils::getUuid();
                                 std::string timestamp =
-                                        services::WorkspaceService::getCurrentTimestamp();
+                                        utils::getCurrentTimestamp();
                                 std::string timestampStr =
                                         timestamp.substr(0, 19);  // YYYY-MM-DDTHH:MM:SS
                                 std::replace(timestampStr.begin(), timestampStr.end(), 'T', '_');

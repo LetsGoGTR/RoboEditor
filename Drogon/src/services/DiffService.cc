@@ -39,12 +39,12 @@ bool services::DiffService::isSupportedFormat(const std::string &fileName)
            supportedFormats_.end();
 }
 
-services::DiffResult services::DiffService::diffYaml(const std::string &contentA,
+services::ServiceResult services::DiffService::diffYaml(const std::string &contentA,
                                                      const std::string &contentB,
                                                      const std::string &nameA,
                                                      const std::string &nameB)
 {
-    services::DiffResult result;
+    services::ServiceResult result;
     try {
         auto diffs     = diff_utils::DiffYaml::compareFiles(contentA, contentB);
         result.data    = diff_utils::DiffYaml::generateResult(diffs, "Yaml", nameA, nameB);
@@ -57,12 +57,12 @@ services::DiffResult services::DiffService::diffYaml(const std::string &contentA
     return result;
 }
 
-services::DiffResult services::DiffService::diffPython(const std::string &contentA,
+services::ServiceResult services::DiffService::diffPython(const std::string &contentA,
                                                        const std::string &contentB,
                                                        const std::string &nameA,
                                                        const std::string &nameB)
 {
-    services::DiffResult result;
+    services::ServiceResult result;
     try {
         auto diffs     = diff_utils::DiffPython::compareFiles(contentA, contentB);
         result.data    = diff_utils::DiffPython::generateResult(diffs, nameA, nameB);
@@ -75,12 +75,12 @@ services::DiffResult services::DiffService::diffPython(const std::string &conten
     return result;
 }
 
-services::DiffResult services::DiffService::diffText(const std::string &contentA,
+services::ServiceResult services::DiffService::diffText(const std::string &contentA,
                                                      const std::string &contentB,
                                                      const std::string &nameA,
                                                      const std::string &nameB)
 {
-    services::DiffResult result;
+    services::ServiceResult result;
     try {
         auto diffs     = diff_utils::DiffText::compareFiles(contentA, contentB);
         result.data    = diff_utils::DiffText::generateResult(diffs, nameA, nameB);
@@ -93,12 +93,12 @@ services::DiffResult services::DiffService::diffText(const std::string &contentA
     return result;
 }
 
-services::DiffResult services::DiffService::diff(const std::string &contentA,
+services::ServiceResult services::DiffService::diff(const std::string &contentA,
                                                  const std::string &contentB,
                                                  const std::string &nameA,
                                                  const std::string &nameB)
 {
-    services::DiffResult result;
+    services::ServiceResult result;
     result.success = false;
 
     // Validate content is not empty

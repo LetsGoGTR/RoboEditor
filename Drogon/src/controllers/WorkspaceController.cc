@@ -5,6 +5,7 @@
 #include <sstream>
 
 #include "../services/WorkspaceService.h"
+#include "../utils/TimeUtils.h"
 #include "ControllerHelper.h"
 
 namespace fs = std::filesystem;
@@ -42,7 +43,7 @@ void api::v1::Workspace::workspaceImport(
     metadata.target      = req->getParameter("target");
     metadata.name        = workspaceName;
     metadata.description = req->getParameter("description");
-    metadata.createdAt   = services::WorkspaceService::getCurrentTimestamp();
+    metadata.createdAt   = utils::getCurrentTimestamp();
     metadata.updatedAt   = metadata.createdAt;
 
     try {
@@ -161,8 +162,8 @@ void api::v1::Workspace::list(const drogon::HttpRequestPtr                      
     if (deviceId.empty()) {
         LOG_INFO << "Listed " << result.data["count"].asInt() << " workspaces from all devices";
     } else {
-        LOG_INFO << "Listed " << result.data["count"].asInt() << " workspaces from device: "
-                 << deviceId;
+        LOG_INFO << "Listed " << result.data["count"].asInt()
+                 << " workspaces from device: " << deviceId;
     }
 }
 
@@ -258,8 +259,7 @@ void api::v1::Workspace::update(const drogon::HttpRequestPtr                    
                                        ? (*json)["description"].asString()
                                        : existingResult.data["metadata"]["description"].asString();
 
-        auto result =
-                services::WorkspaceService::updateWorkspaceMetadata(baseDir, workspaceId, metadata);
+        auto result = services::WorkspaceService::updateWorkspace(baseDir, workspaceId, metadata);
 
         if (!result.success)
             return sendError(
