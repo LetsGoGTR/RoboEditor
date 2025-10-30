@@ -26,6 +26,9 @@ namespace services
         // Check if a file format is supported
         static bool isSupportedFormat(const std::string &fileName);
 
+        static DiffResult diffDirectories(const std::string& dirA,
+                                         const std::string& dirB);
+
       private:
         static const std::vector<std::string> supportedFormats_;
 

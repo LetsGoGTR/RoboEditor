@@ -7,6 +7,7 @@
 #include "../utils/diff/DiffPython.h"
 #include "../utils/diff/DiffText.h"
 #include "../utils/diff/DiffYaml.h"
+#include "../utils/diff/treediff.h"
 
 namespace fs = std::filesystem;
 
@@ -64,8 +65,7 @@ services::DiffResult services::DiffService::diffPython(const std::string &conten
 {
     services::DiffResult result;
     try {
-        auto diffs     = diff_utils::DiffPython::compareFiles(contentA, contentB);
-        result.data    = diff_utils::DiffPython::generateResult(diffs, nameA, nameB);
+        result.data    = DiffPython::runFromText(contentA, contentB, nameA, nameB);
         result.success = true;
     } catch (const std::exception &e) {
         result.success      = false;
@@ -90,6 +90,41 @@ services::DiffResult services::DiffService::diffText(const std::string &contentA
         result.errorMessage = "Text diff error: " + std::string(e.what());
         LOG_ERROR << "Text diff failed: " << e.what();
     }
+    return result;
+}
+
+services::DiffResult services::DiffService::diffDirectories(const std::string& dirA,
+                                                               const std::string& dirB)
+{
+    services::DiffResult result;
+    result.success = false;
+
+    fs::path rootA(dirA), rootB(dirB);
+
+    try {
+        if (!fs::exists(rootA) || !fs::is_directory(rootA)) {
+            result.errorMessage = "dirA is not a directory: " + dirA;
+            return result;
+        }
+        if (!fs::exists(rootB) || !fs::is_directory(rootB)) {
+            result.errorMessage = "dirB is not a directory: " + dirB;
+            return result;
+        }
+    } catch (const std::exception& e) {
+        result.errorMessage = std::string("filesystem error: ") + e.what();
+        return result;
+    }
+
+    Json::Value j;
+    try {
+        j = treediff::Run(rootA, rootB);
+    } catch (const std::exception& e) {
+        result.errorMessage = std::string("treediff failed: ") + e.what();
+        return result;
+    }
+
+    result.success = true;
+    result.data    = std::move(j);
     return result;
 }
 

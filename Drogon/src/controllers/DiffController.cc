@@ -2,7 +2,7 @@
 
 #include <filesystem>
 
-#include "../models/FileRequest.h"
+#include "../models/Request.h"
 #include "../services/DiffService.h"
 #include "../services/FileService.h"
 #include "ControllerHelper.h"
@@ -66,4 +66,89 @@ void api::v1::Diff::diffFiles(const drogon::HttpRequestPtr                      
 void api::v1::Diff::diffWorkspaces(const drogon::HttpRequestPtr                          &req,
                                    std::function<void(const drogon::HttpResponsePtr &)> &&callback)
 {
+    auto json = req->getJsonObject();
+    if (!json) {
+        Json::Value error; error["error"] = "Invalid JSON";
+        auto resp = drogon::HttpResponse::newHttpJsonResponse(error);
+        resp->setStatusCode(drogon::k400BadRequest);
+        callback(resp);
+        return;
+    }
+
+    auto wsReq = drogon_model::WorkspaceRequest::fromJson(*json);
+    if (!wsReq.has_value() || !wsReq->isValid()) {
+        Json::Value error;
+        error["error"] = "Missing or invalid fields: dirPathA, dirPathB";
+        auto resp = drogon::HttpResponse::newHttpJsonResponse(error);
+        resp->setStatusCode(drogon::k400BadRequest);
+        callback(resp);
+        return;
+    }
+
+    // ---- 경로 조립 & canonical ----
+    fs::path joinedA = fs::path(baseDir) / wsReq->dirPathA;
+    fs::path joinedB = fs::path(baseDir) / wsReq->dirPathB;
+
+    std::error_code ec;
+    auto normalize = [&](const fs::path& p) {
+        fs::path w = fs::weakly_canonical(p, ec);
+        if (ec) {
+            ec.clear();  // 다음 호출에 영향을 주지 않게
+            w = fs::absolute(p).lexically_normal();
+        }
+        return w;
+    };
+
+    fs::path fullA = normalize(joinedA);
+    fs::path fullB = normalize(joinedB);
+
+    // 디렉터리 존재/타입 검증
+    auto ensureDir = [](const fs::path &p, const char *which, Json::Value &out) -> bool {
+        std::error_code e;
+        if (!fs::exists(p, e)) { out["error"] = std::string(which) + " not found"; out["path"] = p.generic_string(); return false; }
+        if (!fs::is_directory(p, e)) { out["error"] = std::string(which) + " is not a directory"; out["path"] = p.generic_string(); return false; }
+        return true;
+    };
+
+    {
+        Json::Value e1;
+        if (!ensureDir(fullA, "dirA", e1)) {
+            auto resp = drogon::HttpResponse::newHttpJsonResponse(e1);
+            resp->setStatusCode(drogon::k404NotFound);
+            callback(resp);
+            return;
+        }
+    }
+    {
+        Json::Value e2;
+        if (!ensureDir(fullB, "dirB", e2)) {
+            auto resp = drogon::HttpResponse::newHttpJsonResponse(e2);
+            resp->setStatusCode(drogon::k404NotFound);
+            callback(resp);
+            return;
+        }
+    }
+
+    auto diffResult = services::DiffService::diffDirectories(fullA.generic_string(),
+                                                         fullB.generic_string());
+    if (!diffResult.success) {
+        Json::Value error;
+        error["error"]   = "Failed to perform workspace diff";
+        error["message"] = diffResult.errorMessage;
+        auto resp        = drogon::HttpResponse::newHttpJsonResponse(error);
+        resp->setStatusCode(drogon::k400BadRequest);
+        callback(resp);
+        return;
+    }
+
+    Json::Value response;
+    response["success"] = true;
+    response["data"]    = diffResult.data;
+
+    auto resp = drogon::HttpResponse::newHttpJsonResponse(response);
+    resp->setStatusCode(drogon::k200OK);
+    callback(resp);
+
+    LOG_INFO << "Successfully performed workspace diff between "
+            << fullA.generic_string() << " and " << fullB.generic_string();
 }
