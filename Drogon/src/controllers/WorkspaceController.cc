@@ -10,7 +10,7 @@
 
 namespace fs = std::filesystem;
 
-static std::string baseDir = "/tmp/drogon-app/storage/";
+static std::string baseDir = drogon::app().getCustomConfig()["storage"]["base_dir"].asString();
 
 using helpers::sendError;
 using helpers::sendSuccess;
@@ -47,7 +47,7 @@ void api::v1::Workspace::workspaceImport(
     metadata.updatedAt   = metadata.createdAt;
 
     try {
-        std::string tempDir = "/tmp/drogon-upload/";
+        std::string tempDir = drogon::app().getCustomConfig()["storage"]["temp_upload_dir"].asString();
         if (!fs::exists(tempDir))
             fs::create_directories(tempDir);
 
@@ -98,7 +98,7 @@ void api::v1::Workspace::workspaceExport(
         auto        metadata      = services::WorkspaceService::loadMetadata(workspacePath);
         std::string workspaceName = metadata.name.empty() ? workspaceId : metadata.name;
 
-        std::string tempDir = "/tmp/drogon-export/";
+        std::string tempDir = drogon::app().getCustomConfig()["storage"]["temp_export_dir"].asString();
         if (!fs::exists(tempDir))
             fs::create_directories(tempDir);
 

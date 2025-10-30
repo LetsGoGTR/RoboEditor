@@ -22,12 +22,4 @@ namespace utils
         return oss.str();
     }
 
-    inline std::time_t fileTimeToUnixTime(const std::filesystem::file_time_type &ftime)
-    {
-        auto sctp = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
-                ftime - std::filesystem::file_time_type::clock::now() +
-                std::chrono::system_clock::now());
-        return std::chrono::system_clock::to_time_t(sctp);
-    }
-
 }  // namespace utils

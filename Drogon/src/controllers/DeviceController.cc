@@ -12,7 +12,7 @@
 
 namespace fs = std::filesystem;
 
-static std::string baseDir = "/tmp/drogon-app/storage/";
+static std::string baseDir = drogon::app().getCustomConfig()["storage"]["base_dir"].asString();
 
 using helpers::sendError;
 using helpers::sendSuccess;
@@ -268,7 +268,7 @@ void api::v1::Device::apply(const drogon::HttpRequestPtr                        
 
                 try {
                     // Export workspace to temp file
-                    std::string tempDir = "/tmp/drogon-apply/";
+                    std::string tempDir = drogon::app().getCustomConfig()["storage"]["temp_apply_dir"].asString();
                     if (!fs::exists(tempDir))
                         fs::create_directories(tempDir);
 
@@ -436,7 +436,7 @@ void api::v1::Device::backup(const drogon::HttpRequestPtr                       
 
                             try {
                                 // Save archive to temp file
-                                std::string tempDir = "/tmp/drogon-backup/";
+                                std::string tempDir = drogon::app().getCustomConfig()["storage"]["temp_backup_dir"].asString();
                                 if (!fs::exists(tempDir))
                                     fs::create_directories(tempDir);
 
