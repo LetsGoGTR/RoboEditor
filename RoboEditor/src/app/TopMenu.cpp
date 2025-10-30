@@ -26,10 +26,6 @@ void TopMenu::build()
     openFile_   = file_->addAction("Open File");
     openFolder_ = file_->addAction("Open Folder");
 
-    // add file Shortcuts
-    newFile_->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_N));
-    openFile_->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_O));
-
     // View > Show Log ▶
     showLogMenu_ = view_->addMenu("Show Log");
 
