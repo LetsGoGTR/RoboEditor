@@ -50,6 +50,7 @@ class ComparePage : public QWidget
         // 메인/센터스택 쪽으로 전달할 로그용 이벤트
         void uiCompareClicked(const QString &leftPath, const QString &rightPath);
         void closed();                                 // [X] 클릭
+        void targetPathChanged(const QString &newPath); // 비교 대상 파일 변경됨
 
       private slots:
         void onCompareClicked();
@@ -59,9 +60,8 @@ class ComparePage : public QWidget
         QWidget*     dock_{nullptr};                   // 헤더+[X]+rightSplit
         QSplitter*   rightSplit_{nullptr};             // (좌) rightText_ | (우) diffPanel_
         DropTextEdit* rightText_{nullptr};             // 읽기 전용 (비교대상)
-        QWidget*     diffPanel_{nullptr};              // 기존 “테이블+상단 버튼” 위젯
+        QWidget*     diffPanel_{nullptr};              // 기존 "테이블+상단 버튼" 위젯
         QTableWidget*  diffTable_      = nullptr;
-        QLabel*        fileInfoLabel_  = nullptr;
         QLabel*        statLabel_      = nullptr;
         QString      targetPath_;
 

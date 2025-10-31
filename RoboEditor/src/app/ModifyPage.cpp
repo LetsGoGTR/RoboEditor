@@ -2,10 +2,12 @@
 #include "CodeEditor.h"
 #include "ComparePage.h"
 
+#include <QAbstractButton>
 #include <QApplication>
 #include <QFileInfo>
 #include <QHBoxLayout>
 #include <QKeySequence>
+#include <QMessageBox>
 #include <QShortcut>
 
 ModifyPage::ModifyPage(QWidget *parent) : QWidget(parent), currentDoc(nullptr)
@@ -140,33 +142,83 @@ void ModifyPage::buildUi() {
 }
 
 void ModifyPage::showCompare() {
-    if (!comparePane_) {
-        const QString path = QFileDialog::getOpenFileName(this, tr("Select file to compare"));
-        if (path.isEmpty()) return;
-        ensureCompare();
-        comparePane_->setTargetPath(path);                 // 대상 저장 + 우측뷰 갱신
-        comparePane_->recalcDiff(currentLeftText());       // 좌(현재문서) vs 우(대상)
+    // 케이스 1: 이미 ComparePage가 열려있으면 -> 즉시 재비교
+    if (comparePane_ && comparePane_->isVisible()) {
+        comparePane_->recalcDiff(currentLeftText());
         return;
     }
-    // 이미 열려 있으면 대상 유지, 즉시 재비교
+    
+    // 케이스 2: ComparePage가 닫혀있거나 없음
+    QString targetPath;
+    
+    // 이전에 비교한 파일이 있으면 선택창 표시
+    if (!lastComparedPath_.isEmpty()) {
+        // 간단한 질문 다이얼로그
+        QMessageBox msgBox(this);
+        msgBox.setWindowTitle(tr("파일 비교"));
+        msgBox.setText(tr("이전에 비교한 파일이 있습니다:\n%1\n\n이전 파일을 다시 사용하시겠습니까?")
+                          .arg(QFileInfo(lastComparedPath_).fileName()));
+        msgBox.setIcon(QMessageBox::Question);
+        msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel);
+        msgBox.button(QMessageBox::Yes)->setText(tr("이전 파일 사용"));
+        msgBox.button(QMessageBox::No)->setText(tr("새 파일 선택"));
+        msgBox.button(QMessageBox::Cancel)->setText(tr("취소"));
+        
+        int result = msgBox.exec();
+        
+        if (result == QMessageBox::Yes) {
+            // 이전 파일 재사용
+            targetPath = lastComparedPath_;
+        } else if (result == QMessageBox::No) {
+            // 새 파일 선택
+            targetPath = QFileDialog::getOpenFileName(this, tr("Select file to compare"));
+        } else {
+            // 취소
+            return;
+        }
+    } else {
+        // 이전 파일이 없으면 바로 파일 선택
+        targetPath = QFileDialog::getOpenFileName(this, tr("Select file to compare"));
+    }
+    
+    if (targetPath.isEmpty()) return;
+    
+    // ComparePage 생성 및 비교 실행
+    lastComparedPath_ = targetPath;
+    ensureCompare(targetPath);
     comparePane_->recalcDiff(currentLeftText());
 }
 
-void ModifyPage::ensureCompare() {
-    if (comparePane_) return;
+void ModifyPage::ensureCompare(const QString& targetPath) {
+    if (comparePane_) {
+        // 이미 존재하면 경로만 업데이트
+        comparePane_->setTargetPath(targetPath);
+        comparePane_->show();
+        return;
+    }
+    
+    // 새로 생성
     comparePane_ = new ComparePage(this);
+    comparePane_->setTargetPath(targetPath);
     mainSplit_->addWidget(comparePane_);
     mainSplit_->setStretchFactor(0, 1);
     mainSplit_->setStretchFactor(1, 0);
 
     connect(comparePane_, &ComparePage::closed, this, &ModifyPage::closeCompare);
+    connect(comparePane_, &ComparePage::targetPathChanged, this, [this](const QString& path) {
+        lastComparedPath_ = path;
+    });
     connect(this, &ModifyPage::editorTextChangedForDiff, this, [this]{
-        if (comparePane_) comparePane_->recalcDiff(currentLeftText());
+        if (comparePane_ && comparePane_->isVisible()) {
+            comparePane_->recalcDiff(currentLeftText());
+        }
     });
 }
 
 void ModifyPage::closeCompare() {
     if (!comparePane_) return;
+    
+    // 경로는 보존 (lastComparedPath_에 이미 저장되어 있음)
     comparePane_->hide();
     comparePane_->setParent(nullptr); // 스플리터에서 분리
     comparePane_->deleteLater();
@@ -193,8 +245,8 @@ void ModifyPage::openFromTree(const QString& path) {
 }
 
 void ModifyPage::compareWithFromTree(const QString& path) {
-    ensureCompare();
-    comparePane_->setTargetPath(path);
+    lastComparedPath_ = path;
+    ensureCompare(path);
     comparePane_->recalcDiff(currentLeftText());
 }
 

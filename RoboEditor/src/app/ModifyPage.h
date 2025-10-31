@@ -86,12 +86,13 @@ class ModifyPage : public QWidget
         void              closeDocument(int index);
         void              closeDocument(Document * doc);
         void              buildUi();
-        void              ensureCompare();
+        void              ensureCompare(const QString& targetPath);
         QString           currentLeftText() const;
         QSplitter*        mainSplit_{nullptr};   // [0] editorHost, [1] comparePane(옵션)
         QWidget*          editorHost_{nullptr};
         QPlainTextEdit*   editor_{nullptr};      // 현재 탭의 에디터(CodeEditor)
         ComparePage*      comparePane_{nullptr};
+        QString           lastComparedPath_;     // 마지막으로 비교한 파일 경로 저장
         // 라인번호
         LineNumberArea*   lineArea_{nullptr};
         int               lineNumberAreaWidth() const;

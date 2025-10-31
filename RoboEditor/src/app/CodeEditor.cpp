@@ -14,6 +14,9 @@ void LineNumberArea::paintEvent(QPaintEvent* ev) { editor_->lineNumberAreaPaintE
 CodeEditor::CodeEditor(QWidget* parent): DropTextEdit(parent),
     lineNumberArea_(new LineNumberArea(this)) {
 
+    // CodeEditor는 편집 가능해야 함 (DropTextEdit는 기본 readOnly)
+    setReadOnly(false);
+
     connect(this, &QPlainTextEdit::blockCountChanged,
             this, &CodeEditor::updateLineNumberAreaWidth);
     connect(this, &QPlainTextEdit::updateRequest,

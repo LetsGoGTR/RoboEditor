@@ -62,7 +62,7 @@ void MainWindow::wire()
         return;
     }
     // 왼쪽 네비 → 페이지 전환
-    connect(nav_.get(), &NavDock::clickCompare, this, [=] { center_->showCompare(); });
+    connect(nav_.get(), &NavDock::clickCompare, center_.get(), &CenterStack::showModifyWithCompare);
     connect(nav_.get(), &NavDock::clickBackup, this, [=] { center_->showBackup(); });
     connect(nav_.get(), &NavDock::clickOpenFile, this, [=] { center_->showOpenFile(); });
     connect(nav_.get(), &NavDock::clickApply, this, [=] { center_->showApply(); });
