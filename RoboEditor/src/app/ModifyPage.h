@@ -101,6 +101,9 @@ class ModifyPage : public QWidget
         int cursorLine;
         int cursorColumn;
 
+      public slots:
+        void closeCurrentTab();
+
       private slots:
         void onTextChanged();
 };
