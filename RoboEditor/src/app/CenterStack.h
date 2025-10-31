@@ -23,6 +23,15 @@ class CenterStack : public QWidget
         void showApply();
         void openCompareResult(const QString &left, const QString &right);
 
+        // 페이지 접근자
+        ModifyPage *modifyPage() const
+        {
+            return mfp_;
+        }
+
+      public slots:
+        void showModifyWithCompare();  // ModifyPage로 전환 + Compare 패널 표시
+
         ModifyPage *getModifyPage() const
         {
             return mfp_;

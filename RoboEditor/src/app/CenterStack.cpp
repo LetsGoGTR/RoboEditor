@@ -70,3 +70,14 @@ void CenterStack::showApply()
 {
     stack_->setCurrentIndex(idxA_);
 }
+
+void CenterStack::showModifyWithCompare()
+{
+    // ModifyPage로 전환
+    stack_->setCurrentIndex(idxM_);
+
+    // ModifyPage의 Compare 기능 활성화
+    if (mfp_) {
+        mfp_->showCompare();
+    }
+}

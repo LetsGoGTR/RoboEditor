@@ -4,8 +4,10 @@
 #include <QTableWidget>
 #include <QTableWidgetItem>
 #include <QTextStream>
+#include <QToolButton>
 #include <QTreeView>
 
+#include <QAbstractItemView>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDebug>
@@ -13,53 +15,200 @@
 #include <QFile>
 #include <QFileDialog>
 #include <QFileSystemModel>
+#include <QFrame>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLabel>
 #include <QLineEdit>
 #include <QMessageBox>
+#include <QModelIndex>
 #include <QPushButton>
 #include <QSplitter>
+#include <QStyle>
 #include <QVBoxLayout>
 
 #include "DropTextEdit.h"
 
 ComparePage::ComparePage(QWidget *parent) : QWidget(parent)
 {
-    currentLeftRoot_  = "/robot/A";
-    currentRightRoot_ = "/robot/B";
+    dock_  = buildDock();
+    auto v = new QVBoxLayout(this);
+    v->setContentsMargins(0, 0, 0, 0);
+    v->addWidget(dock_);
+}
 
-    // 상단 바
-    viewModeCombo_ = new QComboBox(this);
-    viewModeCombo_->addItems({"Text", "YAML Key", "JSON Key"});
+QWidget *ComparePage::buildDock()
+{
+    auto w = new QWidget(this);
+    auto v = new QVBoxLayout(w);
+    v->setContentsMargins(0, 0, 0, 0);
 
-    openLeftBtn_    = new QPushButton("Left Folder", this);
-    leftFileSelect_ = new QComboBox(this);
+    // 헤더 + [X] - 탭 스타일로 디자인
+    auto header = new QWidget(w);
+    header->setMaximumHeight(28);
+    header->setStyleSheet("QWidget { "
+                          "  background-color: #f0f0f0; "
+                          "  border: 1px solid #ccc; "
+                          "  border-bottom: none; "
+                          "  border-top-left-radius: 3px; "
+                          "  border-top-right-radius: 3px; "
+                          "}");
+    auto h = new QHBoxLayout(header);
+    h->setContentsMargins(8, 4, 8, 4);
+    h->setSpacing(4);
 
-    openRightBtn_    = new QPushButton("Right Folder", this);
-    rightFileSelect_ = new QComboBox(this);
+    auto  title = new QLabel(tr("Compare"), header);
+    QFont font  = title->font();
+    font.setPointSize(9);
+    title->setFont(font);
 
-    compareBtn_ = new QPushButton("Compare", this);
+    auto btnClose = new QToolButton(header);
+    btnClose->setIcon(style()->standardIcon(QStyle::SP_TitleBarCloseButton));
+    btnClose->setAutoRaise(true);
+    btnClose->setMaximumSize(18, 18);
 
-    fileInfoLabel_ = new QLabel(
-            QString("Left: %1 | Right: %2").arg(currentLeftRoot_, currentRightRoot_), this);
+    h->addWidget(title);
+    h->addStretch();
+    h->addWidget(btnClose);
+    connect(btnClose, &QToolButton::clicked, this, &ComparePage::onCloseClicked);
+    v->addWidget(header);
 
-    auto *topBar = new QHBoxLayout;
-    topBar->addWidget(viewModeCombo_);
-    topBar->addWidget(openLeftBtn_);
-    topBar->addWidget(leftFileSelect_);
-    topBar->addWidget(openRightBtn_);
-    topBar->addWidget(rightFileSelect_);
-    topBar->addWidget(compareBtn_);
-    topBar->addStretch();
-    topBar->addWidget(fileInfoLabel_);
+    // 내부 스플리터: (좌) 비교대상 텍스트(읽기 전용) | (우) diff 패널
+    rightSplit_ = new QSplitter(Qt::Horizontal, w);
 
-    // 좌측 탭 (dirTabs_)
-    dirTabs_ = new QTabWidget(this);
+    // 좌측: 비교 대상 텍스트 - 흰색 배경, 테두리
+    rightText_ = new DropTextEdit(rightSplit_);
+    rightText_->setReadOnly(true);
+    rightText_->setStyleSheet(
+            "QPlainTextEdit { background-color: white; border: 1px solid #ccc; }");
 
-    leftText_  = new DropTextEdit(this);
-    rightText_ = new DropTextEdit(this);
+    // 우측: diff 패널
+    diffPanel_ = buildDiffPanel();
 
+    rightSplit_->addWidget(rightText_);
+    rightSplit_->addWidget(diffPanel_);
+    rightSplit_->setStretchFactor(0, 1);
+    rightSplit_->setStretchFactor(1, 1);
+
+    v->addWidget(rightSplit_);
+    return w;
+}
+
+QWidget *ComparePage::buildDiffPanel()
+{
+    if (diffPanel_)
+        return diffPanel_;
+    diffPanel_ = new QWidget(this);
+    diffPanel_->setStyleSheet("QWidget { "
+                              "  background-color: white; "
+                              "  border: 1px solid #ccc; "
+                              "  border-top: none; "
+                              "}");
+
+    auto v = new QVBoxLayout(diffPanel_);
+    v->setContentsMargins(8, 8, 8, 8);
+
+    // 상단: 파일 선택 + 필터 버튼
+    auto topBar = new QWidget(diffPanel_);
+    topBar->setStyleSheet("QWidget { background-color: transparent; border: none; }");
+    auto topLayout = new QHBoxLayout(topBar);
+    topLayout->setContentsMargins(0, 0, 0, 4);
+    topLayout->setSpacing(6);
+
+    // 파일 선택 버튼
+    auto btnSelectFile = new QPushButton(tr("Select File"), topBar);
+    btnSelectFile->setFixedSize(90, 26);
+    topLayout->addWidget(btnSelectFile);
+
+    connect(btnSelectFile, &QPushButton::clicked, this, [this]() {
+        QString path = QFileDialog::getOpenFileName(this, tr("Select file to compare"));
+        if (!path.isEmpty()) {
+            setTargetPath(path);
+            emit targetPathChanged(path);
+        }
+    });
+
+    // 구분선
+    auto separator1 = new QFrame(topBar);
+    separator1->setFrameShape(QFrame::VLine);
+    separator1->setFrameShadow(QFrame::Sunken);
+    topLayout->addWidget(separator1);
+
+    // 필터 레이블
+    auto filterLabel = new QLabel(tr("Filter:"), topBar);
+    topLayout->addWidget(filterLabel);
+
+    // 필터 버튼들 - 좌측 정렬
+    auto btnAll     = new QPushButton(tr("All"), topBar);
+    auto btnAdded   = new QPushButton(tr("Added"), topBar);
+    auto btnRemoved = new QPushButton(tr("Removed"), topBar);
+    auto btnChanged = new QPushButton(tr("Changed"), topBar);
+
+    btnAll->setCheckable(true);
+    btnAdded->setCheckable(true);
+    btnRemoved->setCheckable(true);
+    btnChanged->setCheckable(true);
+    btnAll->setChecked(true);
+
+    // 버튼 크기 통일
+    btnAll->setFixedSize(50, 26);
+    btnAdded->setFixedSize(60, 26);
+    btnRemoved->setFixedSize(70, 26);
+    btnChanged->setFixedSize(70, 26);
+
+    topLayout->addWidget(btnAll);
+    topLayout->addWidget(btnAdded);
+    topLayout->addWidget(btnRemoved);
+    topLayout->addWidget(btnChanged);
+
+    // 왼쪽으로 밀착
+    topLayout->addStretch();
+
+    // 구분선
+    auto separator2 = new QFrame(topBar);
+    separator2->setFrameShape(QFrame::VLine);
+    separator2->setFrameShadow(QFrame::Sunken);
+    topLayout->addWidget(separator2);
+
+    // 통계 레이블 - 우측
+    if (!statLabel_)
+        statLabel_ = new QLabel("Changes: 0", topBar);
+    statLabel_->setStyleSheet("QLabel { font-weight: bold; }");
+    topLayout->addWidget(statLabel_);
+
+    v->addWidget(topBar);
+
+    // 필터 버튼 연결 (상호 배타적)
+    connect(btnAll, &QPushButton::clicked, this, [=]() {
+        btnAll->setChecked(true);
+        btnAdded->setChecked(false);
+        btnRemoved->setChecked(false);
+        btnChanged->setChecked(false);
+        // TODO: 필터 적용
+    });
+    connect(btnAdded, &QPushButton::clicked, this, [=]() {
+        btnAll->setChecked(false);
+        btnAdded->setChecked(true);
+        btnRemoved->setChecked(false);
+        btnChanged->setChecked(false);
+        // TODO: ADDED만 필터
+    });
+    connect(btnRemoved, &QPushButton::clicked, this, [=]() {
+        btnAll->setChecked(false);
+        btnAdded->setChecked(false);
+        btnRemoved->setChecked(true);
+        btnChanged->setChecked(false);
+        // TODO: REMOVED만 필터
+    });
+    connect(btnChanged, &QPushButton::clicked, this, [=]() {
+        btnAll->setChecked(false);
+        btnAdded->setChecked(false);
+        btnRemoved->setChecked(false);
+        btnChanged->setChecked(true);
+        // TODO: CHANGED만 필터
+    });
+
+<<<<<<< HEAD
     // 왼쪽 탭 페이지
     leftTabPage_  = new QWidget(this);
     rightTabPage_ = new QWidget(this);
@@ -180,130 +329,160 @@ ComparePage::ComparePage(QWidget *parent) : QWidget(parent)
     statLabel_      = new QLabel("Diff: 0 changes", this);
 
     diffTable_ = new QTableWidget(this);
+=======
+    // ===== Diff 테이블 =====
+    if (!diffTable_) {
+        diffTable_ = new QTableWidget(diffPanel_);
+    }
+
+    // 컬럼 설정
+>>>>>>> a09564dbc88ff95326652d5bb5d21a60665de2f9
     diffTable_->setColumnCount(4);
-    diffTable_->setHorizontalHeaderLabels({"Line", "Left", "Right", "State"});
-    diffTable_->horizontalHeader()->setStretchLastSection(false);
-    diffTable_->horizontalHeader()->setSectionResizeMode(QHeaderView::Interactive);
+    diffTable_->setHorizontalHeaderLabels({"Key", "Left", "Right", "State"});
 
-    diffTable_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-    diffTable_->setMinimumWidth(50);
-    diffTable_->setHorizontalScrollMode(QAbstractItemView::ScrollPerPixel);
-    diffTable_->setSizeAdjustPolicy(QAbstractScrollArea::AdjustIgnored);
+    // 가로 헤더 설정
+    QHeaderView *hHeader = diffTable_->horizontalHeader();
+    hHeader->setVisible(true);                                // 헤더 항상 표시
+    hHeader->setStretchLastSection(true);                     // 마지막 컬럼 늘림
+    hHeader->setSectionResizeMode(QHeaderView::Interactive);  // 사용자가 컬럼 크기 조절 가능
+    hHeader->setDefaultAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    hHeader->setHighlightSections(false);
+    hHeader->setStyleSheet("QHeaderView::section { "
+                           "  background-color: #f5f5f5; "
+                           "  border: 1px solid #d0d0d0; "
+                           "  padding: 4px 8px; "
+                           "  font-weight: bold; "
+                           "  font-size: 9pt; "
+                           "}");
 
-    diffTable_->setColumnWidth(0, 50);   // Key/Line
-    diffTable_->setColumnWidth(1, 100);  // Left
-    diffTable_->setColumnWidth(2, 100);  // Right
-    diffTable_->setColumnWidth(3, 70);   // State
+    // 세로 헤더 설정
+    QHeaderView *vHeader = diffTable_->verticalHeader();
+    vHeader->setVisible(true);
+    vHeader->setDefaultSectionSize(28);  // 행 높이 통일
+    vHeader->setSectionResizeMode(QHeaderView::Fixed);
 
-    diffTable_->setSelectionMode(QAbstractItemView::NoSelection);
+    // 테이블 동작 설정
+    diffTable_->setSelectionBehavior(QAbstractItemView::SelectRows);
+    diffTable_->setSelectionMode(QAbstractItemView::SingleSelection);
     diffTable_->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    diffTable_->setAlternatingRowColors(true);
 
-    auto *diffCtrlLayout = new QGridLayout;
-    diffCtrlLayout->setContentsMargins(0, 0, 0, 0);
-    diffCtrlLayout->setHorizontalSpacing(6);
-    diffCtrlLayout->setVerticalSpacing(3);
+    // 테이블 스타일 (스크롤바 포함)
+    diffTable_->setStyleSheet("QTableWidget { "
+                              "  background-color: white; "
+                              "  gridline-color: #e0e0e0; "
+                              "  border: 1px solid #d0d0d0; "
+                              "  font-family: 'Consolas', 'Monaco', 'Courier New', monospace; "
+                              "  font-size: 9pt; "
+                              "} "
+                              "QTableWidget::item { "
+                              "  padding: 4px 8px; "
+                              "  border: none; "
+                              "} "
+                              "QTableWidget::item:selected { "
+                              "  background-color: #cce8ff; "
+                              "  color: black; "
+                              "} "
+                              "QTableWidget::item:alternate { "
+                              "  background-color: #fafafa; "
+                              "} "
+                              /* 세로 스크롤바 */
+                              "QScrollBar:vertical { "
+                              "  background: #f0f0f0; "
+                              "  width: 14px; "
+                              "  border: none; "
+                              "  margin: 0px; "
+                              "} "
+                              "QScrollBar::handle:vertical { "
+                              "  background: #c0c0c0; "
+                              "  min-height: 20px; "
+                              "  border-radius: 7px; "
+                              "  margin: 2px; "
+                              "} "
+                              "QScrollBar::handle:vertical:hover { "
+                              "  background: #a0a0a0; "
+                              "} "
+                              "QScrollBar::handle:vertical:pressed { "
+                              "  background: #808080; "
+                              "} "
+                              "QScrollBar::add-line:vertical, "
+                              "QScrollBar::sub-line:vertical { "
+                              "  height: 0px; "
+                              "} "
+                              "QScrollBar::add-page:vertical, "
+                              "QScrollBar::sub-page:vertical { "
+                              "  background: none; "
+                              "} "
+                              /* 가로 스크롤바 */
+                              "QScrollBar:horizontal { "
+                              "  background: #f0f0f0; "
+                              "  height: 14px; "
+                              "  border: none; "
+                              "  margin: 0px; "
+                              "} "
+                              "QScrollBar::handle:horizontal { "
+                              "  background: #c0c0c0; "
+                              "  min-width: 20px; "
+                              "  border-radius: 7px; "
+                              "  margin: 2px; "
+                              "} "
+                              "QScrollBar::handle:horizontal:hover { "
+                              "  background: #a0a0a0; "
+                              "} "
+                              "QScrollBar::handle:horizontal:pressed { "
+                              "  background: #808080; "
+                              "} "
+                              "QScrollBar::add-line:horizontal, "
+                              "QScrollBar::sub-line:horizontal { "
+                              "  width: 0px; "
+                              "} "
+                              "QScrollBar::add-page:horizontal, "
+                              "QScrollBar::sub-page:horizontal { "
+                              "  background: none; "
+                              "}");
 
-    diffCtrlLayout->addWidget(keySearchEdit_, 0, 0, 1, 1);
-    diffCtrlLayout->addWidget(chkOnlyChanged_, 0, 1, 1, 1);
-    diffCtrlLayout->addWidget(chkHideSame_, 0, 2, 1, 1);
-    diffCtrlLayout->addWidget(chkOnlyAddDel_, 0, 3, 1, 1);
+    // 초기 컬럼 너비 설정
+    diffTable_->setColumnWidth(0, 200);  // Key
+    diffTable_->setColumnWidth(1, 200);  // Left
+    diffTable_->setColumnWidth(2, 200);  // Right
+    // State는 자동으로 늘어남 (stretchLastSection)
 
-    diffCtrlLayout->addWidget(statLabel_, 1, 0, 1, 4);
+    v->addWidget(diffTable_);
 
-    // 왼쪽 폴더 탭 영역 래퍼
-    QWidget *leftPanel = new QWidget(this);
-    {
-        auto *v = new QVBoxLayout;
-        v->setContentsMargins(0, 0, 0, 0);
-        v->addWidget(dirTabs_);
-        leftPanel->setLayout(v);
+    return diffPanel_;
+}
+
+void ComparePage::onCloseClicked()
+{
+    emit closed();
+}
+
+void ComparePage::setTargetPath(const QString &path)
+{
+    targetPath_ = path;
+    loadRightText(targetPath_);
+    emit targetPathChanged(path);
+}
+
+void ComparePage::recalcDiff(const QString &leftText)
+{
+    const QString rightText = rightText_ ? rightText_->toPlainText() : QString();
+
+    // (임시) 빈 diff라도 테이블이 null이 아니도록 보장
+    if (!diffTable_)
+        buildDiffPanel();  // 방어적
+    if (!diffTable_)
+        return;
+
+    // TODO: 이후 실제 diff 로직으로 교체
+    QList<DiffRow> rows;
+    if (!leftText.isEmpty() || !rightText.isEmpty()) {
+        rows.push_back({"(preview)",
+                        QString::number(leftText.size()),
+                        QString::number(rightText.size()),
+                        leftText == rightText ? "SAME" : "CHANGED"});
     }
-
-    // 오른쪽 diff 영역 래퍼
-    QWidget *rightPanel = new QWidget(this);
-    {
-        auto *v = new QVBoxLayout;
-        v->setContentsMargins(0, 0, 0, 0);
-        v->addLayout(diffCtrlLayout);  // 검색/필터 줄
-        v->addWidget(diffTable_, 1);   // diff 테이블 본체
-        rightPanel->setLayout(v);
-    }
-
-    rightPanel->setMinimumWidth(80);
-
-    rightPanel->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
-
-    QSplitter *mainSplit = new QSplitter(Qt::Horizontal, this);
-
-    // 왼쪽 패널(폴더 탭)
-    mainSplit->addWidget(leftPanel);
-
-    // 가운데 패널(텍스트 비교 splitter 포함)
-    mainSplit->addWidget(centerPanel);
-
-    // 오른쪽 패널(diff 테이블)
-    mainSplit->addWidget(rightPanel);
-
-    // 각 영역 초기 비율 설정 (왼:중:오 비슷하게)
-    mainSplit->setStretchFactor(0, 0);  // 폴더 브라우저는 기본적으로 작게
-    mainSplit->setStretchFactor(1, 2);  // 가운데는 크게
-    mainSplit->setStretchFactor(2, 1);  // diff는 중간
-
-    // 최종 레이아웃
-    auto *rootLayout = new QVBoxLayout;
-    rootLayout->setContentsMargins(0, 0, 0, 0);
-    rootLayout->addLayout(topBar);        // 위쪽 컨트롤 바는 그대로 레이아웃
-    rootLayout->addWidget(mainSplit, 1);  // 아래쪽은 이제 splitter 하나
-    setLayout(rootLayout);
-
-    // 초기 파일 목록(더미)
-    leftFiles_  = {"main.yaml", "task.srl", "io_map.yaml"};
-    rightFiles_ = {"main.yaml", "task.srl", "io_map_v2.yaml"};
-    leftFileSelect_->addItems(leftFiles_);
-    rightFileSelect_->addItems(rightFiles_);
-
-    connect(openLeftBtn_, &QPushButton::clicked, this, &ComparePage::onOpenLeftFolderClicked);
-    connect(openRightBtn_, &QPushButton::clicked, this, &ComparePage::onOpenRightFolderClicked);
-    connect(compareBtn_, &QPushButton::clicked, this, &ComparePage::onCompareClicked);
-    if (fsTreeLeft_) {
-        connect(fsTreeLeft_,
-                &QTreeView::doubleClicked,
-                this,
-                &ComparePage::onLeftTreeDoubleClicked);
-        connect(leftText_, &DropTextEdit::fileDroppedToLeft, this, [this](const QString &path) {
-            loadFileIntoEditor(path, /*isLeft=*/true);
-
-            QFileInfo info(path);
-            int       found = leftFileSelect_->findText(info.fileName());
-            if (found == -1) {
-                leftFileSelect_->addItem(info.fileName());
-                found = leftFileSelect_->findText(info.fileName());
-            }
-            leftFileSelect_->setCurrentIndex(found);
-
-            // 현재 루트 갱신까지 하고 싶으면:
-            // currentLeftRoot_ = QFileInfo(path).absolutePath();
-        });
-    }
-    if (fsTreeRight_) {
-        connect(fsTreeRight_,
-                &QTreeView::doubleClicked,
-                this,
-                &ComparePage::onRightTreeDoubleClicked);
-        connect(rightText_, &DropTextEdit::fileDroppedToRight, this, [this](const QString &path) {
-            loadFileIntoEditor(path, /*isLeft=*/false);
-
-            QFileInfo info(path);
-            int       found = rightFileSelect_->findText(info.fileName());
-            if (found == -1) {
-                rightFileSelect_->addItem(info.fileName());
-                found = rightFileSelect_->findText(info.fileName());
-            }
-            rightFileSelect_->setCurrentIndex(found);
-
-            // currentRightRoot_ = QFileInfo(path).absolutePath();
-        });
-    }
+    setDiffRows(rows);
 }
 
 // 내부 상태 업데이트용
@@ -311,57 +490,26 @@ void ComparePage::setRoots(const QString &leftRoot, const QString &rightRoot)
 {
     currentLeftRoot_  = leftRoot;
     currentRightRoot_ = rightRoot;
-    fileInfoLabel_->setText(
-            QString("Left: %1 | Right: %2").arg(currentLeftRoot_, currentRightRoot_));
-}
-
-// 콤보박스 갱신
-// void ComparePage::populateFileSelects(const QStringList& leftFiles,
-//                                       const QStringList& rightFiles)
-// {
-//     leftFileSelect_->clear();
-//     leftFileSelect_->addItems(leftFiles);
-
-//     rightFileSelect_->clear();
-//     rightFileSelect_->addItems(rightFiles);
-// }
-
-// API로 받은 폴더 목록을 UI에 반영하는 자리
-void ComparePage::updateFolderListing(const QString     &side,
-                                      const QString     &basePath,
-                                      const QStringList &folders,
-                                      const QStringList &files)
-{
-    Q_UNUSED(folders)
-
-    if (side == "left") {
-        currentLeftRoot_ = basePath;
-        leftFiles_       = files;
-        leftFileSelect_->clear();
-        leftFileSelect_->addItems(leftFiles_);
-    } else {
-        currentRightRoot_ = basePath;
-        rightFiles_       = files;
-        rightFileSelect_->clear();
-        rightFileSelect_->addItems(rightFiles_);
-    }
-
-    fileInfoLabel_->setText(
-            QString("Left: %1 | Right: %2").arg(currentLeftRoot_, currentRightRoot_));
+    // fileInfoLabel_ 제거됨
 }
 
 // 좌/우 본문 텍스트 채우기
 void ComparePage::setFileContents(const QString &leftText, const QString &rightText)
 {
-    leftText_->setPlainText(leftText);
-    rightText_->setPlainText(rightText);
+    // leftText는 이제 ModifyPage가 가진다. 여기서는 우측만 갱신.
+    Q_UNUSED(leftText);
+    if (rightText_)
+        rightText_->setPlainText(rightText);
 }
 
 // diff 테이블 갱신
 void ComparePage::refreshDiffTable(const QList<DiffRow> &rows)
 {
     diffTable_->setRowCount(rows.size());
-    int changeCount = 0;
+    int changeCount  = 0;
+    int addedCount   = 0;
+    int removedCount = 0;
+    int changedCount = 0;
 
     for (int i = 0; i < rows.size(); i++) {
         const auto &r = rows[i];
@@ -371,25 +519,83 @@ void ComparePage::refreshDiffTable(const QList<DiffRow> &rows)
         auto *itemRight = new QTableWidgetItem(r.target);
         auto *itemState = new QTableWidgetItem(r.state);
 
+        // State에 따라 명확한 색상과 아이콘 적용
         if (r.state == "CHANGED") {
-            itemKey->setBackground(Qt::yellow);
-            itemLeft->setBackground(Qt::yellow);
-            itemRight->setBackground(Qt::yellow);
-            itemState->setBackground(Qt::yellow);
+            // 노란색 - 변경됨
+            QColor bgColor(255, 250, 205);   // 레몬 크림색
+            QColor textColor(184, 134, 11);  // 어두운 황금색
+
+            itemKey->setBackground(bgColor);
+            itemLeft->setBackground(bgColor);
+            itemRight->setBackground(bgColor);
+            itemState->setBackground(bgColor);
+
+            itemState->setForeground(QBrush(textColor));
+            QFont boldFont = itemState->font();
+            boldFont.setBold(true);
+            itemState->setFont(boldFont);
+            itemState->setText("● CHANGED");
+
+            changedCount++;
             changeCount++;
+
         } else if (r.state == "ADDED") {
-            itemKey->setBackground(Qt::green);
-            itemLeft->setBackground(Qt::green);
-            itemRight->setBackground(Qt::green);
-            itemState->setBackground(Qt::green);
+            // 초록색 - 추가됨
+            QColor bgColor(220, 252, 231);  // 연한 민트색
+            QColor textColor(22, 163, 74);  // 진한 초록색
+
+            itemKey->setBackground(bgColor);
+            itemLeft->setBackground(bgColor);
+            itemRight->setBackground(bgColor);
+            itemState->setBackground(bgColor);
+
+            itemState->setForeground(QBrush(textColor));
+            QFont boldFont = itemState->font();
+            boldFont.setBold(true);
+            itemState->setFont(boldFont);
+            itemState->setText("+ ADDED");
+
+            addedCount++;
             changeCount++;
+
         } else if (r.state == "REMOVED") {
-            itemKey->setBackground(Qt::red);
-            itemLeft->setBackground(Qt::red);
-            itemRight->setBackground(Qt::red);
-            itemState->setBackground(Qt::red);
+            // 빨간색 - 삭제됨
+            QColor bgColor(254, 226, 226);  // 연한 핑크색
+            QColor textColor(220, 38, 38);  // 진한 빨강색
+
+            itemKey->setBackground(bgColor);
+            itemLeft->setBackground(bgColor);
+            itemRight->setBackground(bgColor);
+            itemState->setBackground(bgColor);
+
+            itemState->setForeground(QBrush(textColor));
+            QFont boldFont = itemState->font();
+            boldFont.setBold(true);
+            itemState->setFont(boldFont);
+            itemState->setText("− REMOVED");
+
+            removedCount++;
             changeCount++;
+
+        } else if (r.state == "SAME") {
+            // 회색 - 동일함
+            QColor bgColor(249, 250, 251);    // 아주 연한 회색
+            QColor textColor(107, 114, 128);  // 중간 회색
+
+            itemKey->setBackground(bgColor);
+            itemLeft->setBackground(bgColor);
+            itemRight->setBackground(bgColor);
+            itemState->setBackground(bgColor);
+
+            itemState->setForeground(QBrush(textColor));
+            itemState->setText("= SAME");
         }
+
+        // 텍스트 정렬
+        itemKey->setTextAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+        itemLeft->setTextAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+        itemRight->setTextAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+        itemState->setTextAlignment(Qt::AlignCenter | Qt::AlignVCenter);
 
         diffTable_->setItem(i, 0, itemKey);
         diffTable_->setItem(i, 1, itemLeft);
@@ -397,7 +603,12 @@ void ComparePage::refreshDiffTable(const QList<DiffRow> &rows)
         diffTable_->setItem(i, 3, itemState);
     }
 
-    statLabel_->setText(QString("Diff: %1 changes").arg(changeCount));
+    // 통계 업데이트
+    QString stats = QString("Changes: %1").arg(changeCount);
+    if (addedCount > 0 || removedCount > 0 || changedCount > 0) {
+        stats += QString(" (+%1 -%2 ~%3)").arg(addedCount).arg(removedCount).arg(changedCount);
+    }
+    statLabel_->setText(stats);
 }
 
 void ComparePage::setDiffRows(const QList<DiffRow> &rows)
@@ -458,56 +669,20 @@ void ComparePage::fetchCompareFromApiDummy(const QString &leftFilePath,
 // 버튼 핸들러
 // ------------------------
 
-void ComparePage::onOpenLeftFolderClicked()
-{
-    // 나중엔 서버에 basePathHint(currentLeftRoot_) 넘겨서
-    // api/v1/folder?path=currentLeftRoot_
-    //fetchFolderFromApiDummy("left", currentLeftRoot_);
-
-    // 1) 폴더 선택 다이얼로그 오픈
-    QString dirPath = QFileDialog::getExistingDirectory(
-            this,
-            tr("Select LEFT folder"),
-            currentLeftRoot_.isEmpty() ? QDir::homePath() : currentLeftRoot_,
-            QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
-
-    // 사용자가 취소 눌렀으면 빈 문자열이므로 그냥 종료
-    if (dirPath.isEmpty())
-        return;
-
-    // 2) 실제 디렉토리 내용 읽어서 UI 반영
-    loadLocalFolder("left", dirPath);
-}
-
-void ComparePage::onOpenRightFolderClicked()
-{
-    //fetchFolderFromApiDummy("right", currentRightRoot_);
-
-    QString dirPath = QFileDialog::getExistingDirectory(
-            this,
-            tr("Select RIGHT folder"),
-            currentRightRoot_.isEmpty() ? QDir::homePath() : currentRightRoot_,
-            QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
-
-    if (dirPath.isEmpty())
-        return;
-
-    loadLocalFolder("right", dirPath);
-}
-
 void ComparePage::onCompareClicked()
 {
-    // const QString leftPath  = leftFileSelect_->currentText();
-    // const QString rightPath = rightFileSelect_->currentText();
+    // QLineEdit에서 파일명 읽기
+    const QString leftFileName  = leftFileSelect_ ? leftFileSelect_->text().trimmed() : QString();
+    const QString rightFileName = rightFileSelect_ ? rightFileSelect_->text().trimmed() : QString();
 
-    // // 1) 상위(MainWindow까지 올라갈 로그용 이벤트)
-    // emit requestCompare(leftPath, rightPath);
-
-    // // 2) 실제 데이터는 지금은 내부 더미 호출로 UI 갱신
-    // fetchCompareFromApiDummy(leftPath, rightPath);
-
-    const QString leftFileName  = leftFileSelect_->currentText();
-    const QString rightFileName = rightFileSelect_->currentText();
+    if (leftFileName.isEmpty() || rightFileName.isEmpty()) {
+        qWarning() << "[Compare] file name is empty" << leftFileName << rightFileName;
+        return;
+    }
+    if (currentLeftRoot_.isEmpty() || currentRightRoot_.isEmpty()) {
+        qWarning() << "[Compare] root path not set" << currentLeftRoot_ << currentRightRoot_;
+        return;
+    }
 
     // full path 조립
     const QString leftFullPath  = QDir(currentLeftRoot_).filePath(leftFileName);
@@ -516,10 +691,11 @@ void ComparePage::onCompareClicked()
     // 로그/신호
     emit uiCompareClicked(leftFullPath, rightFullPath);
 
+    // 좌/우 에디터 로딩
     loadFileIntoEditor(leftFullPath, /*isLeft=*/true);
     loadFileIntoEditor(rightFullPath, /*isLeft=*/false);
 
-    // 지금은 더미 diff로 렌더만 해줌
+    // 임시 diff
     fetchCompareFromApiDummy(leftFullPath, rightFullPath);
 }
 
@@ -559,89 +735,66 @@ void ComparePage::loadLocalFolder(const QString &side, const QString &path)
     refreshTreeView(side, path);
 }
 
-void ComparePage::refreshTreeView(const QString &side, const QString &path)
+void ComparePage::loadRightText(const QString &path)
 {
-    if (side == "left") {
-        // 모델 루트 세팅
-        QModelIndex idx = fsModelLeft_->setRootPath(path);
-        // 트리뷰에 루트 인덱스 지정
-        fsTreeLeft_->setRootIndex(idx);
-
-        // 보기 편하게 첫 번째 컬럼만 보이도록 하려면:
-        // 숨기고 싶은 컬럼(예: size, type 등) 조정 가능
-        // 예: 1:Size, 2:Type, 3:DateModified (플랫폼/모델에 따라 다를 수도 있음)
-        for (int c = 1; c < fsModelLeft_->columnCount(); ++c) {
-            fsTreeLeft_->setColumnHidden(c, true);
-        }
+    QFile f(path);
+    if (f.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        QTextStream   in(&f);
+        const QString content = in.readAll();
+        f.close();
+        if (rightText_)
+            rightText_->setPlainText(content);
     } else {
-        QModelIndex idx = fsModelRight_->setRootPath(path);
-        fsTreeRight_->setRootIndex(idx);
-        for (int c = 1; c < fsModelRight_->columnCount(); ++c) {
-            fsTreeRight_->setColumnHidden(c, true);
-        }
+        if (rightText_)
+            rightText_->setPlainText(tr("Failed to open: %1").arg(path));
     }
 }
 
 void ComparePage::loadFileIntoEditor(const QString &fullPath, bool isLeft)
 {
     QFile f(fullPath);
-    if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        qWarning() << "[ComparePage] Cannot open file:" << fullPath;
-        // 선택사항: QMessageBox로 사용자에게 알려줄 수도 있음
-        // QMessageBox::warning(this, "Open failed", "파일을 열 수 없습니다:\n" + fullPath);
+    if (!f.open(QIODevice::ReadOnly | QIODevice::Text))
         return;
-    }
     QTextStream   ts(&f);
     const QString content = ts.readAll();
     f.close();
 
     if (isLeft) {
-        leftText_->setPlainText(content);
+        // 좌측은 ModifyPage 영역. 필요하면 시그널로 위임하도록 변경 가능.
+        // 현재는 무시.
+        return;
     } else {
-        rightText_->setPlainText(content);
+        if (rightText_)
+            rightText_->setPlainText(content);
     }
 }
-
-void ComparePage::onLeftTreeDoubleClicked(const QModelIndex &idx)
+// ----- 선언만 있던 슬롯/헬퍼의 최소 구현 -----
+void ComparePage::onOpenLeftFolderClicked()
+{ /* TODO: hook later */
+}
+void ComparePage::onOpenRightFolderClicked()
+{ /* TODO: hook later */
+}
+void ComparePage::onLeftTreeDoubleClicked(const QModelIndex &)
+{ /* TODO */
+}
+void ComparePage::onRightTreeDoubleClicked(const QModelIndex &)
+{ /* TODO */
+}
+void ComparePage::refreshTreeView(const QString &side, const QString &path)
 {
-    if (!idx.isValid())
-        return;
-    // 전체 경로
-    QString path = fsModelLeft_->filePath(idx);
-
-    QFileInfo info(path);
-    if (info.isFile()) {
-        // 왼쪽 에디터에 로드
-        loadFileIntoEditor(path, /*isLeft=*/true);
-
-        // 콤보박스도 이 파일을 가리키게 업데이트해주면 UX 좋아짐
-        // (옵션)
-        int found = leftFileSelect_->findText(info.fileName());
-        if (found == -1) {
-            leftFileSelect_->addItem(info.fileName());
-            found = leftFileSelect_->findText(info.fileName());
-        }
-        leftFileSelect_->setCurrentIndex(found);
-    }
+    Q_UNUSED(side);
+    Q_UNUSED(path);
 }
 
-void ComparePage::onRightTreeDoubleClicked(const QModelIndex &idx)
+void ComparePage::updateFolderListing(const QString &side,
+                                      const QString &basePath,
+                                      const QStringList & /*folders*/,
+                                      const QStringList & /*files*/)
 {
-    if (!idx.isValid())
-        return;
-    QString path = fsModelRight_->filePath(idx);
-
-    QFileInfo info(path);
-    if (info.isFile()) {
-        // 오른쪽 에디터에 로드
-        loadFileIntoEditor(path, /*isLeft=*/false);
-
-        // 우측 콤보박스도 동기화 (옵션)
-        int found = rightFileSelect_->findText(info.fileName());
-        if (found == -1) {
-            rightFileSelect_->addItem(info.fileName());
-            found = rightFileSelect_->findText(info.fileName());
-        }
-        rightFileSelect_->setCurrentIndex(found);
-    }
+    if (side == "left")
+        currentLeftRoot_ = basePath;
+    else
+        currentRightRoot_ = basePath;
+    // fileInfoLabel_ 제거됨
 }
