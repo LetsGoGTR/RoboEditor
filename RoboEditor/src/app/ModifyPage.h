@@ -12,10 +12,17 @@
 #include <QObject>
 #include <QPlainTextEdit>
 #include <QWidget>
+#include <QSplitter>
+#include <QTabWidget>
+#include <QVBoxLayout>
 
 //Document : 개별 파일 관리
 //FileManager : 여러 Document 관리
 //ModifyPage : UI
+
+class ComparePage;
+class LineNumberArea;
+class ModifyPage;
 
 class Document : public QObject
 {
@@ -78,10 +85,23 @@ class ModifyPage : public QWidget
         void              setCurrentDocument(int index);
         void              closeDocument(int index);
         void              closeDocument(Document * doc);
-        Document         *currentDocument();
+        void              buildUi();
+        void              ensureCompare();
+        QString           currentLeftText() const;
+        QSplitter*        mainSplit_{nullptr};   // [0] editorHost, [1] comparePane(옵션)
+        QWidget*          editorHost_{nullptr};
+        QPlainTextEdit*   editor_{nullptr};      // 현재 탭의 에디터(CodeEditor)
+        ComparePage*      comparePane_{nullptr};
+        // 라인번호
+        LineNumberArea*   lineArea_{nullptr};
+        int               lineNumberAreaWidth() const;
+        void              lineNumberAreaPaintEvent(QPaintEvent*);
+        Document           *currentDocument();
 
       signals:
         void uiModifyClicked(const QString &target);
+        void editorFileDropped(const QString& path);      // DropTextEdit 드롭 중계
+        void editorTextChangedForDiff();                  // (선택) 편집 변경→디프 갱신
 
       public:
         void setEditorManager(EditorManager * manager);
@@ -96,6 +116,9 @@ class ModifyPage : public QWidget
         bool      hasUnsavedChanges(Document * doc);
         void      updateTitle();
         void      onTabChanged(int index);
+        // 트리뷰 연동용 (함수만 준비)
+        void      openFromTree(const QString& path);
+        void      compareWithFromTree(const QString& path);
 
       private:
         int cursorLine;
@@ -103,6 +126,10 @@ class ModifyPage : public QWidget
 
       private slots:
         void onTextChanged();
+
+      public slots:
+        void showCompare();    // Compare 버튼 진입: "닫힘→파일선택", "열림→재비교"
+        void closeCompare();   // ComparePane의 [X] 클릭 시 호출
 };
 
 #endif  // MODIFYPAGE_H

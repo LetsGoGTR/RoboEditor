@@ -1,4 +1,6 @@
 #include "ModifyPage.h"
+#include "CodeEditor.h"
+#include "ComparePage.h"
 
 #include <QApplication>
 #include <QFileInfo>
@@ -8,11 +10,7 @@
 
 ModifyPage::ModifyPage(QWidget *parent) : QWidget(parent), currentDoc(nullptr)
 {
-    tabWidget = new QTabWidget(this);
-    tabWidget->setTabsClosable(true);
-    QVBoxLayout *layout = new QVBoxLayout(this);
-    layout->addWidget(tabWidget);
-    setLayout(layout);
+    buildUi();
 
     auto openShortcut = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_O), this);
     connect(openShortcut, &QShortcut::activated, this, &ModifyPage::openFile);
@@ -37,14 +35,14 @@ ModifyPage::ModifyPage(QWidget *parent) : QWidget(parent), currentDoc(nullptr)
     connect(tabWidget, &QTabWidget::currentChanged, [=](int index) {
         if (index < 0 || index >= documents.size()) {
             currentDoc           = nullptr;
-            editor               = nullptr;
+            editor_               = nullptr;
             currentDocumentIndex = -1;
             return;
         }
 
         currentDocumentIndex = index;
         currentDoc           = documents[index];
-        editor               = qobject_cast<QPlainTextEdit *>(tabWidget->widget(index));
+        editor_               = qobject_cast<QPlainTextEdit *>(tabWidget->widget(index));
 
         updateTitle();
     });
@@ -87,26 +85,128 @@ Document *ModifyPage::openDocument(const QString &path)
         return nullptr;
     }
 
-    QPlainTextEdit *newEditor = new QPlainTextEdit();
-    newEditor->setPlainText(doc->gcontent());
+    auto *neweditor_ = new CodeEditor();
+    neweditor_->setPlainText(doc->gcontent());
 
-    int index = tabWidget->addTab(newEditor, doc->gfileName());
+    int index = tabWidget->addTab(neweditor_, doc->gfileName());
     tabWidget->setCurrentIndex(index);
 
-    connect(newEditor, &QPlainTextEdit::textChanged, [=]() {
-        doc->setContent(newEditor->toPlainText());
+    connect(neweditor_, &QPlainTextEdit::textChanged, [=]() {
+        doc->setContent(neweditor_->toPlainText());
         doc->setModified(true);
         updateTitle();
+
+        emit editorTextChangedForDiff();
     });
 
+    connect(neweditor_, &DropTextEdit::fileDroppedToLeft,
+            this, [this](const QString& p){ emit editorFileDropped(p); });
+    connect(neweditor_, &DropTextEdit::fileDroppedToRight,
+            this, [this](const QString& p){ emit editorFileDropped(p); });
+
     currentDoc = doc;
-    editor     = newEditor;
+    editor_     = neweditor_;
     updateTitle();
     documents.append(doc);
     setCurrentDocument(documents.size() - 1);
 
     return doc;
 }
+
+QString ModifyPage::currentLeftText() const {
+    // Document를 신뢰해서 문자열 스냅샷만 전달
+    if (currentDoc) return currentDoc->gcontent();
+    // (혹은 탭 위젯에서 직접 읽어도 됨)
+    auto *ed = qobject_cast<QPlainTextEdit*>(tabWidget->currentWidget());
+    return ed ? ed->toPlainText() : QString();
+}
+
+void ModifyPage::buildUi() {
+    auto outer = new QVBoxLayout(this);
+    outer->setContentsMargins(0,0,0,0);
+
+    mainSplit_  = new QSplitter(Qt::Horizontal, this);
+    editorHost_ = new QWidget(mainSplit_);
+    auto ev = new QVBoxLayout(editorHost_);
+    ev->setContentsMargins(0,0,0,0);
+
+    // 여기서 탭을 **한 번만** 만든다
+    tabWidget = new QTabWidget(editorHost_);
+    tabWidget->setTabsClosable(true);
+    ev->addWidget(tabWidget);
+
+    mainSplit_->addWidget(editorHost_);  // [0]은 항상 ModifyPage(탭)
+    outer->addWidget(mainSplit_);
+}
+
+void ModifyPage::showCompare() {
+    if (!comparePane_) {
+        const QString path = QFileDialog::getOpenFileName(this, tr("Select file to compare"));
+        if (path.isEmpty()) return;
+        ensureCompare();
+        comparePane_->setTargetPath(path);                 // 대상 저장 + 우측뷰 갱신
+        comparePane_->recalcDiff(currentLeftText());       // 좌(현재문서) vs 우(대상)
+        return;
+    }
+    // 이미 열려 있으면 대상 유지, 즉시 재비교
+    comparePane_->recalcDiff(currentLeftText());
+}
+
+void ModifyPage::ensureCompare() {
+    if (comparePane_) return;
+    comparePane_ = new ComparePage(this);
+    mainSplit_->addWidget(comparePane_);
+    mainSplit_->setStretchFactor(0, 1);
+    mainSplit_->setStretchFactor(1, 0);
+
+    connect(comparePane_, &ComparePage::closed, this, &ModifyPage::closeCompare);
+    connect(this, &ModifyPage::editorTextChangedForDiff, this, [this]{
+        if (comparePane_) comparePane_->recalcDiff(currentLeftText());
+    });
+}
+
+void ModifyPage::closeCompare() {
+    if (!comparePane_) return;
+    comparePane_->hide();
+    comparePane_->setParent(nullptr); // 스플리터에서 분리
+    comparePane_->deleteLater();
+    comparePane_ = nullptr;
+}
+
+void ModifyPage::openFromTree(const QString& path) {
+    QFile f(path);
+    if (f.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        QTextStream in(&f);
+        const QString text = in.readAll();
+        f.close();
+
+        auto *ed = qobject_cast<QPlainTextEdit*>(tabWidget->currentWidget());
+        if (ed) {
+            ed->setPlainText(text);
+            if (currentDoc) {
+                currentDoc->setContent(text);
+                currentDoc->setModified(true);
+                updateTitle();
+            }
+        }
+    }
+}
+
+void ModifyPage::compareWithFromTree(const QString& path) {
+    ensureCompare();
+    comparePane_->setTargetPath(path);
+    comparePane_->recalcDiff(currentLeftText());
+}
+
+int ModifyPage::lineNumberAreaWidth() const {
+    auto *ed = editor_ ? editor_ : qobject_cast<QPlainTextEdit*>(tabWidget->currentWidget());
+    if (!ed) return 12;
+    int digits = 1, max = qMax(1, ed->blockCount());
+    while (max >= 10) { max /= 10; ++digits; }
+    return 6 + 3 + ed->fontMetrics().horizontalAdvance(QLatin1Char('9')) * digits;
+}
+
+
 void ModifyPage::closeDocument(int index)
 {
     documents.removeAt(index);
@@ -145,10 +245,10 @@ void ModifyPage::closeFile(int index)
 
     if (!documents.isEmpty()) {
         currentDoc = documents.last();
-        editor     = qobject_cast<QPlainTextEdit *>(tabWidget->widget(tabWidget->count() - 1));
+        editor_     = qobject_cast<QPlainTextEdit *>(tabWidget->widget(tabWidget->count() - 1));
     } else {
         currentDoc = nullptr;
-        editor     = nullptr;
+        editor_     = nullptr;
     }
     updateTitle();
 }
@@ -251,7 +351,7 @@ bool ModifyPage::hasUnsavedChanges(Document *doc)
 void ModifyPage::onTextChanged()
 {
     if (currentDoc) {
-        currentDoc->setContent(editor->toPlainText());
+        currentDoc->setContent(editor_->toPlainText());
         currentDoc->setModified(true);
     }
 }

@@ -6,6 +6,7 @@
 #include <QString>
 #include <QStringList>
 #include <QWidget>
+#include <QSplitter>
 
 class QComboBox;
 class QPushButton;
@@ -23,7 +24,9 @@ class ComparePage : public QWidget
     Q_OBJECT
       public:
         explicit ComparePage(QWidget *parent = nullptr);
+        void setTargetPath(const QString& path);       // 파일 선택 시 1회 호출
 
+        QWidget* buildDiffPanel();
         struct DiffRow
         {
             QString key;
@@ -32,18 +35,40 @@ class ComparePage : public QWidget
             QString state;  // "SAME", "CHANGED", "ADDED", "REMOVED"
         };
 
+      public slots:
+        void onOpenLeftFolderClicked();
+        void onOpenRightFolderClicked();
+        void onLeftTreeDoubleClicked(const QModelIndex& idx);
+        void onRightTreeDoubleClicked(const QModelIndex& idx);
+
+        void refreshTreeView(const QString& side, const QString& path);
+        void loadLocalFolder(const QString& side, const QString& path);
+
+        void recalcDiff(const QString& leftText);      // 좌 텍스트 받아 재계산
+
       signals:
         // 메인/센터스택 쪽으로 전달할 로그용 이벤트
         void uiCompareClicked(const QString &leftPath, const QString &rightPath);
+        void closed();                                 // [X] 클릭
 
       private slots:
-        void onOpenLeftFolderClicked();
-        void onOpenRightFolderClicked();
         void onCompareClicked();
-        void onLeftTreeDoubleClicked(const QModelIndex &idx);
-        void onRightTreeDoubleClicked(const QModelIndex &idx);
+        void onCloseClicked();
 
       private:
+        QWidget*     dock_{nullptr};                   // 헤더+[X]+rightSplit
+        QSplitter*   rightSplit_{nullptr};             // (좌) rightText_ | (우) diffPanel_
+        DropTextEdit* rightText_{nullptr};             // 읽기 전용 (비교대상)
+        QWidget*     diffPanel_{nullptr};              // 기존 “테이블+상단 버튼” 위젯
+        QTableWidget*  diffTable_      = nullptr;
+        QLabel*        fileInfoLabel_  = nullptr;
+        QLabel*        statLabel_      = nullptr;
+        QString      targetPath_;
+
+        QLineEdit* leftFileSelect_{nullptr};
+        QLineEdit* rightFileSelect_{nullptr};
+
+        QWidget* buildDock();
         // 현재 선택된 루트 경로
         QString currentLeftRoot_;
         QString currentRightRoot_;
@@ -57,32 +82,15 @@ class ComparePage : public QWidget
         QWidget    *leftTabPage_;
         QWidget    *rightTabPage_;
 
-        // 상단 컨트롤
-        QComboBox   *viewModeCombo_;
-        QPushButton *openLeftBtn_;
-        QComboBox   *leftFileSelect_;
-        QPushButton *openRightBtn_;
-        QComboBox   *rightFileSelect_;
-        QPushButton *compareBtn_;
-        QLabel      *fileInfoLabel_;
-
         // 본문 텍스트 뷰
         DropTextEdit *leftText_;
-        DropTextEdit *rightText_;
+        //DropTextEdit *rightText_;
 
         // diff 영역
         QLineEdit    *keySearchEdit_;
         QCheckBox    *chkOnlyChanged_;
         QCheckBox    *chkHideSame_;
         QCheckBox    *chkOnlyAddDel_;
-        QLabel       *statLabel_;
-        QTableWidget *diffTable_;
-
-        // (지금은 안 보이는 로컬/미래용 트리 모델)
-        QFileSystemModel *fsModelLeft_;
-        QFileSystemModel *fsModelRight_;
-        QTreeView        *fsTreeLeft_;
-        QTreeView        *fsTreeRight_;
 
         // 내부 유틸
         void setRoots(const QString &leftRoot, const QString &rightRoot);
@@ -96,11 +104,10 @@ class ComparePage : public QWidget
         void setDiffRows(const QList<DiffRow> &rows);
         void refreshDiffTable(const QList<DiffRow> &rows);
 
+        void loadRightText(const QString& path);
         // 나중에 REST 붙일 자리 (지금은 더미)
         void fetchFolderFromApiDummy(const QString &side, const QString &basePathHint);
         void fetchCompareFromApiDummy(const QString &leftFilePath, const QString &rightFilePath);
-        void loadLocalFolder(const QString &side, const QString &path);
-        void refreshTreeView(const QString &side, const QString &path);
         void loadFileIntoEditor(const QString &fullPath, bool isLeft);
 };
 

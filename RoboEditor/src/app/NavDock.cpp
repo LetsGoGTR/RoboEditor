@@ -20,7 +20,7 @@ void NavDock::build()
     v->setSpacing(8);
     auto mk = [&](const QString &t) {
         auto *b = new QPushButton(t);
-        b->setMinimumWidth(180);
+        b->setMinimumWidth(60);
         return b;
     };
     auto *bC = mk("비교하기"), *bB = mk("백업하기"), *bA = mk("적용하기"), *bM = mk("수정하기"),
