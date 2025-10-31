@@ -23,6 +23,11 @@ class CenterStack : public QWidget
         void showApply();
         void openCompareResult(const QString &left, const QString &right);
 
+        ModifyPage *getModifyPage() const
+        {
+            return mfp_;
+        }
+
         // 메인윈도우가 받을 시그널 (재발행)
       signals:
         void compareRequested(const QString &left, const QString &right);

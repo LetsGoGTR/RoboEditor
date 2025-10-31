@@ -14,25 +14,6 @@ ModifyPage::ModifyPage(QWidget *parent) : QWidget(parent), currentDoc(nullptr)
     layout->addWidget(tabWidget);
     setLayout(layout);
 
-    auto openShortcut = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_O), this);
-    connect(openShortcut, &QShortcut::activated, this, &ModifyPage::openFile);
-
-    auto saveShortcut = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_S), this);
-    connect(saveShortcut, &QShortcut::activated, this, &ModifyPage::saveFile);
-
-    auto saveAsShortcut = new QShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_S), this);
-    connect(saveAsShortcut, &QShortcut::activated, this, &ModifyPage::saveAsFile);
-
-    auto closeShortcut = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_W), this);
-    connect(closeShortcut, &QShortcut::activated, this, [this]() {
-        int index = tabWidget->currentIndex();
-        if (index >= 0)
-            closeFile(index);
-    });
-
-    auto quitShortcut = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Q), this);
-    connect(quitShortcut, &QShortcut::activated, this, []() { QApplication::quit(); });
-
     // 탭 전환 시 현재 문서 갱신
     connect(tabWidget, &QTabWidget::currentChanged, [=](int index) {
         if (index < 0 || index >= documents.size()) {
@@ -248,6 +229,14 @@ bool ModifyPage::hasUnsavedChanges(Document *doc)
         return false;
     return doc->gisModified();
 }
+
+void ModifyPage::closeCurrentTab()
+{
+    int index = tabWidget->currentIndex();
+    if (index >= 0)
+        closeFile(index);
+}
+
 void ModifyPage::onTextChanged()
 {
     if (currentDoc) {
