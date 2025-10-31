@@ -35,6 +35,7 @@ set(PROJECT_SOURCES
         src/app/PasswordManager.cpp
         src/app/SelectController.cpp
         src/app/SelectStorage.cpp
+        src/app/Center.cpp
 
         src/app/BackupPage.h
         src/app/OpenFilePage.h
@@ -51,6 +52,7 @@ set(PROJECT_SOURCES
         src/app/PasswordManager.h
         src/app/SelectController.h
         src/app/SelectStorage.h
+        src/app/Center.h
 
         src/ui/mainwindow.ui
         src/ui/ApplyPage.ui

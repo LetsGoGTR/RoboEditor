@@ -111,7 +111,7 @@ ComparePage::ComparePage(QWidget *parent) : QWidget(parent)
     rightText_->setAcceptAsLeft(false);
     rightText_->setAcceptAsRight(true);
 
-    // 왼쪽 탭 layout
+    // 왼쪽 탭 layout : 제어기
     {
         auto *v = new QVBoxLayout;
         v->setContentsMargins(0, 0, 0, 0);
@@ -120,7 +120,7 @@ ComparePage::ComparePage(QWidget *parent) : QWidget(parent)
         leftTabPage_->setLayout(v);
     }
 
-    // 오른쪽 탭 layout
+    // 오른쪽 탭 layout : 워크스페이스
     {
         auto *v = new QVBoxLayout;
         v->setContentsMargins(0, 0, 0, 0);

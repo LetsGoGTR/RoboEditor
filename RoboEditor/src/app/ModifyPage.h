@@ -78,7 +78,6 @@ class ModifyPage : public QWidget
         void              setCurrentDocument(int index);
         void              closeDocument(int index);
         void              closeDocument(Document * doc);
-        Document         *currentDocument();
 
       signals:
         void uiModifyClicked(const QString &target);
@@ -88,7 +87,9 @@ class ModifyPage : public QWidget
         explicit ModifyPage(QWidget *parent = nullptr);
         QTabWidget *tabWidget;
 
+        // 외부에서 접근 가능한 메서드들
         Document *openDocument(const QString &path);
+        Document *currentDocument();  // private에서 public으로 이동
         void      closeFile(int index);
         void      openFile();
         void      saveFile();

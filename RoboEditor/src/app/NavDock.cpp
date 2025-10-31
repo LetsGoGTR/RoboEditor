@@ -1,7 +1,9 @@
 #include "NavDock.h"
 
 #include <QIcon>
-
+#include <QVBoxLayout>     // ✅ 추가
+#include <QPushButton>     // ✅ 추가
+#include <QAction>         // ✅ 추가 (필요)
 NavDock::NavDock(QWidget *parent) : QToolBar(parent)
 {
     setMovable(false);
@@ -10,7 +12,6 @@ NavDock::NavDock(QWidget *parent) : QToolBar(parent)
     setIconSize(QSize(24, 24));
     build();
 }
-
 void NavDock::build()
 {
     auto mk = [&](const QString &text, const QString &iconPath) {
@@ -32,3 +33,4 @@ void NavDock::build()
     connect(actModify, &QAction::triggered, this, &NavDock::clickModify);
     connect(actOpen, &QAction::triggered, this, &NavDock::clickOpenFile);
 }
+
