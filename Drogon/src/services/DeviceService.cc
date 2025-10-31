@@ -1,5 +1,8 @@
 #include "DeviceService.h"
 
+#include "../utils/JsonFileUtils.h"
+#include "../utils/TimeUtils.h"
+
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -8,17 +11,7 @@
 
 namespace fs = std::filesystem;
 
-const std::string services::DeviceService::metadataFilename_ = ".metadata.json";
-
-// Helper functions
-services::DeviceOperationResult services::DeviceService::createError(const std::string &message)
-{
-    DeviceOperationResult result;
-    result.success      = false;
-    result.errorMessage = message;
-    LOG_ERROR << message;
-    return result;
-}
+const std::string services::DeviceService::metadataFilename_ = ".device.json";
 
 Json::Value services::DeviceMetadata::toJson() const
 {
@@ -52,101 +45,25 @@ services::DeviceMetadata services::DeviceMetadata::fromJson(const Json::Value &j
     return metadata;
 }
 
-std::string services::DeviceService::getCurrentTimestamp()
-{
-    auto now        = std::chrono::system_clock::now();
-    auto time_t_now = std::chrono::system_clock::to_time_t(now);
-    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
-
-    std::ostringstream oss;
-    oss << std::put_time(std::gmtime(&time_t_now), "%Y-%m-%dT%H:%M:%S");
-    oss << '.' << std::setfill('0') << std::setw(3) << ms.count() << 'Z';
-
-    return oss.str();
-}
-
-bool services::DeviceService::saveMetadata(const std::string    &devicePath,
-                                           const DeviceMetadata &metadata)
-{
-    try {
-        std::string   metadataPath = devicePath + "/" + metadataFilename_;
-        std::ofstream file(metadataPath);
-
-        if (!file.is_open()) {
-            LOG_ERROR << "Failed to open metadata file for writing: " << metadataPath;
-            return false;
-        }
-
-        Json::Value               json = metadata.toJson();
-        Json::StreamWriterBuilder writer;
-        writer["indentation"] = "  ";
-        std::string jsonStr   = Json::writeString(writer, json);
-
-        file << jsonStr;
-        file.close();
-
-        LOG_INFO << "Metadata saved: " << metadataPath;
-        return true;
-
-    } catch (const std::exception &e) {
-        LOG_ERROR << "Failed to save metadata: " << e.what();
-        return false;
-    }
-}
-
 services::DeviceMetadata services::DeviceService::loadMetadata(const std::string &devicePath)
 {
-    DeviceMetadata metadata;
-
-    try {
-        std::string metadataPath = devicePath + "/" + metadataFilename_;
-
-        if (!fs::exists(metadataPath)) {
-            LOG_WARN << "Metadata file not found: " << metadataPath;
-            return metadata;
-        }
-
-        std::ifstream file(metadataPath);
-        if (!file.is_open()) {
-            LOG_ERROR << "Failed to open metadata file: " << metadataPath;
-            return metadata;
-        }
-
-        Json::Value             json;
-        Json::CharReaderBuilder reader;
-        std::string             errors;
-
-        if (!Json::parseFromStream(reader, file, &json, &errors)) {
-            LOG_ERROR << "Failed to parse metadata JSON: " << errors;
-            file.close();
-            return metadata;
-        }
-
-        file.close();
-        metadata = DeviceMetadata::fromJson(json);
-
-        LOG_INFO << "Metadata loaded: " << metadataPath;
-
-    } catch (const std::exception &e) {
-        LOG_ERROR << "Failed to load metadata: " << e.what();
-    }
-
-    return metadata;
+    std::string metadataPath = devicePath + "/" + metadataFilename_;
+    return utils::loadJsonFromFile<DeviceMetadata>(metadataPath);
 }
 
-services::DeviceOperationResult
+services::ServiceResult
 services::DeviceService::createDevice(const std::string &baseDir, const DeviceMetadata &metadata)
 {
     // Validation
     if (metadata.id.empty()) {
-        return createError("Device ID cannot be empty");
+        return ServiceResult::createError("Device ID cannot be empty");
     }
 
     std::string devicePath = baseDir + metadata.id;
 
     // Check if device already exists
     if (fs::exists(devicePath)) {
-        return createError("Device already exists: " + metadata.id);
+        return ServiceResult::createError("Device already exists: " + metadata.id);
     }
 
     try {
@@ -155,17 +72,18 @@ services::DeviceService::createDevice(const std::string &baseDir, const DeviceMe
 
         // Prepare metadata with timestamps
         DeviceMetadata newMetadata = metadata;
-        std::string    timestamp   = getCurrentTimestamp();
+        std::string    timestamp   = utils::getCurrentTimestamp();
         newMetadata.createdAt      = timestamp;
         newMetadata.updatedAt      = timestamp;
 
         // Save metadata
-        if (!saveMetadata(devicePath, newMetadata)) {
+        std::string metadataPath = devicePath + "/" + metadataFilename_;
+        if (!utils::saveJsonToFile(metadataPath, newMetadata)) {
             fs::remove_all(devicePath);
-            return createError("Failed to save metadata");
+            return ServiceResult::createError("Failed to save metadata");
         }
 
-        DeviceOperationResult result;
+        ServiceResult result;
         result.success = true;
         result.data    = newMetadata.toJson();
 
@@ -175,26 +93,26 @@ services::DeviceService::createDevice(const std::string &baseDir, const DeviceMe
     } catch (const std::exception &e) {
         if (fs::exists(devicePath))
             fs::remove_all(devicePath);
-        return createError("Create failed: " + std::string(e.what()));
+        return ServiceResult::createError("Create failed: " + std::string(e.what()));
     }
 }
 
-services::DeviceOperationResult services::DeviceService::readDevice(const std::string &baseDir,
+services::ServiceResult services::DeviceService::readDevice(const std::string &baseDir,
                                                                     const std::string &deviceId)
 {
     std::string devicePath = baseDir + deviceId;
 
     // Validation
     if (!fs::exists(devicePath) || !fs::is_directory(devicePath)) {
-        return createError("Device not found: " + deviceId);
+        return ServiceResult::createError("Device not found: " + deviceId);
     }
 
     DeviceMetadata metadata = loadMetadata(devicePath);
     if (metadata.id.empty()) {
-        return createError("Invalid device metadata: " + deviceId);
+        return ServiceResult::createError("Invalid device metadata: " + deviceId);
     }
 
-    DeviceOperationResult result;
+    ServiceResult result;
     result.success = true;
     result.data    = metadata.toJson();
 
@@ -202,20 +120,20 @@ services::DeviceOperationResult services::DeviceService::readDevice(const std::s
     return result;
 }
 
-services::DeviceOperationResult services::DeviceService::updateDevice(
+services::ServiceResult services::DeviceService::updateDevice(
         const std::string &baseDir, const std::string &deviceId, const DeviceMetadata &metadata)
 {
     std::string devicePath = baseDir + deviceId;
 
     // Validation
     if (!fs::exists(devicePath) || !fs::is_directory(devicePath)) {
-        return createError("Device not found: " + deviceId);
+        return ServiceResult::createError("Device not found: " + deviceId);
     }
 
     // Load existing metadata to preserve createdAt
     DeviceMetadata existingMetadata = loadMetadata(devicePath);
     if (existingMetadata.id.empty()) {
-        return createError("Invalid device metadata: " + deviceId);
+        return ServiceResult::createError("Invalid device metadata: " + deviceId);
     }
 
     try {
@@ -223,14 +141,15 @@ services::DeviceOperationResult services::DeviceService::updateDevice(
         DeviceMetadata updatedMetadata = metadata;
         updatedMetadata.id             = deviceId;  // Ensure ID doesn't change
         updatedMetadata.createdAt      = existingMetadata.createdAt;
-        updatedMetadata.updatedAt      = getCurrentTimestamp();
+        updatedMetadata.updatedAt      = utils::getCurrentTimestamp();
 
         // Save metadata
-        if (!saveMetadata(devicePath, updatedMetadata)) {
-            return createError("Failed to save metadata");
+        std::string metadataPath = devicePath + "/" + metadataFilename_;
+        if (!utils::saveJsonToFile(metadataPath, updatedMetadata)) {
+            return ServiceResult::createError("Failed to save metadata");
         }
 
-        DeviceOperationResult result;
+        ServiceResult result;
         result.success = true;
         result.data    = updatedMetadata.toJson();
 
@@ -238,18 +157,18 @@ services::DeviceOperationResult services::DeviceService::updateDevice(
         return result;
 
     } catch (const std::exception &e) {
-        return createError("Update failed: " + std::string(e.what()));
+        return ServiceResult::createError("Update failed: " + std::string(e.what()));
     }
 }
 
-services::DeviceOperationResult services::DeviceService::deleteDevice(const std::string &baseDir,
+services::ServiceResult services::DeviceService::deleteDevice(const std::string &baseDir,
                                                                       const std::string &deviceId)
 {
     std::string devicePath = baseDir + deviceId;
 
     // Validation
     if (!fs::exists(devicePath) || !fs::is_directory(devicePath)) {
-        return createError("Device not found: " + deviceId);
+        return ServiceResult::createError("Device not found: " + deviceId);
     }
 
     try {
@@ -259,7 +178,7 @@ services::DeviceOperationResult services::DeviceService::deleteDevice(const std:
         // Delete device directory
         fs::remove_all(devicePath);
 
-        DeviceOperationResult result;
+        ServiceResult result;
         result.success = true;
         result.data    = metadata.toJson();
 
@@ -267,17 +186,17 @@ services::DeviceOperationResult services::DeviceService::deleteDevice(const std:
         return result;
 
     } catch (const std::exception &e) {
-        return createError("Delete failed: " + std::string(e.what()));
+        return ServiceResult::createError("Delete failed: " + std::string(e.what()));
     }
 }
 
-services::DeviceOperationResult services::DeviceService::listDevices(const std::string &baseDir)
+services::ServiceResult services::DeviceService::listDevices(const std::string &baseDir)
 {
     if (!fs::exists(baseDir)) {
         try {
             fs::create_directories(baseDir);
         } catch (const std::exception &e) {
-            return createError("Failed to create base directory: " + std::string(e.what()));
+            return ServiceResult::createError("Failed to create base directory: " + std::string(e.what()));
         }
     }
 
@@ -295,8 +214,8 @@ services::DeviceOperationResult services::DeviceService::listDevices(const std::
             devices.append(metadata.toJson());
         }
 
-        DeviceOperationResult result;
-        result.success        = true;
+        ServiceResult result;
+        result.success         = true;
         result.data["devices"] = devices;
         result.data["count"]   = (int)devices.size();
 
@@ -304,6 +223,6 @@ services::DeviceOperationResult services::DeviceService::listDevices(const std::
         return result;
 
     } catch (const std::exception &e) {
-        return createError("List failed: " + std::string(e.what()));
+        return ServiceResult::createError("List failed: " + std::string(e.what()));
     }
 }

@@ -7,11 +7,13 @@
 #include "../services/AuthService.h"
 #include "../services/DeviceService.h"
 #include "../services/WorkspaceService.h"
+#include "../utils/RobotHttpClient.h"
+#include "../utils/TimeUtils.h"
 #include "ControllerHelper.h"
 
 namespace fs = std::filesystem;
 
-static std::string baseDir = "/tmp/drogon-app/storage/";
+static std::string baseDir = drogon::app().getCustomConfig()["storage"]["base_dir"].asString();
 
 using helpers::sendError;
 using helpers::sendSuccess;
@@ -233,41 +235,11 @@ void api::v1::Device::apply(const drogon::HttpRequestPtr                        
     auto callbackPtr = std::make_shared<std::function<void(const drogon::HttpResponsePtr &)>>(
             std::move(callback));
 
-    // Check if robot is running
-    auto runningClient = drogon::HttpClient::newHttpClient("http://" + ip);
-    auto runningReq    = drogon::HttpRequest::newHttpRequest();
-    runningReq->setPath("/api/v1/robot/running");
-    runningReq->setMethod(drogon::Get);
-
-    runningClient->sendRequest(
-            runningReq,
-            [callbackPtr, ip, deviceId, workspaceId, this](
-                    drogon::ReqResult result, const drogon::HttpResponsePtr &response) {
-                if (result != drogon::ReqResult::Ok) {
-                    return sendError(*callbackPtr,
-                                     drogon::k500InternalServerError,
-                                     "Failed to connect to robot",
-                                     ip);
-                }
-
-                auto json = response->getJsonObject();
-                if (!json || !json->isMember("data")) {
-                    return sendError(*callbackPtr,
-                                     drogon::k500InternalServerError,
-                                     "Invalid response from robot");
-                }
-
-                bool isRunning = (*json)["data"].asBool();
-                if (isRunning) {
-                    return sendError(*callbackPtr,
-                                     drogon::k409Conflict,
-                                     "Robot is running",
-                                     "Cannot apply while robot is running");
-                }
-
-                try {
+    // Check if robot is running before proceeding
+    checkRobotStatus(ip, [callbackPtr, ip, deviceId, workspaceId, this]() {
+        try {
                     // Export workspace to temp file
-                    std::string tempDir = "/tmp/drogon-apply/";
+                    std::string tempDir = drogon::app().getCustomConfig()["storage"]["temp_apply_dir"].asString();
                     if (!fs::exists(tempDir))
                         fs::create_directories(tempDir);
 
@@ -286,65 +258,24 @@ void api::v1::Device::apply(const drogon::HttpRequestPtr                        
                                          exportResult.errorMessage);
                     }
 
-                    // Read file content
-                    std::ifstream file(tempFile, std::ios::binary);
-                    if (!file.is_open()) {
-                        fs::remove(tempFile);
-                        return sendError(*callbackPtr,
-                                         drogon::k500InternalServerError,
-                                         "Failed to read exported file");
-                    }
-
-                    std::ostringstream fileBuffer;
-                    fileBuffer << file.rdbuf();
-                    std::string fileContent = fileBuffer.str();
-                    file.close();
-
-                    // Build multipart/form-data body
-                    std::string boundary = "----WebKitFormBoundary" + drogon::utils::getUuid();
-                    std::ostringstream multipartBody;
-
-                    multipartBody << "--" << boundary << "\r\n";
-                    multipartBody << "Content-Disposition: form-data; name=\"file\"; "
-                                  << "filename=\"workspace.tar.gz\"\r\n";
-                    multipartBody << "Content-Type: application/gzip\r\n\r\n";
-                    multipartBody << fileContent;
-                    multipartBody << "\r\n--" << boundary << "--\r\n";
-
-                    // Upload to robot
-                    auto uploadClient = drogon::HttpClient::newHttpClient("http://" + ip);
-                    auto uploadReq    = drogon::HttpRequest::newHttpRequest();
-                    uploadReq->setPath("/api/v1/robot/import");
-                    uploadReq->setMethod(drogon::Post);
-                    uploadReq->setContentTypeString("multipart/form-data; boundary=" + boundary);
-                    uploadReq->setBody(multipartBody.str());
-
-                    uploadClient->sendRequest(
-                            uploadReq,
-                            [callbackPtr, tempFile, deviceId, workspaceId](
-                                    drogon::ReqResult              result,
-                                    const drogon::HttpResponsePtr &response) {
+                    // Upload workspace to robot
+                    utils::RobotHttpClient::uploadWorkspace(
+                            ip, tempFile, [callbackPtr, tempFile, deviceId, workspaceId](
+                                                  bool success, const std::string &error) {
                                 // Clean up temp file
                                 fs::remove(tempFile);
 
-                                if (result != drogon::ReqResult::Ok) {
+                                if (!success) {
                                     return sendError(*callbackPtr,
                                                      drogon::k500InternalServerError,
-                                                     "Failed to upload to robot");
-                                }
-
-                                if (response->getStatusCode() != drogon::k200OK &&
-                                    response->getStatusCode() != drogon::k201Created) {
-                                    return sendError(*callbackPtr,
-                                                     drogon::k500InternalServerError,
-                                                     "Robot import failed",
-                                                     std::string(response->getBody()));
+                                                     "Failed to upload workspace to robot",
+                                                     error);
                                 }
 
                                 Json::Value responseJson;
-                                responseJson["success"]        = true;
-                                responseJson["message"]        = "Apply completed successfully";
-                                responseJson["data"]["target"] = deviceId;
+                                responseJson["success"]             = true;
+                                responseJson["message"]             = "Apply completed successfully";
+                                responseJson["data"]["target"]      = deviceId;
                                 responseJson["data"]["workspaceId"] = workspaceId;
 
                                 auto resp = drogon::HttpResponse::newHttpJsonResponse(responseJson);
@@ -355,14 +286,14 @@ void api::v1::Device::apply(const drogon::HttpRequestPtr                        
                                          << " (Workspace: " << workspaceId << ")";
                             });
 
-                } catch (const std::exception &e) {
-                    LOG_ERROR << "Apply exception: " << e.what();
-                    sendError(*callbackPtr,
-                              drogon::k500InternalServerError,
-                              "Internal server error",
-                              e.what());
-                }
-            });
+        } catch (const std::exception &e) {
+            LOG_ERROR << "Apply exception: " << e.what();
+            sendError(*callbackPtr,
+                      drogon::k500InternalServerError,
+                      "Internal server error",
+                      e.what());
+        }
+    }, callbackPtr);
 }
 
 void api::v1::Device::backup(const drogon::HttpRequestPtr                          &req,
@@ -385,70 +316,36 @@ void api::v1::Device::backup(const drogon::HttpRequestPtr                       
     auto callbackPtr = std::make_shared<std::function<void(const drogon::HttpResponsePtr &)>>(
             std::move(callback));
 
-    // Check if robot is running
-    auto runningClient = drogon::HttpClient::newHttpClient("http://" + ip);
-    auto runningReq    = drogon::HttpRequest::newHttpRequest();
-    runningReq->setPath("/api/v1/robot/running");
-    runningReq->setMethod(drogon::Get);
+    // Check if robot is running before proceeding
+    checkRobotStatus(ip, [callbackPtr, ip, deviceId, this]() {
+        // Download workspace from robot
+        utils::RobotHttpClient::downloadWorkspace(
+                ip, [callbackPtr, deviceId, this](const std::string &content,
+                                                  const std::string &error) {
+                    if (!error.empty()) {
+                        return sendError(*callbackPtr,
+                                         drogon::k500InternalServerError,
+                                         "Failed to download workspace from robot",
+                                         error);
+                    }
 
-    runningClient->sendRequest(
-            runningReq,
-            [callbackPtr, ip, deviceId, this](drogon::ReqResult              result,
-                                              const drogon::HttpResponsePtr &response) {
-                if (result != drogon::ReqResult::Ok) {
-                    return sendError(*callbackPtr,
-                                     drogon::k500InternalServerError,
-                                     "Failed to connect to robot",
-                                     ip);
-                }
+                    try {
+                        // Save archive to temp file
+                        std::string tempDir =
+                                drogon::app().getCustomConfig()["storage"]["temp_backup_dir"]
+                                        .asString();
+                        if (!fs::exists(tempDir))
+                            fs::create_directories(tempDir);
 
-                auto json = response->getJsonObject();
-                if (!json || !json->isMember("data")) {
-                    return sendError(*callbackPtr,
-                                     drogon::k500InternalServerError,
-                                     "Invalid response from robot");
-                }
-
-                bool isRunning = (*json)["data"].asBool();
-                if (isRunning) {
-                    return sendError(*callbackPtr,
-                                     drogon::k409Conflict,
-                                     "Robot is running",
-                                     "Cannot backup while robot is running");
-                }
-
-                // Download archive from robot
-                auto exportClient = drogon::HttpClient::newHttpClient("http://" + ip);
-                auto exportReq    = drogon::HttpRequest::newHttpRequest();
-                exportReq->setPath("/api/v1/robot/export");
-                exportReq->setMethod(drogon::Get);
-
-                exportClient->sendRequest(
-                        exportReq,
-                        [callbackPtr, deviceId, this](drogon::ReqResult              result,
-                                                      const drogon::HttpResponsePtr &response) {
-                            if (result != drogon::ReqResult::Ok) {
-                                return sendError(*callbackPtr,
-                                                 drogon::k500InternalServerError,
-                                                 "Failed to download archive from robot");
-                            }
-
-                            try {
-                                // Save archive to temp file
-                                std::string tempDir = "/tmp/drogon-backup/";
-                                if (!fs::exists(tempDir))
-                                    fs::create_directories(tempDir);
-
-                                std::string tempFile =
-                                        tempDir + drogon::utils::getUuid() + ".tar.gz";
-                                std::ofstream file(tempFile, std::ios::binary);
-                                file << response->getBody();
-                                file.close();
+                        std::string   tempFile = tempDir + drogon::utils::getUuid() + ".tar.gz";
+                        std::ofstream file(tempFile, std::ios::binary);
+                        file << content;
+                        file.close();
 
                                 // Generate workspace ID and name
                                 std::string workspaceId = drogon::utils::getUuid();
                                 std::string timestamp =
-                                        services::WorkspaceService::getCurrentTimestamp();
+                                        utils::getCurrentTimestamp();
                                 std::string timestampStr =
                                         timestamp.substr(0, 19);  // YYYY-MM-DDTHH:MM:SS
                                 std::replace(timestampStr.begin(), timestampStr.end(), 'T', '_');
@@ -491,12 +388,37 @@ void api::v1::Device::backup(const drogon::HttpRequestPtr                       
                                          << " (Workspace: " << workspaceId << ")";
 
                             } catch (const std::exception &e) {
-                                LOG_ERROR << "Backup exception: " << e.what();
-                                sendError(*callbackPtr,
-                                          drogon::k500InternalServerError,
-                                          "Internal server error",
-                                          e.what());
-                            }
-                        });
-            });
+                            LOG_ERROR << "Backup exception: " << e.what();
+                            sendError(*callbackPtr,
+                                      drogon::k500InternalServerError,
+                                      "Internal server error",
+                                      e.what());
+                        }
+                    });
+    }, callbackPtr);
+}
+
+void api::v1::Device::checkRobotStatus(
+        const std::string                                                      &ip,
+        std::function<void()>                                                   onNotRunning,
+        std::shared_ptr<std::function<void(const drogon::HttpResponsePtr &)>>   callbackPtr)
+{
+    utils::RobotHttpClient::checkRunning(ip, [callbackPtr, onNotRunning](bool isRunning, const std::string &error) {
+        if (!error.empty()) {
+            return sendError(*callbackPtr,
+                             drogon::k500InternalServerError,
+                             "Failed to check robot status",
+                             error);
+        }
+
+        if (isRunning) {
+            return sendError(*callbackPtr,
+                             drogon::k409Conflict,
+                             "Robot is running",
+                             "Cannot perform operation while robot is running");
+        }
+
+        // Robot is not running, proceed with operation
+        onNotRunning();
+    });
 }

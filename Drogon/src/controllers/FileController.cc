@@ -3,7 +3,7 @@
 #include "../services/FileService.h"
 #include "ControllerHelper.h"
 
-static std::string baseDir = "/tmp/drogon-app/storage/";
+static std::string baseDir = drogon::app().getCustomConfig()["storage"]["base_dir"].asString();
 
 using helpers::sendError;
 using helpers::sendSuccess;

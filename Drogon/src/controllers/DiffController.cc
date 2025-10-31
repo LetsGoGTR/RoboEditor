@@ -9,7 +9,7 @@
 
 namespace fs = std::filesystem;
 
-static std::string baseDir = "/tmp/drogon-app/storage/";
+static std::string baseDir = drogon::app().getCustomConfig()["storage"]["base_dir"].asString();
 
 using helpers::sendError;
 using helpers::sendSuccess;
@@ -22,13 +22,20 @@ void api::v1::Diff::diffFiles(const drogon::HttpRequestPtr                      
         return sendError(callback, drogon::k400BadRequest, "Invalid JSON");
     }
 
-    auto fileReq = drogon_model::FileRequest::fromJson(*json);
-    if (!fileReq.has_value() || !fileReq->isValid()) {
-        return sendError(callback, drogon::k400BadRequest, "Missing or invalid fields: filePathA, filePathB");
+    // Parse and validate JSON directly in controller
+    if (!json->isMember("filePathA") || !json->isMember("filePathB")) {
+        return sendError(callback, drogon::k400BadRequest, "Missing required fields: filePathA, filePathB");
     }
 
-    std::string fullPathA = baseDir + fileReq->filePathA;
-    std::string fullPathB = baseDir + fileReq->filePathB;
+    std::string filePathA = (*json)["filePathA"].asString();
+    std::string filePathB = (*json)["filePathB"].asString();
+
+    if (filePathA.empty() || filePathB.empty()) {
+        return sendError(callback, drogon::k400BadRequest, "filePathA and filePathB cannot be empty");
+    }
+
+    std::string fullPathA = baseDir + filePathA;
+    std::string fullPathB = baseDir + filePathB;
 
     LOG_DEBUG << "diff api called";
     LOG_DEBUG << "filePathA: " << fullPathA;
@@ -36,12 +43,12 @@ void api::v1::Diff::diffFiles(const drogon::HttpRequestPtr                      
 
     auto resultA = services::FileService::readFile(fullPathA);
     if (!resultA.success) {
-        return sendError(callback, drogon::k404NotFound, "Failed to read file A", resultA.errorMessage + " (path: " + fileReq->filePathA + ")");
+        return sendError(callback, drogon::k404NotFound, "Failed to read file A", resultA.errorMessage + " (path: " + filePathA + ")");
     }
 
     auto resultB = services::FileService::readFile(fullPathB);
     if (!resultB.success) {
-        return sendError(callback, drogon::k404NotFound, "Failed to read file B", resultB.errorMessage + " (path: " + fileReq->filePathB + ")");
+        return sendError(callback, drogon::k404NotFound, "Failed to read file B", resultB.errorMessage + " (path: " + filePathB + ")");
     }
 
     // Extract content from results

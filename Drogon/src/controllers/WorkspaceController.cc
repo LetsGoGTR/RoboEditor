@@ -5,11 +5,12 @@
 #include <sstream>
 
 #include "../services/WorkspaceService.h"
+#include "../utils/TimeUtils.h"
 #include "ControllerHelper.h"
 
 namespace fs = std::filesystem;
 
-static std::string baseDir = "/tmp/drogon-app/storage/";
+static std::string baseDir = drogon::app().getCustomConfig()["storage"]["base_dir"].asString();
 
 using helpers::sendError;
 using helpers::sendSuccess;
@@ -42,11 +43,11 @@ void api::v1::Workspace::workspaceImport(
     metadata.target      = req->getParameter("target");
     metadata.name        = workspaceName;
     metadata.description = req->getParameter("description");
-    metadata.createdAt   = services::WorkspaceService::getCurrentTimestamp();
+    metadata.createdAt   = utils::getCurrentTimestamp();
     metadata.updatedAt   = metadata.createdAt;
 
     try {
-        std::string tempDir = "/tmp/drogon-upload/";
+        std::string tempDir = drogon::app().getCustomConfig()["storage"]["temp_upload_dir"].asString();
         if (!fs::exists(tempDir))
             fs::create_directories(tempDir);
 
@@ -97,7 +98,7 @@ void api::v1::Workspace::workspaceExport(
         auto        metadata      = services::WorkspaceService::loadMetadata(workspacePath);
         std::string workspaceName = metadata.name.empty() ? workspaceId : metadata.name;
 
-        std::string tempDir = "/tmp/drogon-export/";
+        std::string tempDir = drogon::app().getCustomConfig()["storage"]["temp_export_dir"].asString();
         if (!fs::exists(tempDir))
             fs::create_directories(tempDir);
 
@@ -161,8 +162,8 @@ void api::v1::Workspace::list(const drogon::HttpRequestPtr                      
     if (deviceId.empty()) {
         LOG_INFO << "Listed " << result.data["count"].asInt() << " workspaces from all devices";
     } else {
-        LOG_INFO << "Listed " << result.data["count"].asInt() << " workspaces from device: "
-                 << deviceId;
+        LOG_INFO << "Listed " << result.data["count"].asInt()
+                 << " workspaces from device: " << deviceId;
     }
 }
 
@@ -258,8 +259,7 @@ void api::v1::Workspace::update(const drogon::HttpRequestPtr                    
                                        ? (*json)["description"].asString()
                                        : existingResult.data["metadata"]["description"].asString();
 
-        auto result =
-                services::WorkspaceService::updateWorkspaceMetadata(baseDir, workspaceId, metadata);
+        auto result = services::WorkspaceService::updateWorkspace(baseDir, workspaceId, metadata);
 
         if (!result.success)
             return sendError(

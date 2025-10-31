@@ -1,68 +1,18 @@
 #include "FileService.h"
 
+#include "../utils/PathValidator.h"
+
 #include <filesystem>
 #include <fstream>
 #include <sstream>
 
 namespace fs = std::filesystem;
 
-bool services::FileService::validateFilePath(const std::string &filePath)
-{
-    if (filePath.empty()) {
-        return false;
-    }
-
-    // Check for path traversal attacks
-    if (filePath.find("..") != std::string::npos) {
-        return false;
-    }
-
-    return true;
-}
-
-bool services::FileService::fileExists(const std::string &filePath)
-{
-    try {
-        return fs::exists(filePath) && fs::is_regular_file(filePath);
-    } catch (const std::exception &e) {
-        LOG_ERROR << "Error checking file existence: " << e.what();
-        return false;
-    }
-}
-
-bool services::FileService::isDirectory(const std::string &filePath)
-{
-    try {
-        return fs::exists(filePath) && fs::is_directory(filePath);
-    } catch (const std::exception &e) {
-        LOG_ERROR << "Error checking if directory: " << e.what();
-        return false;
-    }
-}
-
-std::string services::FileService::getFileExtension(const std::string &filePath)
-{
-    return fs::path(filePath).extension().string();
-}
-
-int64_t services::FileService::getFileSize(const std::string &filePath)
-{
-    try {
-        if (fileExists(filePath)) {
-            return fs::file_size(filePath);
-        }
-        return -1;
-    } catch (const std::exception &e) {
-        LOG_ERROR << "Error getting file size: " << e.what();
-        return -1;
-    }
-}
-
 Json::Value services::FileService::getFileInfo(const std::string &filePath)
 {
     Json::Value info;
 
-    if (!fileExists(filePath)) {
+    if (!utils::isValidFile(filePath)) {
         return info;
     }
 
@@ -87,18 +37,18 @@ Json::Value services::FileService::getFileInfo(const std::string &filePath)
     return info;
 }
 
-services::FileOperationResult services::FileService::readFile(const std::string &filePath)
+services::ServiceResult services::FileService::readFile(const std::string &filePath)
 {
-    services::FileOperationResult result;
+    services::ServiceResult result;
     result.success = false;
 
-    if (!validateFilePath(filePath)) {
+    if (!utils::validatePath(filePath)) {
         result.errorMessage = "Invalid file path";
         LOG_WARN << "Invalid file path: " << filePath;
         return result;
     }
 
-    if (!fileExists(filePath)) {
+    if (!utils::isValidFile(filePath)) {
         result.errorMessage = "File does not exist";
         LOG_WARN << "File does not exist: " << filePath;
         return result;
@@ -123,19 +73,19 @@ services::FileOperationResult services::FileService::readFile(const std::string 
     return result;
 }
 
-services::FileOperationResult services::FileService::createFile(const std::string &filePath,
-                                                                const std::string &content)
+services::ServiceResult services::FileService::createFile(const std::string &filePath,
+                                                          const std::string &content)
 {
-    services::FileOperationResult result;
+    services::ServiceResult result;
     result.success = false;
 
-    if (!validateFilePath(filePath)) {
+    if (!utils::validatePath(filePath)) {
         result.errorMessage = "Invalid file path";
         LOG_WARN << "Invalid file path: " << filePath;
         return result;
     }
 
-    if (fileExists(filePath)) {
+    if (utils::isValidFile(filePath)) {
         result.errorMessage = "File already exists";
         LOG_WARN << "File already exists: " << filePath;
         return result;
@@ -171,19 +121,19 @@ services::FileOperationResult services::FileService::createFile(const std::strin
     return result;
 }
 
-services::FileOperationResult services::FileService::updateFile(const std::string &filePath,
-                                                                const std::string &content)
+services::ServiceResult services::FileService::updateFile(const std::string &filePath,
+                                                          const std::string &content)
 {
-    services::FileOperationResult result;
+    services::ServiceResult result;
     result.success = false;
 
-    if (!validateFilePath(filePath)) {
+    if (!utils::validatePath(filePath)) {
         result.errorMessage = "Invalid file path";
         LOG_WARN << "Invalid file path: " << filePath;
         return result;
     }
 
-    if (!fileExists(filePath)) {
+    if (!utils::isValidFile(filePath)) {
         result.errorMessage = "File does not exist";
         LOG_WARN << "File does not exist: " << filePath;
         return result;
@@ -213,18 +163,18 @@ services::FileOperationResult services::FileService::updateFile(const std::strin
     return result;
 }
 
-services::FileOperationResult services::FileService::deleteFile(const std::string &filePath)
+services::ServiceResult services::FileService::deleteFile(const std::string &filePath)
 {
-    services::FileOperationResult result;
+    services::ServiceResult result;
     result.success = false;
 
-    if (!validateFilePath(filePath)) {
+    if (!utils::validatePath(filePath)) {
         result.errorMessage = "Invalid file path";
         LOG_WARN << "Invalid file path: " << filePath;
         return result;
     }
 
-    if (!fileExists(filePath)) {
+    if (!utils::isValidFile(filePath)) {
         result.errorMessage = "File does not exist";
         LOG_WARN << "File does not exist: " << filePath;
         return result;
@@ -244,25 +194,25 @@ services::FileOperationResult services::FileService::deleteFile(const std::strin
     return result;
 }
 
-services::FileOperationResult services::FileService::moveFile(const std::string &oldPath,
-                                                              const std::string &newPath)
+services::ServiceResult services::FileService::moveFile(const std::string &oldPath,
+                                                        const std::string &newPath)
 {
-    services::FileOperationResult result;
+    services::ServiceResult result;
     result.success = false;
 
-    if (!validateFilePath(oldPath) || !validateFilePath(newPath)) {
+    if (!utils::validatePath(oldPath) || !utils::validatePath(newPath)) {
         result.errorMessage = "Invalid file path";
         LOG_WARN << "Invalid file path - old: " << oldPath << ", new: " << newPath;
         return result;
     }
 
-    if (!fileExists(oldPath)) {
+    if (!utils::isValidFile(oldPath)) {
         result.errorMessage = "Source file does not exist";
         LOG_WARN << "Source file does not exist: " << oldPath;
         return result;
     }
 
-    if (fileExists(newPath)) {
+    if (utils::isValidFile(newPath)) {
         result.errorMessage = "Destination file already exists";
         LOG_WARN << "Destination file already exists: " << newPath;
         return result;
