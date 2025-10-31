@@ -348,7 +348,7 @@ Json::Value diff_utils::calculateStatistics(const std::vector<diff_utils::DiffEn
     result["added"]        = addedCount;
     result["removed"]      = removedCount;
     result["modified"]     = modifiedCount;
-    result["totalChanges"] = diffs.size();
+    result["totalChanges"] = (int)diffs.size();
 
     return result;
 }

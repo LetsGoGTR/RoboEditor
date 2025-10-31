@@ -1,10 +1,10 @@
 #pragma once
 
-#include "ServiceResult.h"
-
 #include <drogon/drogon.h>
 #include <string>
 #include <vector>
+
+#include "ServiceResult.h"
 
 namespace services
 {
@@ -18,8 +18,7 @@ namespace services
                                   const std::string &nameA,
                                   const std::string &nameB);
 
-        static DiffResult diffDirectories(const std::string& dirA,
-                                         const std::string& dirB);
+        static ServiceResult diffDirectories(const std::string &dirA, const std::string &dirB);
 
       private:
         static const std::vector<std::string> supportedFormats_;

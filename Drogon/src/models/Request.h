@@ -56,14 +56,18 @@ namespace drogon_model
             return req;
         }
 
-        static bool isSafeRelative(const std::string& p)
+        static bool isSafeRelative(const std::string &p)
         {
-            if (p.empty()) return false;
+            if (p.empty())
+                return false;
             // 절대경로 형태 차단 (리눅스/맥: '/', 윈도우: 드라이브 + ':', 혹은 '\\' 시작)
-            if (p.size() >= 1 && (p[0] == '/' || p[0] == '\\')) return false;
-            if (p.size() >= 2 && std::isalpha(static_cast<unsigned char>(p[0])) && p[1] == ':') return false;
+            if (p.size() >= 1 && (p[0] == '/' || p[0] == '\\'))
+                return false;
+            if (p.size() >= 2 && std::isalpha(static_cast<unsigned char>(p[0])) && p[1] == ':')
+                return false;
             // 상위 폴더 탈출 방지
-            if (p.find("..") != std::string::npos) return false;
+            if (p.find("..") != std::string::npos)
+                return false;
             return true;
         }
 
