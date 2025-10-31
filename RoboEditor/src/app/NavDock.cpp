@@ -1,45 +1,34 @@
-// NavDock.cpp
 #include "NavDock.h"
 
-#include <QDockWidget>
-#include <QMainWindow>
-#include <QPushButton>
-#include <QVBoxLayout>
-#include <QWidget>
+#include <QIcon>
 
-NavDock::NavDock(QMainWindow *mw) : QObject(mw), mw_(mw)
+NavDock::NavDock(QWidget *parent) : QToolBar(parent)
 {
+    setMovable(false);
+    setFloatable(false);
+    setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+    setIconSize(QSize(24, 24));
     build();
 }
 
 void NavDock::build()
 {
-    auto *left = new QWidget;
-    auto *v    = new QVBoxLayout(left);
-    v->setContentsMargins(8, 8, 8, 8);
-    v->setSpacing(8);
-    auto mk = [&](const QString &t) {
-        auto *b = new QPushButton(t);
-        b->setMinimumWidth(60);
-        return b;
+    auto mk = [&](const QString &text, const QString &iconPath) {
+        auto *act = new QAction(QIcon(iconPath), text, this);
+        addAction(act);
+        return act;
     };
-    auto *bC = mk("비교하기"), *bB = mk("백업하기"), *bA = mk("적용하기"), *bM = mk("수정하기"),
-         *bL = mk("확인하기");
-    v->addWidget(bC);
-    v->addWidget(bB);
-    v->addWidget(bA);
-    v->addWidget(bM);
-    v->addWidget(bL);
-    v->addStretch();
 
-    dock_ = new QDockWidget("Navigation", mw_);
-    dock_->setWidget(left);
-    dock_->setFeatures(QDockWidget::NoDockWidgetFeatures);
-    mw_->addDockWidget(Qt::LeftDockWidgetArea, dock_);
+    QAction *actCompare = mk("비교하기", ":/icons/compare.png");
+    QAction *actBackup  = mk("백업하기", ":/icons/backup.png");
+    QAction *actApply   = mk("적용하기", ":/icons/apply.png");
+    QAction *actModify  = mk("수정하기", ":/icons/modify.png");
+    QAction *actOpen    = mk("확인하기", ":/icons/open.png");
 
-    connect(bC, &QPushButton::clicked, this, &NavDock::clickCompare);
-    connect(bB, &QPushButton::clicked, this, &NavDock::clickBackup);
-    connect(bA, &QPushButton::clicked, this, &NavDock::clickApply);
-    connect(bM, &QPushButton::clicked, this, &NavDock::clickModify);
-    connect(bL, &QPushButton::clicked, this, &NavDock::clickOpenFile);
+    // 신호 연결
+    connect(actCompare, &QAction::triggered, this, &NavDock::clickCompare);
+    connect(actBackup, &QAction::triggered, this, &NavDock::clickBackup);
+    connect(actApply, &QAction::triggered, this, &NavDock::clickApply);
+    connect(actModify, &QAction::triggered, this, &NavDock::clickModify);
+    connect(actOpen, &QAction::triggered, this, &NavDock::clickOpenFile);
 }

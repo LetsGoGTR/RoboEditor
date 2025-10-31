@@ -64,6 +64,7 @@ set(PROJECT_SOURCES
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
     find_package(Qt6 REQUIRED COMPONENTS Widgets)
 find_package(Qt6 REQUIRED COMPONENTS Widgets)
+find_package(Qt6 REQUIRED COMPONENTS Core)
 
     qt_add_executable(RoboEditor
         MANUAL_FINALIZATION
@@ -72,6 +73,7 @@ find_package(Qt6 REQUIRED COMPONENTS Widgets)
         src/app/SettingController.ui
         src/app/CodeEditor.cpp
         src/app/CodeEditor.h
+        src/app/ShortcutManager.h src/app/ShortcutManager.cpp
         # src/app/OpenFilePage.h src/app/OpenFilePage.cpp
     )
 # Define target properties for Android with Qt 6 as:
@@ -100,6 +102,7 @@ target_link_libraries(RoboEditor PRIVATE Qt${QT_VERSION_MAJOR}::Widgets)
 target_link_libraries(RoboEditor PRIVATE Qt6::Widgets)
 target_link_libraries(RoboEditor PRIVATE Qt6::Widgets)
 target_link_libraries(RoboEditor PRIVATE Qt6::Network)
+target_link_libraries(RoboEditor PRIVATE Qt6::Core)
 
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
