@@ -35,7 +35,6 @@ set(PROJECT_SOURCES
         src/app/PasswordManager.cpp
         src/app/SelectController.cpp
         src/app/SelectStorage.cpp
-        src/app/Center.cpp
 
         src/app/BackupPage.h
         src/app/OpenFilePage.h
@@ -52,7 +51,6 @@ set(PROJECT_SOURCES
         src/app/PasswordManager.h
         src/app/SelectController.h
         src/app/SelectStorage.h
-        src/app/Center.h
 
         src/ui/mainwindow.ui
         src/ui/ApplyPage.ui
@@ -66,14 +64,15 @@ set(PROJECT_SOURCES
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
     find_package(Qt6 REQUIRED COMPONENTS Widgets)
 find_package(Qt6 REQUIRED COMPONENTS Widgets)
-find_package(Qt6 REQUIRED COMPONENTS Core)
 
     qt_add_executable(RoboEditor
         MANUAL_FINALIZATION
         ${PROJECT_SOURCES}
         src/app/ControllerManager.h src/app/ControllerManager.cpp
         src/app/SettingController.ui
-        src/app/ShortcutManager.h src/app/ShortcutManager.cpp
+
+        src/app/Center.h src/app/Center.cpp
+        src/app/ControllerTreeWidget.h src/app/ControllerTreeWidget.cpp
         # src/app/OpenFilePage.h src/app/OpenFilePage.cpp
     )
 # Define target properties for Android with Qt 6 as:
@@ -102,7 +101,6 @@ target_link_libraries(RoboEditor PRIVATE Qt${QT_VERSION_MAJOR}::Widgets)
 target_link_libraries(RoboEditor PRIVATE Qt6::Widgets)
 target_link_libraries(RoboEditor PRIVATE Qt6::Widgets)
 target_link_libraries(RoboEditor PRIVATE Qt6::Network)
-target_link_libraries(RoboEditor PRIVATE Qt6::Core)
 
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
