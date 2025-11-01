@@ -5,6 +5,7 @@
 
 #include <memory>
 
+#include "BackupPage.h"
 #include "ModifyPage.h"
 #include "ShortcutManager.h"
 
@@ -28,7 +29,11 @@ class MainWindow : public QMainWindow
         std::unique_ptr<LogManager>  logm_;
 
         ModifyPage      *modifyPage;
+        BackupPage      *backupPage;
         ShortcutManager *shortcutMgr;
+
+        QWidget *applyPopup_  = nullptr;
+        QWidget *backupPopup_ = nullptr;
 
         void ensureCenter();
         void ensureNav();

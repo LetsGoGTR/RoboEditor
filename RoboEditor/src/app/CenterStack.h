@@ -8,7 +8,6 @@ class QStackedWidget;
 class ComparePage;
 class BackupPage;
 class OpenFilePage;
-class ApplyPage;
 class ModifyPage;
 
 class CenterStack : public QWidget
@@ -17,15 +16,16 @@ class CenterStack : public QWidget
       public:
         explicit CenterStack(QWidget *parent = nullptr);
         void showCompare();
-        void showBackup();
         void showOpenFile();
         void showModify();
-        void showApply();
         void openCompareResult(const QString &left, const QString &right);
-        
+
         // 페이지 접근자
-        ModifyPage* modifyPage() const { return mfp_; }
-        
+        ModifyPage *modifyPage() const
+        {
+            return mfp_;
+        }
+
       public slots:
         void showModifyWithCompare();  // ModifyPage로 전환 + Compare 패널 표시
 
@@ -37,18 +37,14 @@ class CenterStack : public QWidget
         // 메인윈도우가 받을 시그널 (재발행)
       signals:
         void compareRequested(const QString &left, const QString &right);
-        void backupRequested(const QString &target);
         void openFileRequested(const QString &target);
         void modifyRequested(const QString &target);
-        void applyRequested(const QString &target);
 
       private:
         QStackedWidget *stack_ = nullptr;
-        int             idxC_ = -1, idxB_ = -1, idxO_ = -1, idxA_ = -1, idxM_ = -1;
+        int             idxC_ = -1, idxO_ = -1, idxM_ = -1;
         ComparePage    *cmp_ = nullptr;
-        BackupPage     *bkp_ = nullptr;
         OpenFilePage   *ofp_ = nullptr;
-        ApplyPage      *alp_ = nullptr;
         ModifyPage     *mfp_ = nullptr;
 };
 
