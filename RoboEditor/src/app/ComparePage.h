@@ -59,7 +59,8 @@ class ComparePage : public QWidget
       private:
         QWidget*     dock_{nullptr};                   // 헤더+[X]+rightSplit
         QSplitter*   rightSplit_{nullptr};             // (좌) rightText_ | (우) diffPanel_
-        DropTextEdit* rightText_{nullptr};             // 읽기 전용 (비교대상)
+        QTabWidget*  compareTabWidget_{nullptr};       // 비교 파일들을 탭으로 관리
+        DropTextEdit* rightText_{nullptr};             // 읽기 전용 (비교대상) - 현재 활성 탭
         QWidget*     diffPanel_{nullptr};              // 기존 "테이블+상단 버튼" 위젯
         QTableWidget*  diffTable_      = nullptr;
         QLabel*        statLabel_      = nullptr;

@@ -12,6 +12,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileDialog>
+#include <QFileInfo>
 #include <QFileSystemModel>
 #include <QFrame>
 #include <QHBoxLayout>
@@ -46,48 +47,84 @@ QWidget* ComparePage::buildDock() {
     auto w = new QWidget(this);
     auto v = new QVBoxLayout(w); v->setContentsMargins(0,0,0,0);
 
-    // 헤더 + [X] - 탭 스타일로 디자인
-    auto header = new QWidget(w);
-    header->setMaximumHeight(28);
-    header->setStyleSheet(
-        "QWidget { "
+    // 내부 스플리터: (좌) 비교파일 탭 위젯 | (우) diff 패널
+    rightSplit_ = new QSplitter(Qt::Horizontal, w);
+    
+    // 좌측: 비교 파일들을 탭으로 관리
+    compareTabWidget_ = new QTabWidget(rightSplit_);
+    compareTabWidget_->setTabsClosable(true);
+    compareTabWidget_->setStyleSheet(
+        "QTabWidget::pane { "
+        "  border: none; "
+        "  background-color: white; "
+        "} "
+        "QTabBar::tab { "
         "  background-color: #f0f0f0; "
         "  border: 1px solid #ccc; "
         "  border-bottom: none; "
         "  border-top-left-radius: 3px; "
         "  border-top-right-radius: 3px; "
+        "  padding: 4px 8px; "
+        "  margin-right: 2px; "
+        "  font-size: 9pt; "
+        "} "
+        "QTabBar::tab:selected { "
+        "  background-color: white; "
+        "  font-weight: bold; "
+        "} "
+        "QTabBar::tab:hover { "
+        "  background-color: #e0e0e0; "
         "}"
     );
-    auto h = new QHBoxLayout(header); 
-    h->setContentsMargins(8,4,8,4);
-    h->setSpacing(4);
     
-    auto title = new QLabel(tr("Compare"), header);
-    QFont font = title->font();
-    font.setPointSize(9);
-    title->setFont(font);
+    // 탭 닫기 시그널 연결 - 마지막 탭이 닫히면 Compare 전체 닫기
+    connect(compareTabWidget_, &QTabWidget::tabCloseRequested, this, [this](int index) {
+        auto *widget = compareTabWidget_->widget(index);
+        compareTabWidget_->removeTab(index);
+        if (widget) widget->deleteLater();
+        
+        // 마지막 탭이 닫히면 Compare 전체를 닫음
+        if (compareTabWidget_->count() == 0) {
+            emit closed();
+            return;
+        }
+        
+        // 현재 활성 탭 업데이트
+        if (compareTabWidget_->count() > 0) {
+            int currentIndex = compareTabWidget_->currentIndex();
+            if (currentIndex >= 0) {
+                rightText_ = qobject_cast<DropTextEdit*>(compareTabWidget_->currentWidget());
+                // 남아있는 탭의 경로로 신호 발송 (diff 재계산)
+                QString tabPath = compareTabWidget_->tabToolTip(currentIndex);
+                if (!tabPath.isEmpty()) {
+                    targetPath_ = tabPath;
+                    emit targetPathChanged(tabPath);
+                }
+            }
+        } else {
+            rightText_ = nullptr;
+        }
+    });
     
-    auto btnClose = new QToolButton(header);
-    btnClose->setIcon(style()->standardIcon(QStyle::SP_TitleBarCloseButton));
-    btnClose->setAutoRaise(true);
-    btnClose->setMaximumSize(18, 18);
-    
-    h->addWidget(title); h->addStretch(); h->addWidget(btnClose);
-    connect(btnClose, &QToolButton::clicked, this, &ComparePage::onCloseClicked);
-    v->addWidget(header);
-
-    // 내부 스플리터: (좌) 비교대상 텍스트(읽기 전용) | (우) diff 패널
-    rightSplit_ = new QSplitter(Qt::Horizontal, w);
-    
-    // 좌측: 비교 대상 텍스트 - 흰색 배경, 테두리
-    rightText_  = new DropTextEdit(rightSplit_);
-    rightText_->setReadOnly(true);
-    rightText_->setStyleSheet("QPlainTextEdit { background-color: white; border: 1px solid #ccc; }");
+    // 탭 변경 시 현재 활성 탭 업데이트
+    connect(compareTabWidget_, &QTabWidget::currentChanged, this, [this](int index) {
+        if (index >= 0) {
+            rightText_ = qobject_cast<DropTextEdit*>(compareTabWidget_->widget(index));
+            // 탭이 변경될 때 targetPath 업데이트 및 신호 발송 (diff 재계산 트리거)
+            QString tabPath = compareTabWidget_->tabToolTip(index);
+            if (!tabPath.isEmpty()) {
+                targetPath_ = tabPath;
+                emit targetPathChanged(tabPath);
+            }
+        } else {
+            rightText_ = nullptr;
+        }
+    });
     
     // 우측: diff 패널
     diffPanel_  = buildDiffPanel();
     
-    rightSplit_->addWidget(rightText_);
+    rightSplit_->addWidget(compareTabWidget_);
     rightSplit_->addWidget(diffPanel_);
     rightSplit_->setStretchFactor(0, 1);
     rightSplit_->setStretchFactor(1, 1);
@@ -102,8 +139,7 @@ QWidget* ComparePage::buildDiffPanel() {
     diffPanel_->setStyleSheet(
         "QWidget { "
         "  background-color: white; "
-        "  border: 1px solid #ccc; "
-        "  border-top: none; "
+        "  border: none; "
         "}"
     );
     
@@ -120,6 +156,22 @@ QWidget* ComparePage::buildDiffPanel() {
     // 파일 선택 버튼
     auto btnSelectFile = new QPushButton(tr("Select File"), topBar);
     btnSelectFile->setFixedSize(90, 26);
+    btnSelectFile->setStyleSheet(
+        "QPushButton { "
+        "  background-color: #f0f0f0; "
+        "  border: 1px solid #b0b0b0; "
+        "  border-radius: 3px; "
+        "  padding: 4px 8px; "
+        "  font-size: 9pt; "
+        "} "
+        "QPushButton:hover { "
+        "  background-color: #e0e0e0; "
+        "  border: 1px solid #909090; "
+        "} "
+        "QPushButton:pressed { "
+        "  background-color: #d0d0d0; "
+        "}"
+    );
     topLayout->addWidget(btnSelectFile);
     
     connect(btnSelectFile, &QPushButton::clicked, this, [this]() {
@@ -157,6 +209,35 @@ QWidget* ComparePage::buildDiffPanel() {
     btnAdded->setFixedSize(60, 26);
     btnRemoved->setFixedSize(70, 26);
     btnChanged->setFixedSize(70, 26);
+    
+    // 필터 버튼 스타일
+    QString filterBtnStyle = 
+        "QPushButton { "
+        "  background-color: #ffffff; "
+        "  border: 1px solid #b0b0b0; "
+        "  border-radius: 3px; "
+        "  padding: 4px 8px; "
+        "  font-size: 9pt; "
+        "  color: #606060; "
+        "} "
+        "QPushButton:hover { "
+        "  background-color: #f5f5f5; "
+        "  border: 1px solid #909090; "
+        "} "
+        "QPushButton:checked { "
+        "  background-color: #007acc; "
+        "  border: 1px solid #005a9e; "
+        "  color: white; "
+        "  font-weight: bold; "
+        "} "
+        "QPushButton:checked:hover { "
+        "  background-color: #005a9e; "
+        "}";
+    
+    btnAll->setStyleSheet(filterBtnStyle);
+    btnAdded->setStyleSheet(filterBtnStyle);
+    btnRemoved->setStyleSheet(filterBtnStyle);
+    btnChanged->setStyleSheet(filterBtnStyle);
     
     topLayout->addWidget(btnAll);
     topLayout->addWidget(btnAdded);
@@ -252,7 +333,7 @@ QWidget* ComparePage::buildDiffPanel() {
         "QTableWidget { "
         "  background-color: white; "
         "  gridline-color: #e0e0e0; "
-        "  border: 1px solid #d0d0d0; "
+        "  border: none; "
         "  font-family: 'Consolas', 'Monaco', 'Courier New', monospace; "
         "  font-size: 9pt; "
         "} "
@@ -338,12 +419,57 @@ QWidget* ComparePage::buildDiffPanel() {
 void ComparePage::onCloseClicked() { emit closed(); }
 
 void ComparePage::setTargetPath(const QString& path) {
+    if (path.isEmpty()) return;
+    
+    // compareTabWidget_이 null인지 체크
+    if (!compareTabWidget_) {
+        qWarning() << "[ComparePage] compareTabWidget_ is null";
+        return;
+    }
+    
     targetPath_ = path;
-    loadRightText(targetPath_);
+    QFileInfo fileInfo(path);
+    QString fileName = fileInfo.fileName();
+    QString absolutePath = fileInfo.absoluteFilePath();
+    
+    // 기존 탭을 모두 닫음 (새 파일로 교체)
+    while (compareTabWidget_->count() > 0) {
+        auto *widget = compareTabWidget_->widget(0);
+        compareTabWidget_->removeTab(0);
+        if (widget) widget->deleteLater();
+    }
+    
+    // 새 탭 추가
+    auto *newTextEdit = new DropTextEdit(compareTabWidget_);
+    newTextEdit->setReadOnly(true);
+    newTextEdit->setStyleSheet("QPlainTextEdit { background-color: white; border: none; }");
+    
+    // 파일 내용 로드
+    QFile f(path);
+    if (f.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        QTextStream in(&f);
+        const QString content = in.readAll();
+        f.close();
+        newTextEdit->setPlainText(content);
+    } else {
+        newTextEdit->setPlainText(tr("Failed to open: %1").arg(path));
+    }
+    
+    // 탭 추가 및 활성화 (툴팁에 전체 경로 저장)
+    int index = compareTabWidget_->addTab(newTextEdit, fileName);
+    compareTabWidget_->setTabToolTip(index, absolutePath);
+    compareTabWidget_->setCurrentIndex(index);
+    rightText_ = newTextEdit;
+    
     emit targetPathChanged(path);
 }
 
 void ComparePage::recalcDiff(const QString& leftText) {
+    // compareTabWidget_이 null이거나 탭이 없으면 리턴
+    if (!compareTabWidget_ || compareTabWidget_->count() == 0) {
+        return;
+    }
+    
     const QString rightText = rightText_ ? rightText_->toPlainText() : QString();
 
     // (임시) 빈 diff라도 테이블이 null이 아니도록 보장
@@ -477,11 +603,13 @@ void ComparePage::refreshDiffTable(const QList<DiffRow> &rows)
     }
 
     // 통계 업데이트
-    QString stats = QString("Changes: %1").arg(changeCount);
-    if (addedCount > 0 || removedCount > 0 || changedCount > 0) {
-        stats += QString(" (+%1 -%2 ~%3)").arg(addedCount).arg(removedCount).arg(changedCount);
+    if (statLabel_) {
+        QString stats = QString("Changes: %1").arg(changeCount);
+        if (addedCount > 0 || removedCount > 0 || changedCount > 0) {
+            stats += QString(" (+%1 -%2 ~%3)").arg(addedCount).arg(removedCount).arg(changedCount);
+        }
+        statLabel_->setText(stats);
     }
-    statLabel_->setText(stats);
 }
 
 void ComparePage::setDiffRows(const QList<DiffRow> &rows)
