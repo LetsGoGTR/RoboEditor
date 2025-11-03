@@ -1,0 +1,64 @@
+#pragma once
+
+#include "ServiceResult.h"
+
+#include <json/json.h>
+#include <string>
+#include <vector>
+
+namespace services
+{
+
+    struct WorkspaceMetadata
+    {
+        std::string id;
+        std::string target;
+        std::string name;
+        std::string description;
+        std::string createdAt;
+        std::string updatedAt;
+
+        Json::Value              toJson() const;
+        static WorkspaceMetadata fromJson(const Json::Value &json);
+    };
+
+    class WorkspaceService
+    {
+      public:
+        // Workspace CRUD operations
+        static ServiceResult createWorkspace(const std::string       &baseDir,
+                                             const WorkspaceMetadata &metadata);
+        static ServiceResult readWorkspace(const std::string &baseDir, const std::string &workspaceId);
+        static ServiceResult updateWorkspace(const std::string       &baseDir,
+                                             const std::string       &workspaceId,
+                                             const WorkspaceMetadata &metadata);
+        static ServiceResult deleteWorkspace(const std::string &baseDir, const std::string &workspaceId);
+
+        // List all workspaces
+        static ServiceResult listWorkspaces(const std::string &baseDir, const std::string &deviceId = "");
+
+        // Extract archive to UUID-based directory and create metadata
+        static ServiceResult importWorkspace(const std::string       &archivePath,
+                                             const std::string       &baseDir,
+                                             const WorkspaceMetadata &metadata);
+
+        // Compress workspace directory to archive
+        static ServiceResult exportWorkspace(const std::string &workspaceId,
+                                             const std::string &baseDir,
+                                             const std::string &outputPath);
+
+        // Check if archive format is supported
+        static bool isSupportedArchive(const std::string &filename);
+
+        // Load workspace metadata from .workspace.json
+        static WorkspaceMetadata loadMetadata(const std::string &workspacePath);
+
+      private:
+        static const std::vector<std::string> supportedFormats_;
+        static const std::string              metadataFilename_;
+
+        // Helper functions
+        static Json::Value getDirectoryTree(const std::string &path);
+    };
+
+}  // namespace services
