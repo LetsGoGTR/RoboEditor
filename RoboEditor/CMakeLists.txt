@@ -12,6 +12,17 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets LinguistTools)
 find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets LinguistTools)
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Network)
+
+# Additional libraries - vcpkg or manual installation
+find_package(LibArchive)
+find_package(jsoncpp CONFIG)
+find_package(yaml-cpp CONFIG)
+
+# bcrypt는 Windows API로 제공되므로 별도 라이브러리 불필요 (bcrypt.lib)
+if(WIN32)
+    set(BCRYPT_LIBRARIES bcrypt)
+endif()
+
 set(CMAKE_AUTOUIC_SEARCH_PATHS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ui
 )
@@ -35,6 +46,8 @@ set(PROJECT_SOURCES
         src/app/PasswordManager.cpp
         src/app/SelectController.cpp
         src/app/SelectStorage.cpp
+        src/app/SftpClient.cpp
+        src/app/ApiClient.cpp
 
         src/app/BackupPage.h
         src/app/OpenFilePage.h
@@ -51,6 +64,8 @@ set(PROJECT_SOURCES
         src/app/PasswordManager.h
         src/app/SelectController.h
         src/app/SelectStorage.h
+        src/app/SftpClient.h
+        src/app/ApiClient.h
 
         src/ui/mainwindow.ui
         src/ui/ApplyPage.ui
@@ -70,11 +85,14 @@ find_package(Qt6 REQUIRED COMPONENTS Widgets)
         MANUAL_FINALIZATION
         ${PROJECT_SOURCES}
         src/app/ControllerManager.h src/app/ControllerManager.cpp
+
         src/app/CodeEditor.cpp
         src/app/CodeEditor.h
         src/app/ShortcutManager.h src/app/ShortcutManager.cpp
-        src/app/ControllerSetting.h src/app/ControllerSetting.cpp
+        src/app/ControllerSetting.h
+        src/app/ControllerSetting.cpp
         src/ui/ControllerSettings.ui
+
 
         # src/app/OpenFilePage.h src/app/OpenFilePage.cpp
     )
@@ -104,6 +122,23 @@ target_link_libraries(RoboEditor PRIVATE Qt${QT_VERSION_MAJOR}::Widgets)
 target_link_libraries(RoboEditor PRIVATE Qt6::Widgets)
 target_link_libraries(RoboEditor PRIVATE Qt6::Widgets)
 target_link_libraries(RoboEditor PRIVATE Qt6::Network)
+
+# Link additional libraries
+if(WIN32)
+    target_link_libraries(RoboEditor PRIVATE ${BCRYPT_LIBRARIES})
+endif()
+
+if(LibArchive_FOUND)
+    target_link_libraries(RoboEditor PRIVATE LibArchive::LibArchive)
+endif()
+
+if(jsoncpp_FOUND)
+    target_link_libraries(RoboEditor PRIVATE jsoncpp_lib)
+endif()
+
+if(yaml-cpp_FOUND)
+    target_link_libraries(RoboEditor PRIVATE yaml-cpp::yaml-cpp)
+endif()
 
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
