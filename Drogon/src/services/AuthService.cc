@@ -1,31 +1,12 @@
 #include "AuthService.h"
 
 #include <bcrypt/BCrypt.hpp>
-#include <drogon/drogon.h>
+
+#include "../utils/ConfigUtils.h"
 
 std::string services::AuthService::getPasswordHashFromConfig()
 {
-    try {
-        const Json::Value &customConfig = drogon::app().getCustomConfig();
-
-        if (!customConfig.isMember("auth") || !customConfig["auth"].isMember("device_password_hash")) {
-            LOG_ERROR << "Missing auth.device_password_hash in config.json custom_config";
-            return "";
-        }
-
-        std::string hash = customConfig["auth"]["device_password_hash"].asString();
-
-        if (hash.empty()) {
-            LOG_ERROR << "device_password_hash is empty in config.json";
-            return "";
-        }
-
-        return hash;
-
-    } catch (const std::exception &e) {
-        LOG_ERROR << "Failed to load password hash from config: " << e.what();
-        return "";
-    }
+    return utils::config::getPasswordHash();
 }
 
 bool services::AuthService::verifyDevicePassword(const std::string &password)

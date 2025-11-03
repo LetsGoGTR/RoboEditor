@@ -1,17 +1,17 @@
 #include "FileController.h"
 
 #include "../services/FileService.h"
+#include "../utils/ConfigUtils.h"
 #include "ControllerHelper.h"
-
-static std::string baseDir = drogon::app().getCustomConfig()["storage"]["base_dir"].asString();
 
 using helpers::sendError;
 using helpers::sendSuccess;
+using utils::config::getBaseDir;
 
 void api::v1::File::fileRead(const drogon::HttpRequestPtr                          &req,
                              std::function<void(const drogon::HttpResponsePtr &)> &&callback)
 {
-    auto path = baseDir + req->getParameter("path");
+    auto path = getBaseDir() + req->getParameter("path");
 
     if (path.empty()) {
         return sendError(callback, drogon::k400BadRequest, "Missing 'path' query parameter");
@@ -20,7 +20,8 @@ void api::v1::File::fileRead(const drogon::HttpRequestPtr                       
     auto result = services::FileService::readFile(path);
 
     if (!result.success) {
-        return sendError(callback, drogon::k404NotFound, "Failed to read file", result.errorMessage);
+        return sendError(
+                callback, drogon::k404NotFound, "Failed to read file", result.errorMessage);
     }
 
     sendSuccess(callback, drogon::k200OK, result.data);
@@ -30,7 +31,7 @@ void api::v1::File::fileRead(const drogon::HttpRequestPtr                       
 void api::v1::File::fileCreate(const drogon::HttpRequestPtr                          &req,
                                std::function<void(const drogon::HttpResponsePtr &)> &&callback)
 {
-    auto path = baseDir + req->getParameter("path");
+    auto path = getBaseDir() + req->getParameter("path");
 
     if (path.empty()) {
         return sendError(callback, drogon::k400BadRequest, "Missing 'path' query parameter");
@@ -38,7 +39,8 @@ void api::v1::File::fileCreate(const drogon::HttpRequestPtr                     
 
     auto json = req->getJsonObject();
     if (!json || !json->isMember("content")) {
-        return sendError(callback, drogon::k400BadRequest, "Missing 'content' field in request body");
+        return sendError(
+                callback, drogon::k400BadRequest, "Missing 'content' field in request body");
     }
 
     std::string content = (*json)["content"].asString();
@@ -46,7 +48,8 @@ void api::v1::File::fileCreate(const drogon::HttpRequestPtr                     
     auto result = services::FileService::createFile(path, content);
 
     if (!result.success) {
-        return sendError(callback, drogon::k409Conflict, "Failed to create file", result.errorMessage);
+        return sendError(
+                callback, drogon::k409Conflict, "Failed to create file", result.errorMessage);
     }
 
     sendSuccess(callback, drogon::k201Created, result.data, "File created successfully");
@@ -56,7 +59,7 @@ void api::v1::File::fileCreate(const drogon::HttpRequestPtr                     
 void api::v1::File::fileUpdate(const drogon::HttpRequestPtr                          &req,
                                std::function<void(const drogon::HttpResponsePtr &)> &&callback)
 {
-    auto path = baseDir + req->getParameter("path");
+    auto path = getBaseDir() + req->getParameter("path");
 
     if (path.empty()) {
         return sendError(callback, drogon::k400BadRequest, "Missing 'path' query parameter");
@@ -71,18 +74,20 @@ void api::v1::File::fileUpdate(const drogon::HttpRequestPtr                     
     bool hasNewPath = json->isMember("newPath");
 
     if (!hasContent && !hasNewPath) {
-        return sendError(callback, drogon::k400BadRequest, "Either 'content' or 'newPath' must be provided");
+        return sendError(
+                callback, drogon::k400BadRequest, "Either 'content' or 'newPath' must be provided");
     }
 
     std::string currentPath = path;
 
     // Move file if newPath is provided
     if (hasNewPath) {
-        std::string newPath = baseDir + (*json)["newPath"].asString();
+        std::string newPath = getBaseDir() + (*json)["newPath"].asString();
         auto        result  = services::FileService::moveFile(currentPath, newPath);
 
         if (!result.success) {
-            return sendError(callback, drogon::k404NotFound, "Failed to move file", result.errorMessage);
+            return sendError(
+                    callback, drogon::k404NotFound, "Failed to move file", result.errorMessage);
         }
 
         currentPath = newPath;  // Update path for content update
@@ -94,12 +99,15 @@ void api::v1::File::fileUpdate(const drogon::HttpRequestPtr                     
         auto        result  = services::FileService::updateFile(currentPath, content);
 
         if (!result.success) {
-            return sendError(callback, drogon::k500InternalServerError, "Failed to update file content", result.errorMessage);
+            return sendError(callback,
+                             drogon::k500InternalServerError,
+                             "Failed to update file content",
+                             result.errorMessage);
         }
     }
 
     // Success response
-    auto result = services::FileService::getFileInfo(currentPath);
+    auto        result = services::FileService::getFileInfo(currentPath);
     Json::Value data;
     data["path"] = currentPath;
     data["info"] = result;
@@ -111,7 +119,7 @@ void api::v1::File::fileUpdate(const drogon::HttpRequestPtr                     
 void api::v1::File::fileDelete(const drogon::HttpRequestPtr                          &req,
                                std::function<void(const drogon::HttpResponsePtr &)> &&callback)
 {
-    auto path = baseDir + req->getParameter("path");
+    auto path = getBaseDir() + req->getParameter("path");
 
     if (path.empty()) {
         return sendError(callback, drogon::k400BadRequest, "Missing 'path' query parameter");
@@ -120,7 +128,8 @@ void api::v1::File::fileDelete(const drogon::HttpRequestPtr                     
     auto result = services::FileService::deleteFile(path);
 
     if (!result.success) {
-        return sendError(callback, drogon::k404NotFound, "Failed to delete file", result.errorMessage);
+        return sendError(
+                callback, drogon::k404NotFound, "Failed to delete file", result.errorMessage);
     }
 
     Json::Value data;

@@ -7,22 +7,24 @@
 #include "../services/AuthService.h"
 #include "../services/DeviceService.h"
 #include "../services/WorkspaceService.h"
+#include "../utils/ConfigUtils.h"
 #include "../utils/RobotHttpClient.h"
 #include "../utils/TimeUtils.h"
 #include "ControllerHelper.h"
 
 namespace fs = std::filesystem;
 
-static std::string baseDir = drogon::app().getCustomConfig()["storage"]["base_dir"].asString();
-
 using helpers::sendError;
 using helpers::sendSuccess;
+using utils::config::getBaseDir;
+using utils::config::getTempApplyDir;
+using utils::config::getTempBackupDir;
 
 void api::v1::Device::list(const drogon::HttpRequestPtr                          &req,
                            std::function<void(const drogon::HttpResponsePtr &)> &&callback)
 {
     try {
-        auto result = services::DeviceService::listDevices(baseDir);
+        auto result = services::DeviceService::listDevices(getBaseDir());
 
         if (!result.success)
             return sendError(callback,
@@ -68,7 +70,7 @@ void api::v1::Device::create(const drogon::HttpRequestPtr                       
                 json->isMember("description") ? (*json)["description"].asString() : "";
         metadata.ip = json->isMember("ip") ? (*json)["ip"].asString() : "";
 
-        auto result = services::DeviceService::createDevice(baseDir, metadata);
+        auto result = services::DeviceService::createDevice(getBaseDir(), metadata);
 
         if (!result.success)
             return sendError(callback,
@@ -98,7 +100,7 @@ void api::v1::Device::info(const drogon::HttpRequestPtr                         
                            const std::string                                     &deviceId)
 {
     try {
-        auto result = services::DeviceService::readDevice(baseDir, deviceId);
+        auto result = services::DeviceService::readDevice(getBaseDir(), deviceId);
 
         if (!result.success)
             return sendError(
@@ -130,7 +132,7 @@ void api::v1::Device::update(const drogon::HttpRequestPtr                       
 
     try {
         // Load existing metadata first
-        auto existingResult = services::DeviceService::readDevice(baseDir, deviceId);
+        auto existingResult = services::DeviceService::readDevice(getBaseDir(), deviceId);
         if (!existingResult.success) {
             return sendError(callback, drogon::k404NotFound, "Device not found", deviceId);
         }
@@ -145,7 +147,7 @@ void api::v1::Device::update(const drogon::HttpRequestPtr                       
         metadata.ip          = json->isMember("ip") ? (*json)["ip"].asString()
                                                     : existingResult.data["ip"].asString();
 
-        auto result = services::DeviceService::updateDevice(baseDir, deviceId, metadata);
+        auto result = services::DeviceService::updateDevice(getBaseDir(), deviceId, metadata);
 
         if (!result.success)
             return sendError(
@@ -173,7 +175,7 @@ void api::v1::Device::remove(const drogon::HttpRequestPtr                       
                              const std::string                                     &deviceId)
 {
     try {
-        auto result = services::DeviceService::deleteDevice(baseDir, deviceId);
+        auto result = services::DeviceService::deleteDevice(getBaseDir(), deviceId);
 
         if (!result.success)
             return sendError(
@@ -220,7 +222,7 @@ void api::v1::Device::apply(const drogon::HttpRequestPtr                        
     std::string workspaceId = (*json)["workspaceId"].asString();
 
     // Check if device exists
-    auto deviceResult = services::DeviceService::readDevice(baseDir, deviceId);
+    auto deviceResult = services::DeviceService::readDevice(getBaseDir(), deviceId);
     if (!deviceResult.success) {
         return sendError(callback, drogon::k404NotFound, "Device not found", deviceId);
     }
@@ -236,15 +238,17 @@ void api::v1::Device::apply(const drogon::HttpRequestPtr                        
             std::move(callback));
 
     // Check if robot is running before proceeding
-    checkRobotStatus(ip, [callbackPtr, ip, deviceId, workspaceId, this]() {
-        try {
+    checkRobotStatus(
+            ip,
+            [callbackPtr, ip, deviceId, workspaceId, this]() {
+                try {
                     // Export workspace to temp file
-                    std::string tempDir = drogon::app().getCustomConfig()["storage"]["temp_apply_dir"].asString();
+                    std::string tempDir = utils::config::getTempApplyDir();
                     if (!fs::exists(tempDir))
                         fs::create_directories(tempDir);
 
                     std::string tempFile      = tempDir + drogon::utils::getUuid() + ".tar.gz";
-                    std::string deviceBaseDir = baseDir + deviceId + "/";
+                    std::string deviceBaseDir = utils::config::getBaseDir() + deviceId + "/";
 
                     // Export workspace
                     auto exportResult = services::WorkspaceService::exportWorkspace(
@@ -260,8 +264,10 @@ void api::v1::Device::apply(const drogon::HttpRequestPtr                        
 
                     // Upload workspace to robot
                     utils::RobotHttpClient::uploadWorkspace(
-                            ip, tempFile, [callbackPtr, tempFile, deviceId, workspaceId](
-                                                  bool success, const std::string &error) {
+                            ip,
+                            tempFile,
+                            [callbackPtr, tempFile, deviceId, workspaceId](
+                                    bool success, const std::string &error) {
                                 // Clean up temp file
                                 fs::remove(tempFile);
 
@@ -273,9 +279,9 @@ void api::v1::Device::apply(const drogon::HttpRequestPtr                        
                                 }
 
                                 Json::Value responseJson;
-                                responseJson["success"]             = true;
-                                responseJson["message"]             = "Apply completed successfully";
-                                responseJson["data"]["target"]      = deviceId;
+                                responseJson["success"]        = true;
+                                responseJson["message"]        = "Apply completed successfully";
+                                responseJson["data"]["target"] = deviceId;
                                 responseJson["data"]["workspaceId"] = workspaceId;
 
                                 auto resp = drogon::HttpResponse::newHttpJsonResponse(responseJson);
@@ -286,14 +292,15 @@ void api::v1::Device::apply(const drogon::HttpRequestPtr                        
                                          << " (Workspace: " << workspaceId << ")";
                             });
 
-        } catch (const std::exception &e) {
-            LOG_ERROR << "Apply exception: " << e.what();
-            sendError(*callbackPtr,
-                      drogon::k500InternalServerError,
-                      "Internal server error",
-                      e.what());
-        }
-    }, callbackPtr);
+                } catch (const std::exception &e) {
+                    LOG_ERROR << "Apply exception: " << e.what();
+                    sendError(*callbackPtr,
+                              drogon::k500InternalServerError,
+                              "Internal server error",
+                              e.what());
+                }
+            },
+            callbackPtr);
 }
 
 void api::v1::Device::backup(const drogon::HttpRequestPtr                          &req,
@@ -301,7 +308,7 @@ void api::v1::Device::backup(const drogon::HttpRequestPtr                       
                              const std::string                                     &deviceId)
 {
     // Check if device exists
-    auto deviceResult = services::DeviceService::readDevice(baseDir, deviceId);
+    auto deviceResult = services::DeviceService::readDevice(getBaseDir(), deviceId);
     if (!deviceResult.success) {
         return sendError(callback, drogon::k404NotFound, "Device not found", deviceId);
     }
@@ -317,35 +324,36 @@ void api::v1::Device::backup(const drogon::HttpRequestPtr                       
             std::move(callback));
 
     // Check if robot is running before proceeding
-    checkRobotStatus(ip, [callbackPtr, ip, deviceId, this]() {
-        // Download workspace from robot
-        utils::RobotHttpClient::downloadWorkspace(
-                ip, [callbackPtr, deviceId, this](const std::string &content,
-                                                  const std::string &error) {
-                    if (!error.empty()) {
-                        return sendError(*callbackPtr,
-                                         drogon::k500InternalServerError,
-                                         "Failed to download workspace from robot",
-                                         error);
-                    }
+    checkRobotStatus(
+            ip,
+            [callbackPtr, ip, deviceId, this]() {
+                // Download workspace from robot
+                utils::RobotHttpClient::downloadWorkspace(
+                        ip,
+                        [callbackPtr, deviceId, this](const std::string &content,
+                                                      const std::string &error) {
+                            if (!error.empty()) {
+                                return sendError(*callbackPtr,
+                                                 drogon::k500InternalServerError,
+                                                 "Failed to download workspace from robot",
+                                                 error);
+                            }
 
-                    try {
-                        // Save archive to temp file
-                        std::string tempDir =
-                                drogon::app().getCustomConfig()["storage"]["temp_backup_dir"]
-                                        .asString();
-                        if (!fs::exists(tempDir))
-                            fs::create_directories(tempDir);
+                            try {
+                                // Save archive to temp file
+                                std::string tempDir = utils::config::getTempBackupDir();
+                                if (!fs::exists(tempDir))
+                                    fs::create_directories(tempDir);
 
-                        std::string   tempFile = tempDir + drogon::utils::getUuid() + ".tar.gz";
-                        std::ofstream file(tempFile, std::ios::binary);
-                        file << content;
-                        file.close();
+                                std::string tempFile =
+                                        tempDir + drogon::utils::getUuid() + ".tar.gz";
+                                std::ofstream file(tempFile, std::ios::binary);
+                                file << content;
+                                file.close();
 
                                 // Generate workspace ID and name
                                 std::string workspaceId = drogon::utils::getUuid();
-                                std::string timestamp =
-                                        utils::getCurrentTimestamp();
+                                std::string timestamp   = utils::getCurrentTimestamp();
                                 std::string timestampStr =
                                         timestamp.substr(0, 19);  // YYYY-MM-DDTHH:MM:SS
                                 std::replace(timestampStr.begin(), timestampStr.end(), 'T', '_');
@@ -362,7 +370,7 @@ void api::v1::Device::backup(const drogon::HttpRequestPtr                       
                                 metadata.updatedAt   = timestamp;
 
                                 // Import workspace into device folder
-                                std::string deviceBaseDir = baseDir + deviceId + "/";
+                                std::string deviceBaseDir = utils::config::getBaseDir() + deviceId + "/";
                                 auto importResult = services::WorkspaceService::importWorkspace(
                                         tempFile, deviceBaseDir, metadata);
 
@@ -388,37 +396,39 @@ void api::v1::Device::backup(const drogon::HttpRequestPtr                       
                                          << " (Workspace: " << workspaceId << ")";
 
                             } catch (const std::exception &e) {
-                            LOG_ERROR << "Backup exception: " << e.what();
-                            sendError(*callbackPtr,
-                                      drogon::k500InternalServerError,
-                                      "Internal server error",
-                                      e.what());
-                        }
-                    });
-    }, callbackPtr);
+                                LOG_ERROR << "Backup exception: " << e.what();
+                                sendError(*callbackPtr,
+                                          drogon::k500InternalServerError,
+                                          "Internal server error",
+                                          e.what());
+                            }
+                        });
+            },
+            callbackPtr);
 }
 
 void api::v1::Device::checkRobotStatus(
-        const std::string                                                      &ip,
-        std::function<void()>                                                   onNotRunning,
-        std::shared_ptr<std::function<void(const drogon::HttpResponsePtr &)>>   callbackPtr)
+        const std::string                                                    &ip,
+        std::function<void()>                                                 onNotRunning,
+        std::shared_ptr<std::function<void(const drogon::HttpResponsePtr &)>> callbackPtr)
 {
-    utils::RobotHttpClient::checkRunning(ip, [callbackPtr, onNotRunning](bool isRunning, const std::string &error) {
-        if (!error.empty()) {
-            return sendError(*callbackPtr,
-                             drogon::k500InternalServerError,
-                             "Failed to check robot status",
-                             error);
-        }
+    utils::RobotHttpClient::checkRunning(
+            ip, [callbackPtr, onNotRunning](bool isRunning, const std::string &error) {
+                if (!error.empty()) {
+                    return sendError(*callbackPtr,
+                                     drogon::k500InternalServerError,
+                                     "Failed to check robot status",
+                                     error);
+                }
 
-        if (isRunning) {
-            return sendError(*callbackPtr,
-                             drogon::k409Conflict,
-                             "Robot is running",
-                             "Cannot perform operation while robot is running");
-        }
+                if (isRunning) {
+                    return sendError(*callbackPtr,
+                                     drogon::k409Conflict,
+                                     "Robot is running",
+                                     "Cannot perform operation while robot is running");
+                }
 
-        // Robot is not running, proceed with operation
-        onNotRunning();
-    });
+                // Robot is not running, proceed with operation
+                onNotRunning();
+            });
 }

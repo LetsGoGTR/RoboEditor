@@ -5,15 +5,17 @@
 #include <sstream>
 
 #include "../services/WorkspaceService.h"
+#include "../utils/ConfigUtils.h"
 #include "../utils/TimeUtils.h"
 #include "ControllerHelper.h"
 
 namespace fs = std::filesystem;
 
-static std::string baseDir = drogon::app().getCustomConfig()["storage"]["base_dir"].asString();
-
 using helpers::sendError;
 using helpers::sendSuccess;
+using utils::config::getBaseDir;
+using utils::config::getTempExportDir;
+using utils::config::getTempUploadDir;
 
 void api::v1::Workspace::workspaceImport(
         const drogon::HttpRequestPtr                          &req,
@@ -47,14 +49,14 @@ void api::v1::Workspace::workspaceImport(
     metadata.updatedAt   = metadata.createdAt;
 
     try {
-        std::string tempDir = drogon::app().getCustomConfig()["storage"]["temp_upload_dir"].asString();
+        std::string tempDir = getTempUploadDir();
         if (!fs::exists(tempDir))
             fs::create_directories(tempDir);
 
         std::string tempFile = tempDir + drogon::utils::getUuid() + "_" + filename;
         file.saveAs(tempFile);
 
-        auto result = services::WorkspaceService::importWorkspace(tempFile, baseDir, metadata);
+        auto result = services::WorkspaceService::importWorkspace(tempFile, getBaseDir(), metadata);
         fs::remove(tempFile);
 
         if (!result.success)
@@ -89,7 +91,7 @@ void api::v1::Workspace::workspaceExport(
         return sendError(callback, drogon::k400BadRequest, "Missing 'id' field");
 
     std::string workspaceId   = (*json)["id"].asString();
-    std::string workspacePath = baseDir + workspaceId;
+    std::string workspacePath = getBaseDir() + workspaceId;
 
     if (!fs::exists(workspacePath) || !fs::is_directory(workspacePath))
         return sendError(callback, drogon::k404NotFound, "Workspace not found", workspaceId);
@@ -98,14 +100,14 @@ void api::v1::Workspace::workspaceExport(
         auto        metadata      = services::WorkspaceService::loadMetadata(workspacePath);
         std::string workspaceName = metadata.name.empty() ? workspaceId : metadata.name;
 
-        std::string tempDir = drogon::app().getCustomConfig()["storage"]["temp_export_dir"].asString();
+        std::string tempDir = getTempExportDir();
         if (!fs::exists(tempDir))
             fs::create_directories(tempDir);
 
         std::string outputFilename = workspaceName + ".tar.gz";
         std::string outputPath     = tempDir + outputFilename;
 
-        auto result = services::WorkspaceService::exportWorkspace(workspaceId, baseDir, outputPath);
+        auto result = services::WorkspaceService::exportWorkspace(workspaceId, getBaseDir(), outputPath);
 
         if (!result.success)
             return sendError(callback,
@@ -143,7 +145,7 @@ void api::v1::Workspace::list(const drogon::HttpRequestPtr                      
     // Get optional deviceId query parameter
     std::string deviceId = req->getParameter("id");
 
-    auto result = services::WorkspaceService::listWorkspaces(baseDir, deviceId);
+    auto result = services::WorkspaceService::listWorkspaces(getBaseDir(), deviceId);
 
     if (!result.success)
         return sendError(callback,
@@ -181,7 +183,7 @@ void api::v1::Workspace::create(const drogon::HttpRequestPtr                    
     metadata.description = json->isMember("description") ? (*json)["description"].asString() : "";
 
     try {
-        auto result = services::WorkspaceService::createWorkspace(baseDir, metadata);
+        auto result = services::WorkspaceService::createWorkspace(getBaseDir(), metadata);
 
         if (!result.success)
             return sendError(callback,
@@ -211,7 +213,7 @@ void api::v1::Workspace::info(const drogon::HttpRequestPtr                      
                               const std::string                                     &workspaceId)
 {
     try {
-        auto result = services::WorkspaceService::readWorkspace(baseDir, workspaceId);
+        auto result = services::WorkspaceService::readWorkspace(getBaseDir(), workspaceId);
 
         if (!result.success)
             return sendError(
@@ -243,7 +245,7 @@ void api::v1::Workspace::update(const drogon::HttpRequestPtr                    
 
     try {
         // Load existing metadata first
-        auto existingResult = services::WorkspaceService::readWorkspace(baseDir, workspaceId);
+        auto existingResult = services::WorkspaceService::readWorkspace(getBaseDir(), workspaceId);
         if (!existingResult.success) {
             return sendError(callback, drogon::k404NotFound, "Workspace not found", workspaceId);
         }
@@ -259,7 +261,7 @@ void api::v1::Workspace::update(const drogon::HttpRequestPtr                    
                                        ? (*json)["description"].asString()
                                        : existingResult.data["metadata"]["description"].asString();
 
-        auto result = services::WorkspaceService::updateWorkspace(baseDir, workspaceId, metadata);
+        auto result = services::WorkspaceService::updateWorkspace(getBaseDir(), workspaceId, metadata);
 
         if (!result.success)
             return sendError(
@@ -287,7 +289,7 @@ void api::v1::Workspace::remove(const drogon::HttpRequestPtr                    
                                 const std::string                                     &workspaceId)
 {
     try {
-        auto result = services::WorkspaceService::deleteWorkspace(baseDir, workspaceId);
+        auto result = services::WorkspaceService::deleteWorkspace(getBaseDir(), workspaceId);
 
         if (!result.success)
             return sendError(

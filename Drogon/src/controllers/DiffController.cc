@@ -5,14 +5,14 @@
 #include "../models/Request.h"
 #include "../services/DiffService.h"
 #include "../services/FileService.h"
+#include "../utils/ConfigUtils.h"
 #include "ControllerHelper.h"
 
 namespace fs = std::filesystem;
 
-static std::string baseDir = drogon::app().getCustomConfig()["storage"]["base_dir"].asString();
-
 using helpers::sendError;
 using helpers::sendSuccess;
+using utils::config::getBaseDir;
 
 void api::v1::Diff::diffFiles(const drogon::HttpRequestPtr                          &req,
                               std::function<void(const drogon::HttpResponsePtr &)> &&callback)
@@ -24,18 +24,20 @@ void api::v1::Diff::diffFiles(const drogon::HttpRequestPtr                      
 
     // Parse and validate JSON directly in controller
     if (!json->isMember("filePathA") || !json->isMember("filePathB")) {
-        return sendError(callback, drogon::k400BadRequest, "Missing required fields: filePathA, filePathB");
+        return sendError(
+                callback, drogon::k400BadRequest, "Missing required fields: filePathA, filePathB");
     }
 
     std::string filePathA = (*json)["filePathA"].asString();
     std::string filePathB = (*json)["filePathB"].asString();
 
     if (filePathA.empty() || filePathB.empty()) {
-        return sendError(callback, drogon::k400BadRequest, "filePathA and filePathB cannot be empty");
+        return sendError(
+                callback, drogon::k400BadRequest, "filePathA and filePathB cannot be empty");
     }
 
-    std::string fullPathA = baseDir + filePathA;
-    std::string fullPathB = baseDir + filePathB;
+    std::string fullPathA = getBaseDir() + filePathA;
+    std::string fullPathB = getBaseDir() + filePathB;
 
     LOG_DEBUG << "diff api called";
     LOG_DEBUG << "filePathA: " << fullPathA;
@@ -43,12 +45,18 @@ void api::v1::Diff::diffFiles(const drogon::HttpRequestPtr                      
 
     auto resultA = services::FileService::readFile(fullPathA);
     if (!resultA.success) {
-        return sendError(callback, drogon::k404NotFound, "Failed to read file A", resultA.errorMessage + " (path: " + filePathA + ")");
+        return sendError(callback,
+                         drogon::k404NotFound,
+                         "Failed to read file A",
+                         resultA.errorMessage + " (path: " + filePathA + ")");
     }
 
     auto resultB = services::FileService::readFile(fullPathB);
     if (!resultB.success) {
-        return sendError(callback, drogon::k404NotFound, "Failed to read file B", resultB.errorMessage + " (path: " + filePathB + ")");
+        return sendError(callback,
+                         drogon::k404NotFound,
+                         "Failed to read file B",
+                         resultB.errorMessage + " (path: " + filePathB + ")");
     }
 
     // Extract content from results
@@ -63,7 +71,10 @@ void api::v1::Diff::diffFiles(const drogon::HttpRequestPtr                      
     auto diffResult = services::DiffService::diff(contentA, contentB, nameA, nameB);
 
     if (!diffResult.success) {
-        return sendError(callback, drogon::k400BadRequest, "Failed to perform diff", diffResult.errorMessage);
+        return sendError(callback,
+                         drogon::k400BadRequest,
+                         "Failed to perform diff",
+                         diffResult.errorMessage);
     }
 
     sendSuccess(callback, drogon::k200OK, diffResult.data);
@@ -75,8 +86,9 @@ void api::v1::Diff::diffWorkspaces(const drogon::HttpRequestPtr                 
 {
     auto json = req->getJsonObject();
     if (!json) {
-        Json::Value error; error["error"] = "Invalid JSON";
-        auto resp = drogon::HttpResponse::newHttpJsonResponse(error);
+        Json::Value error;
+        error["error"] = "Invalid JSON";
+        auto resp      = drogon::HttpResponse::newHttpJsonResponse(error);
         resp->setStatusCode(drogon::k400BadRequest);
         callback(resp);
         return;
@@ -86,18 +98,18 @@ void api::v1::Diff::diffWorkspaces(const drogon::HttpRequestPtr                 
     if (!wsReq.has_value() || !wsReq->isValid()) {
         Json::Value error;
         error["error"] = "Missing or invalid fields: dirPathA, dirPathB";
-        auto resp = drogon::HttpResponse::newHttpJsonResponse(error);
+        auto resp      = drogon::HttpResponse::newHttpJsonResponse(error);
         resp->setStatusCode(drogon::k400BadRequest);
         callback(resp);
         return;
     }
 
     // ---- 경로 조립 & canonical ----
-    fs::path joinedA = fs::path(baseDir) / wsReq->dirPathA;
-    fs::path joinedB = fs::path(baseDir) / wsReq->dirPathB;
+    fs::path joinedA = fs::path(getBaseDir()) / wsReq->dirPathA;
+    fs::path joinedB = fs::path(getBaseDir()) / wsReq->dirPathB;
 
     std::error_code ec;
-    auto normalize = [&](const fs::path& p) {
+    auto            normalize = [&](const fs::path &p) {
         fs::path w = fs::weakly_canonical(p, ec);
         if (ec) {
             ec.clear();  // 다음 호출에 영향을 주지 않게
@@ -112,8 +124,16 @@ void api::v1::Diff::diffWorkspaces(const drogon::HttpRequestPtr                 
     // 디렉터리 존재/타입 검증
     auto ensureDir = [](const fs::path &p, const char *which, Json::Value &out) -> bool {
         std::error_code e;
-        if (!fs::exists(p, e)) { out["error"] = std::string(which) + " not found"; out["path"] = p.generic_string(); return false; }
-        if (!fs::is_directory(p, e)) { out["error"] = std::string(which) + " is not a directory"; out["path"] = p.generic_string(); return false; }
+        if (!fs::exists(p, e)) {
+            out["error"] = std::string(which) + " not found";
+            out["path"]  = p.generic_string();
+            return false;
+        }
+        if (!fs::is_directory(p, e)) {
+            out["error"] = std::string(which) + " is not a directory";
+            out["path"]  = p.generic_string();
+            return false;
+        }
         return true;
     };
 
@@ -136,8 +156,8 @@ void api::v1::Diff::diffWorkspaces(const drogon::HttpRequestPtr                 
         }
     }
 
-    auto diffResult = services::DiffService::diffDirectories(fullA.generic_string(),
-                                                         fullB.generic_string());
+    auto diffResult =
+            services::DiffService::diffDirectories(fullA.generic_string(), fullB.generic_string());
     if (!diffResult.success) {
         Json::Value error;
         error["error"]   = "Failed to perform workspace diff";
@@ -156,6 +176,6 @@ void api::v1::Diff::diffWorkspaces(const drogon::HttpRequestPtr                 
     resp->setStatusCode(drogon::k200OK);
     callback(resp);
 
-    LOG_INFO << "Successfully performed workspace diff between "
-            << fullA.generic_string() << " and " << fullB.generic_string();
+    LOG_INFO << "Successfully performed workspace diff between " << fullA.generic_string()
+             << " and " << fullB.generic_string();
 }
