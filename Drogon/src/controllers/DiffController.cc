@@ -1,8 +1,9 @@
 #include "DiffController.h"
 
+#include <cctype>
 #include <filesystem>
+#include <optional>
 
-#include "../models/Request.h"
 #include "../services/DiffService.h"
 #include "../services/FileService.h"
 #include "../utils/ConfigUtils.h"
@@ -13,6 +14,48 @@ namespace fs = std::filesystem;
 using helpers::sendError;
 using helpers::sendSuccess;
 using utils::config::getBaseDir;
+
+namespace
+{
+    struct WorkspaceRequest
+    {
+        std::string dirPathA;
+        std::string dirPathB;
+
+        static std::optional<WorkspaceRequest> fromJson(const Json::Value &json)
+        {
+            if (!json.isMember("dirPathA") || !json.isMember("dirPathB")) {
+                return std::nullopt;
+            }
+
+            WorkspaceRequest req;
+            req.dirPathA = json["dirPathA"].asString();
+            req.dirPathB = json["dirPathB"].asString();
+
+            return req;
+        }
+
+        static bool isSafeRelative(const std::string &p)
+        {
+            if (p.empty())
+                return false;
+            // 절대경로 형태 차단 (리눅스/맥: '/', 윈도우: 드라이브 + ':', 혹은 '\\' 시작)
+            if (p.size() >= 1 && (p[0] == '/' || p[0] == '\\'))
+                return false;
+            if (p.size() >= 2 && std::isalpha(static_cast<unsigned char>(p[0])) && p[1] == ':')
+                return false;
+            // 상위 폴더 탈출 방지
+            if (p.find("..") != std::string::npos)
+                return false;
+            return true;
+        }
+
+        bool isValid() const
+        {
+            return isSafeRelative(dirPathA) && isSafeRelative(dirPathB);
+        }
+    };
+}  // namespace
 
 void api::v1::Diff::diffFiles(const drogon::HttpRequestPtr                          &req,
                               std::function<void(const drogon::HttpResponsePtr &)> &&callback)
@@ -94,7 +137,7 @@ void api::v1::Diff::diffWorkspaces(const drogon::HttpRequestPtr                 
         return;
     }
 
-    auto wsReq = drogon_model::WorkspaceRequest::fromJson(*json);
+    auto wsReq = WorkspaceRequest::fromJson(*json);
     if (!wsReq.has_value() || !wsReq->isValid()) {
         Json::Value error;
         error["error"] = "Missing or invalid fields: dirPathA, dirPathB";
