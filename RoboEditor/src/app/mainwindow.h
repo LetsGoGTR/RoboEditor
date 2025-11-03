@@ -1,26 +1,51 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
-#pragma once
+
+#include <QDir>
+#include <QFileDialog>
 #include <QMainWindow>
+
 #include <memory>
-class TopMenu; class NavDock; class CenterStack; class LogManager;
 
-class MainWindow : public QMainWindow {
+// Forward declarations
+#include "BackupPage.h"
+#include "ModifyPage.h"
+#include "ShortcutManager.h"
+
+class TopMenu;
+class NavDock;
+class CenterStack;
+class LogManager;
+class Center;
+
+class MainWindow : public QMainWindow
+{
     Q_OBJECT
-  public:
-    explicit MainWindow(QWidget* parent=nullptr);
-    ~MainWindow();
 
-  private:
-    // lazy objects
-    std::unique_ptr<TopMenu> menu_;
-    std::unique_ptr<NavDock> nav_;
-    std::unique_ptr<CenterStack> center_;
-    std::unique_ptr<LogManager> logm_;
+      public:
+        explicit MainWindow(QWidget *parent = nullptr);
+        ~MainWindow();
 
-    void ensureCenter(); void ensureNav(); void ensureMenu(); void ensureLog();
-    void wire();
+      private:
+        // lazy objects
+
+        ModifyPage      *modifyPage;
+        BackupPage      *backupPage;
+        ShortcutManager *shortcutMgr;
+
+        QWidget *applyPopup_  = nullptr;
+        QWidget *backupPopup_ = nullptr;
+
+        void ensureMenu();
+        void ensureCenter();
+        void ensureNav();
+        void ensureLog();
+        void wire();
+
+        std::unique_ptr<TopMenu>     menu_;
+        std::unique_ptr<CenterStack> center_;  // CenterStack → Center
+        std::unique_ptr<NavDock>     nav_;
+        std::unique_ptr<LogManager>  logm_;
 };
 
-
-#endif // MAINWINDOW_H
+#endif  // MAINWINDOW_H
