@@ -293,10 +293,12 @@ void CenterStack::updateControllerList()
     controllerModel_->clear();
     controllerModel_->setHorizontalHeaderLabels({"Controller List"});
 
+    //각 제어기마다 get api 요청을 보내, runnig, connected 업데이트, api 도메인 주소는 제어기의 ip
+
     // 1. ControllerManager의 싱글톤 인스턴스 가져오기
     ControllerManager *manager = ControllerManager::instance();
 
-    // 2. controllers_ 리스트 가져오기 (thread-safe 스냅샷)
+    // 2. controllers_ 리스트 가져오기
     QList<ControllerInfo> controllers = manager->getControllers();
 
     // 3. 리스트가 비어있는 경우
@@ -310,38 +312,42 @@ void CenterStack::updateControllerList()
     // 4. 제어기별 항목 추가
     for (const auto &c : controllers) {
         QStandardItem *item = new QStandardItem(c.serialNumber);
-
-        // 상태 색상 결정
-        QColor color;
-        if (!c.isConnected)
-            item->setForeground(QBrush(Qt::gray));
-        else {
-            item->setForeground(QBrush(Qt::black));
-            if (c.isRunning) {
-                color = Qt::red;
-            } else {
-                color = Qt::green;
-            }
-
-            item->setIcon(makeCircleIcon(color, 10));
-        }
-        item->setData(QString("C:/backup/%1").arg(c.serialNumber), Qt::UserRole + 1);
         item->setEditable(false);
-
-        // Tooltip에 상세 정보 표시
-        QString tip = QString("IP: %1\nSFTP: %2\nAPI: %3\nUser: %4\nWorkspace: %5")
-                              .arg(c.ip)
-                              .arg(c.sftpPort)
-                              .arg(c.apiPort)
-                              .arg(c.username)
-                              .arg(c.workspacePath);
-        item->setToolTip(tip);
-
+        item->setData(QString("C:/backup/%1").arg(c.serialNumber), Qt::UserRole + 1);
+        item->setToolTip(QString("IP: %1\nSFTP: %2\nAPI: %3\nUser: %4\nWorkspace: %5")
+                                 .arg(c.ip)
+                                 .arg(c.sftpPort)
+                                 .arg(c.apiPort)
+                                 .arg(c.username)
+                                 .arg(c.workspacePath));
         controllerModel_->appendRow(item);
     }
 
     controllerList_->setModel(controllerModel_);
     controllerList_->update();
+
+    // 5. 제어기 상태 표시
+    connect(manager,
+            &ControllerManager::controllerStateUpdated,
+            this,
+            [=](const QString &serial, bool connected, bool running) {
+                for (int i = 0; i < controllerModel_->rowCount(); ++i) {
+                    QStandardItem *item = controllerModel_->item(i);
+                    if (item->text() == serial) {
+                        QColor color;
+                        if (!connected)
+                            color = Qt::gray;
+                        else if (running)
+                            color = Qt::red;
+                        else
+                            color = Qt::green;
+
+                        item->setIcon(makeCircleIcon(color, 10));
+                        break;
+                    }
+                }
+                controllerList_->update();
+            });
 }
 
 QString CenterStack::getWorkspacePath() const

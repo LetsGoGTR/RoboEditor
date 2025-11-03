@@ -1,4 +1,4 @@
-#include "openfilepage.h"
+#include "OpenFilePage.h"
 
 #include <QTreeWidgetItem>
 

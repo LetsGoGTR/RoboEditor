@@ -1,9 +1,14 @@
 #ifndef CONTROLLERMANAGER_H
 #define CONTROLLERMANAGER_H
+
 #include <QList>
+#include <QMap>
 #include <QMutex>
 #include <QObject>
 #include <QString>
+
+#include "ApiClient.h"
+
 struct ControllerInfo
 {
     QString serialNumber;
@@ -15,51 +20,59 @@ struct ControllerInfo
     bool    isConnected;
     bool    isRunning;
 
-    ControllerInfo() :
-        sftpPort(22),
-        apiPort(8080),
-        workspacePath("/home/samsung/workspace3"),
-        isConnected(false),
-        isRunning(false)
-    {
-    }
+    ControllerInfo() : sftpPort(22), apiPort(8080), isConnected(false), isRunning(false) {}
 };
 
 class ControllerManager : public QObject
 {
     Q_OBJECT
+
       public:
         static ControllerManager *instance();
-        explicit ControllerManager(QObject *parent = nullptr);
-        ~ControllerManager();
 
-        //bool isConnected();                              // 제어기 연결 여부 확인
-        //bool isRunning();                                // 제어기 동작 상태 확인
-        bool isDuplicatedSN(const QString &SN);          // 중복 SN 검사
-        int  sendFile();                                 // 제어기로 파일 전송
-        void registerController();                       // 제어기 등록
-        void removeController(int index);                // 인덱스로 제어기 삭제
-        void removeController(const ControllerInfo *c);  // 포인터로 제어기 삭제
-        void updateInfo(const ControllerInfo &newInfo);  // 정보 수정
-        void updateState();                              // 상태 갱신
+        // 제어기 관리
+        void registerController();
+        void removeController(int index);
+        void removeController(const ControllerInfo *curCon);
+        void updateInfo(const ControllerInfo &newInfo);
+
+        // 상태 업데이트
+        void updateControllersStates();  // 모든 제어기 즉시 상태 체크
+
+        // 제어기 정보 조회
+        QList<ControllerInfo> getControllers() const;
+        ControllerInfo        getController(const QString &serialNumber) const;
+        ApiClient            *getApiClient(const QString &serialNumber);
+
+        // 파일 저장/로드
         void saveToFile(const QString &filePath = "");
         void loadFromFile(const QString &filePath = "");
 
-        const QList<ControllerInfo> &getControllers() const
-        {
-            return controllers_;
-        }
-
-      private:
-        ControllerManager(const ControllerManager &)            = delete;  // 복사 금지
-        ControllerManager &operator=(const ControllerManager &) = delete;  // 대입 금지
-        QString            configFilePath_;
       signals:
         void controllerListChanged();
+        void controllerStateUpdated(const QString &serialNumber, bool isConnected, bool isRunning);
 
       private:
-        QList<ControllerInfo> controllers_;
-        mutable QMutex        mutex_;
+        explicit ControllerManager(QObject *parent = nullptr);
+        ~ControllerManager();
+
+        ControllerManager(const ControllerManager &)            = delete;
+        ControllerManager &operator=(const ControllerManager &) = delete;
+
+        bool isDuplicatedSN(const QString &SN);
+
+        // ApiClient 관리
+        void setupApiClient(const QString &serialNumber);
+        void cleanupApiClient(const QString &serialNumber);
+
+        // 상태 업데이트 (thread-safe)
+        void updateRunningState(const QString &serialNumber, bool running);
+        void updateConnectionState(const QString &serialNumber, bool connected);
+
+        QString                    configFilePath_;
+        QList<ControllerInfo>      controllers_;
+        QMap<QString, ApiClient *> apiClients_;  // serialNumber -> ApiClient
+        mutable QMutex             mutex_;
 };
 
 #endif  // CONTROLLERMANAGER_H

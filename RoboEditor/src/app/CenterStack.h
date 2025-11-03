@@ -87,7 +87,6 @@ class CenterStack : public QWidget
         QFileSystemModel   *backupModel_;
         QFileSystemModel   *workspaceModel_;
 
-        // 추가 ModifyPage (중복 제거 필요 시 위의 mfp_와 통합)
         ModifyPage *modifyPage_;
 
         // 경로

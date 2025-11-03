@@ -6,11 +6,11 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QMessageBox>
-#include <QStandardPaths>
 
 #include "ControllerSetting.h"
 
 static ControllerManager *getinstance = nullptr;
+
 ControllerManager::ControllerManager(QObject *parent) : QObject(parent)
 {
     QDir dir("C:/backup/config");
@@ -19,8 +19,18 @@ ControllerManager::ControllerManager(QObject *parent) : QObject(parent)
     configFilePath_ = "C:/backup/config/controllers.json";
     loadFromFile();
 }
+
 ControllerManager::~ControllerManager()
 {
+    // ApiClient들 정리
+    for (auto it = apiClients_.begin(); it != apiClients_.end(); ++it) {
+        if (it.value()) {
+            it.value()->stopPolling();
+            it.value()->deleteLater();
+        }
+    }
+    apiClients_.clear();
+
     saveToFile();
 }
 
@@ -40,7 +50,7 @@ void ControllerManager::registerController()
     if (dialog.exec() == QDialog::Accepted) {
         ControllerInfo newConInfo = dialog.getControllerInfo();
 
-        //동일한 SN이 있으면 에러
+        // 동일한 SN이 있으면 에러
         if (isDuplicatedSN(newConInfo.serialNumber)) {
             QMessageBox::warning(nullptr, "등록 실패", "이미 동일한 제어기가 등록되어 있습니다.");
             return;
@@ -59,42 +69,59 @@ void ControllerManager::registerController()
                                      "작업 경로에 폴더를 생성할 수 없습니다:\n" + folderPath);
                 return;
             }
-        } else {
-            qDebug() << "폴더 이미 존재:" << folderPath;
         }
 
+        // 초기 상태 설정
+        newConInfo.isConnected = false;
+        newConInfo.isRunning   = false;
+
         controllers_.append(newConInfo);
+
         qDebug() << "SN:" << newConInfo.serialNumber;
         qDebug() << "IP:" << newConInfo.ip;
         qDebug() << "SFTP:" << newConInfo.sftpPort;
         qDebug() << "API:" << newConInfo.apiPort;
         qDebug() << "Username:" << newConInfo.username;
         qDebug() << "Workspace:" << newConInfo.workspacePath;
-    } else {
-        qDebug() << "Controller registration canceled";
+
+        saveToFile();
+
+        // ApiClient 설정 (폴링 시작)
+        setupApiClient(newConInfo.serialNumber);
+
+        emit controllerListChanged();
     }
-    saveToFile();
-    emit controllerListChanged();
 }
+
 void ControllerManager::removeController(int index)
 {
     if (index >= 0 && index < controllers_.size()) {
         QString sn = controllers_[index].serialNumber;
+
+        // ApiClient 정리
+        cleanupApiClient(sn);
+
         controllers_.removeAt(index);
-
         saveToFile();
-
         emit controllerListChanged();
 
         qDebug() << "controllers[" << index << "] (" << sn << ") removed";
     }
 }
+
 void ControllerManager::removeController(const ControllerInfo *curCon)
 {
     QMutexLocker locker(&mutex_);
 
     for (int idx = 0; idx < controllers_.size(); ++idx) {
         if (controllers_[idx].serialNumber == curCon->serialNumber) {
+            QString sn = controllers_[idx].serialNumber;
+
+            // ApiClient 정리
+            locker.unlock();
+            cleanupApiClient(sn);
+            locker.relock();
+
             controllers_.removeAt(idx);
             qDebug() << "controllers[" << idx << "] removed";
 
@@ -107,48 +134,224 @@ void ControllerManager::removeController(const ControllerInfo *curCon)
 
 void ControllerManager::updateInfo(const ControllerInfo &newInfo)
 {
-    //ip, username, sftp port, api port, workspacePath 수정
-
     ControllerSetting dialog;
     dialog.setControllerInfo(newInfo);
 
     if (dialog.exec() == QDialog::Accepted) {
         ControllerInfo updated = dialog.getControllerInfo();
 
-        QMutexLocker locker(&mutex_);
-        for (auto &c : controllers_) {
-            if (c.serialNumber == newInfo.serialNumber) {
-                c.ip            = updated.ip;
-                c.username      = updated.username;
-                c.sftpPort      = updated.sftpPort;
-                c.apiPort       = updated.apiPort;
-                c.workspacePath = updated.workspacePath;
+        QString serialNumber;
 
-                qDebug() << "[updateInfo] Controller updated:";
-                qDebug() << "SN:" << c.serialNumber;
-                qDebug() << "IP:" << c.ip;
-                qDebug() << "Username:" << c.username;
-                qDebug() << "SFTP:" << c.sftpPort;
-                qDebug() << "API:" << c.apiPort;
-                qDebug() << "Workspace:" << c.workspacePath;
+        {
+            QMutexLocker locker(&mutex_);
+            for (auto &c : controllers_) {
+                if (c.serialNumber == newInfo.serialNumber) {
+                    serialNumber = c.serialNumber;
 
-                saveToFile();
-                emit controllerListChanged();
-                break;
+                    c.ip            = updated.ip;
+                    c.username      = updated.username;
+                    c.sftpPort      = updated.sftpPort;
+                    c.apiPort       = updated.apiPort;
+                    c.workspacePath = updated.workspacePath;
+
+                    qDebug() << "[updateInfo] Controller updated:";
+                    qDebug() << "SN:" << c.serialNumber;
+                    qDebug() << "IP:" << c.ip;
+                    qDebug() << "Username:" << c.username;
+                    qDebug() << "SFTP:" << c.sftpPort;
+                    qDebug() << "API:" << c.apiPort;
+                    qDebug() << "Workspace:" << c.workspacePath;
+
+                    break;
+                }
             }
+        }
+
+        saveToFile();
+
+        cleanupApiClient(serialNumber);
+        QTimer::singleShot(50, this, [this, serialNumber]() { setupApiClient(serialNumber); });
+
+        emit controllerListChanged();
+    }
+}
+
+void ControllerManager::setupApiClient(const QString &serialNumber)
+{
+    // 이미 존재하면 리턴
+    {
+        QMutexLocker locker(&mutex_);
+        if (apiClients_.contains(serialNumber)) {
+            qWarning() << "[setupApiClient]" << serialNumber << "already has ApiClient";
+            return;
+        }
+    }
+
+    // 제어기 정보 가져오기
+    ControllerInfo info = getController(serialNumber);
+    if (info.serialNumber.isEmpty()) {
+        qWarning() << "[setupApiClient] Controller not found:" << serialNumber;
+        return;
+    }
+
+    QString    baseUrl = QString("http://%1:%2").arg(info.ip).arg(info.apiPort);
+    ApiClient *client  = new ApiClient(baseUrl, this);
+
+    // serialNumber를 값으로 캡처
+    //값이 바뀌었을 때
+    connect(client, &ApiClient::robotStateChanged, this, [this, serialNumber](bool isRunning) {
+        updateRunningState(serialNumber, isRunning);
+    });
+
+    //연결 실패
+    connect(client,
+            &ApiClient::requestFailed,
+            this,
+            [this,
+             serialNumber](const QString &endpoint, const QString &error, const QString &url) {
+                // 제어기 정보 가져오기
+                ControllerInfo info = getController(serialNumber);
+
+                qWarning() << "[ControllerManager]" << serialNumber << " " << url << " "
+                           << "request failed:" << error;
+
+                updateConnectionState(serialNumber, false);
+                updateRunningState(serialNumber, false);
+            });
+
+    //연결 정상
+    connect(client,
+            &ApiClient::requestSucceeded,
+            this,
+            [this, serialNumber](const QString &endpoint, const QJsonObject &response) {
+                bool running = response.value("data").toBool();
+                updateConnectionState(serialNumber, true);
+                updateRunningState(serialNumber, running);
+            });
+
+    // ApiClient 저장
+    {
+        QMutexLocker locker(&mutex_);
+        apiClients_[serialNumber] = client;
+    }
+
+    // 폴링 시작 (5초마다 자동으로 GET /api/robot/running 호출)
+    client->startPolling(5000);
+
+    qDebug() << "[setupApiClient] ApiClient created and polling started for" << serialNumber;
+}
+
+void ControllerManager::cleanupApiClient(const QString &serialNumber)
+{
+    QMutexLocker locker(&mutex_);
+
+    if (apiClients_.contains(serialNumber)) {
+        ApiClient *client = apiClients_.take(serialNumber);
+        if (client) {
+            client->stopPolling();
+            client->deleteLater();
+            qDebug() << "[cleanupApiClient] ApiClient removed for" << serialNumber;
         }
     }
 }
-void ControllerManager::updateState()
+
+// 모든 제어기 상태 업데이트
+void ControllerManager::updateControllersStates()
 {
-    // isRunning, isConnected 확인
+    QMutexLocker locker(&mutex_);
+
+    for (const auto &c : controllers_) {
+        // 이미 ApiClient가 있으면 즉시 체크
+        if (apiClients_.contains(c.serialNumber)) {
+            ApiClient *client = apiClients_[c.serialNumber];
+            locker.unlock();
+            client->checkRobotRunning();
+            locker.relock();
+        } else {
+            // 없으면 새로 생성
+            locker.unlock();
+            setupApiClient(c.serialNumber);
+            locker.relock();
+        }
+    }
 }
-// bool ControllerManager::isConnected() {}
-// bool ControllerManager::isRunning() {}
+
+// 상태 업데이트 메서드들
+void ControllerManager::updateRunningState(const QString &serialNumber, bool running)
+{
+    QMutexLocker locker(&mutex_);
+
+    for (auto &c : controllers_) {
+        if (c.serialNumber == serialNumber) {
+            if (c.isRunning != running) {
+                c.isRunning = running;
+                qDebug() << "[ControllerManager]" << serialNumber << "running state changed to"
+                         << (running ? "RUNNING" : "IDLE");
+
+                locker.unlock();
+                emit controllerStateUpdated(serialNumber, c.isConnected, c.isRunning);
+            }
+            return;
+        }
+    }
+}
+
+void ControllerManager::updateConnectionState(const QString &serialNumber, bool connected)
+{
+    QMutexLocker locker(&mutex_);
+
+    for (auto &c : controllers_) {
+        if (c.serialNumber == serialNumber) {
+            if (c.isConnected != connected) {
+                c.isConnected = connected;
+
+                // 연결 끊기면 running도 false로
+                if (!connected) {
+                    c.isRunning = false;
+                }
+
+                qDebug() << "[ControllerManager]" << serialNumber << "connection state changed to"
+                         << (connected ? "CONNECTED" : "DISCONNECTED");
+
+                locker.unlock();
+                emit controllerStateUpdated(serialNumber, c.isConnected, c.isRunning);
+            }
+            return;
+        }
+    }
+}
+
+// 제어기 정보 가져오기
+ControllerInfo ControllerManager::getController(const QString &serialNumber) const
+{
+    QMutexLocker locker(&mutex_);
+
+    for (const auto &c : controllers_) {
+        if (c.serialNumber == serialNumber) {
+            return c;
+        }
+    }
+
+    return ControllerInfo();  // 빈 구조체 반환
+}
+
+// ApiClient 가져오기
+ApiClient *ControllerManager::getApiClient(const QString &serialNumber)
+{
+    QMutexLocker locker(&mutex_);
+    return apiClients_.value(serialNumber, nullptr);
+}
+
+QList<ControllerInfo> ControllerManager::getControllers() const
+{
+    QMutexLocker locker(&mutex_);
+    return controllers_;  // 복사본 반환
+}
+
 bool ControllerManager::isDuplicatedSN(const QString &SN)
 {
-    for (int idx = 0; idx < controllers_.size(); idx++) {
-        if (controllers_[idx].serialNumber == SN) {
+    for (const auto &c : controllers_) {
+        if (c.serialNumber == SN) {
             return true;
         }
     }
@@ -192,7 +395,6 @@ void ControllerManager::saveToFile(const QString &filePath)
     }
 }
 
-// ✅ JSON 파일에서 로드
 void ControllerManager::loadFromFile(const QString &filePath)
 {
     QString path = filePath.isEmpty() ? configFilePath_ : filePath;
@@ -241,6 +443,12 @@ void ControllerManager::loadFromFile(const QString &filePath)
 
     qDebug() << "[ControllerManager] Loaded" << controllers_.size() << "controllers from:" << path;
 
-    // ✅ 로드 후 UI 업데이트를 위한 signal 발생
+    locker.unlock();
+
+    // ✅ 로드된 제어기들에 대해 ApiClient 자동 생성 및 폴링 시작
+    for (const auto &c : controllers_) {
+        setupApiClient(c.serialNumber);
+    }
+
     emit controllerListChanged();
 }
