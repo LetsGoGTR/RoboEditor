@@ -1,6 +1,7 @@
 #pragma once
 
-#include <drogon/drogon.h>
+#include "logging/Logger.h"
+
 #include <filesystem>
 #include <string>
 
@@ -37,7 +38,7 @@ namespace utils
 
             return pathStr.compare(0, baseStr.length(), baseStr) == 0;
         } catch (const std::exception &e) {
-            LOG_ERROR << "Path validation error: " << e.what();
+            utils::logging::error("Path validation error: " + std::string(e.what()));
             return false;
         }
     }
@@ -48,7 +49,7 @@ namespace utils
             namespace fs = std::filesystem;
             return fs::exists(path) && fs::is_regular_file(path);
         } catch (const std::exception &e) {
-            LOG_ERROR << "File validation error: " << e.what();
+            utils::logging::error("File validation error: " + std::string(e.what()));
             return false;
         }
     }
@@ -64,7 +65,7 @@ namespace utils
             namespace fs = std::filesystem;
             return fs::exists(path) && fs::is_directory(path);
         } catch (const std::exception &e) {
-            LOG_ERROR << "Directory validation error: " << e.what();
+            utils::logging::error("Directory validation error: " + std::string(e.what()));
             return false;
         }
     }

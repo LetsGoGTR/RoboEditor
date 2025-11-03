@@ -2,6 +2,7 @@
 
 #include "../utils/JsonFileUtils.h"
 #include "../utils/TimeUtils.h"
+#include "../utils/logging/Logger.h"
 
 #include <chrono>
 #include <filesystem>
@@ -87,7 +88,7 @@ services::DeviceService::createDevice(const std::string &baseDir, const DeviceMe
         result.success = true;
         result.data    = newMetadata.toJson();
 
-        LOG_INFO << "Created device: " << metadata.name << " (ID: " << metadata.id << ")";
+        utils::logging::info("Created device: " + metadata.name + " (ID: " + metadata.id + ")");
         return result;
 
     } catch (const std::exception &e) {
@@ -116,7 +117,7 @@ services::ServiceResult services::DeviceService::readDevice(const std::string &b
     result.success = true;
     result.data    = metadata.toJson();
 
-    LOG_INFO << "Retrieved device info: " << deviceId;
+    utils::logging::info("Retrieved device info: " + deviceId);
     return result;
 }
 
@@ -153,7 +154,7 @@ services::ServiceResult services::DeviceService::updateDevice(
         result.success = true;
         result.data    = updatedMetadata.toJson();
 
-        LOG_INFO << "Updated device: " << deviceId;
+        utils::logging::info("Updated device: " + deviceId);
         return result;
 
     } catch (const std::exception &e) {
@@ -182,7 +183,7 @@ services::ServiceResult services::DeviceService::deleteDevice(const std::string 
         result.success = true;
         result.data    = metadata.toJson();
 
-        LOG_INFO << "Deleted device: " << deviceId;
+        utils::logging::info("Deleted device: " + deviceId);
         return result;
 
     } catch (const std::exception &e) {
@@ -219,7 +220,7 @@ services::ServiceResult services::DeviceService::listDevices(const std::string &
         result.data["devices"] = devices;
         result.data["count"]   = (int)devices.size();
 
-        LOG_INFO << "Listed " << devices.size() << " devices";
+        utils::logging::info("Listed " + std::to_string(devices.size()) + " devices");
         return result;
 
     } catch (const std::exception &e) {

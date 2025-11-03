@@ -6,35 +6,34 @@
 
 namespace fs = std::filesystem;
 
-void utils::RobotHttpClient::checkRunning(const std::string                              &ip,
-                                          std::function<void(bool, const std::string &)>  callback)
+void utils::RobotHttpClient::checkRunning(const std::string                             &ip,
+                                          std::function<void(bool, const std::string &)> callback)
 {
     auto client = drogon::HttpClient::newHttpClient("http://" + ip);
     auto req    = drogon::HttpRequest::newHttpRequest();
     req->setPath(RUNNING_ENDPOINT);
     req->setMethod(drogon::Get);
 
-    client->sendRequest(req,
-                        [callback](drogon::ReqResult              result,
-                                   const drogon::HttpResponsePtr &response) {
-                            if (result != drogon::ReqResult::Ok) {
-                                return callback(false, "Failed to connect to robot");
-                            }
+    client->sendRequest(
+            req, [callback](drogon::ReqResult result, const drogon::HttpResponsePtr &response) {
+                if (result != drogon::ReqResult::Ok) {
+                    return callback(false, "Failed to connect to robot");
+                }
 
-                            auto json = response->getJsonObject();
-                            if (!json || !json->isMember("data")) {
-                                return callback(false, "Invalid response from robot");
-                            }
+                auto json = response->getJsonObject();
+                if (!json || !json->isMember("data")) {
+                    return callback(false, "Invalid response from robot");
+                }
 
-                            bool isRunning = (*json)["data"].asBool();
-                            callback(isRunning, "");
-                        });
+                bool isRunning = (*json)["data"].asBool();
+                callback(isRunning, "");
+            });
 }
 
 void utils::RobotHttpClient::uploadWorkspace(
-        const std::string                              &ip,
-        const std::string                              &filePath,
-        std::function<void(bool, const std::string &)>  callback)
+        const std::string                             &ip,
+        const std::string                             &filePath,
+        std::function<void(bool, const std::string &)> callback)
 {
     // Read file content
     std::ifstream file(filePath, std::ios::binary);
@@ -67,52 +66,50 @@ void utils::RobotHttpClient::uploadWorkspace(
     req->addHeader("Content-Type", "multipart/form-data; boundary=" + boundary);
     req->setBody(multipartBody.str());
 
-    client->sendRequest(req,
-                        [callback](drogon::ReqResult              result,
-                                   const drogon::HttpResponsePtr &response) {
-                            if (result != drogon::ReqResult::Ok) {
-                                return callback(false, "Failed to upload to robot");
-                            }
+    client->sendRequest(
+            req, [callback](drogon::ReqResult result, const drogon::HttpResponsePtr &response) {
+                if (result != drogon::ReqResult::Ok) {
+                    return callback(false, "Failed to upload to robot");
+                }
 
-                            auto json = response->getJsonObject();
-                            if (!json || !json->isMember("success")) {
-                                return callback(false, "Invalid response from robot");
-                            }
+                auto json = response->getJsonObject();
+                if (!json || !json->isMember("success")) {
+                    return callback(false, "Invalid response from robot");
+                }
 
-                            bool success = (*json)["success"].asBool();
-                            if (!success) {
-                                std::string errorMsg = "Upload rejected by robot";
-                                if (json->isMember("message")) {
-                                    errorMsg = (*json)["message"].asString();
-                                }
-                                return callback(false, errorMsg);
-                            }
+                bool success = (*json)["success"].asBool();
+                if (!success) {
+                    std::string errorMsg = "Upload rejected by robot";
+                    if (json->isMember("message")) {
+                        errorMsg = (*json)["message"].asString();
+                    }
+                    return callback(false, errorMsg);
+                }
 
-                            callback(true, "");
-                        });
+                callback(true, "");
+            });
 }
 
 void utils::RobotHttpClient::downloadWorkspace(
-        const std::string                                      &ip,
-        std::function<void(const std::string &, const std::string &)>  callback)
+        const std::string                                            &ip,
+        std::function<void(const std::string &, const std::string &)> callback)
 {
     auto client = drogon::HttpClient::newHttpClient("http://" + ip);
     auto req    = drogon::HttpRequest::newHttpRequest();
     req->setPath(EXPORT_ENDPOINT);
     req->setMethod(drogon::Get);
 
-    client->sendRequest(req,
-                        [callback](drogon::ReqResult              result,
-                                   const drogon::HttpResponsePtr &response) {
-                            if (result != drogon::ReqResult::Ok) {
-                                return callback("", "Failed to download from robot");
-                            }
+    client->sendRequest(
+            req, [callback](drogon::ReqResult result, const drogon::HttpResponsePtr &response) {
+                if (result != drogon::ReqResult::Ok) {
+                    return callback("", "Failed to download from robot");
+                }
 
-                            std::string content(response->getBody());
-                            if (content.empty()) {
-                                return callback("", "Empty response from robot");
-                            }
+                std::string content(response->getBody());
+                if (content.empty()) {
+                    return callback("", "Empty response from robot");
+                }
 
-                            callback(content, "");
-                        });
+                callback(content, "");
+            });
 }

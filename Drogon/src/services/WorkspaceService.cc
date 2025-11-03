@@ -2,6 +2,7 @@
 
 #include "../utils/JsonFileUtils.h"
 #include "../utils/TimeUtils.h"
+#include "../utils/logging/Logger.h"
 
 #include <algorithm>
 #include <archive.h>
@@ -141,7 +142,7 @@ services::WorkspaceService::importWorkspace(const std::string       &archivePath
         result.success = true;
         result.data    = metadata.toJson();
 
-        LOG_INFO << "Imported workspace: " << metadata.name << " (ID: " << metadata.id << ")";
+        utils::logging::info("Imported workspace: " + metadata.name + " (ID: " + metadata.id + ")");
         return result;
 
     } catch (const std::exception &e) {
@@ -206,7 +207,7 @@ services::ServiceResult services::WorkspaceService::exportWorkspace(
         result.success = true;
         result.data    = metadata.toJson();
 
-        LOG_INFO << "Exported workspace: " << metadata.name << " (ID: " << workspaceId << ")";
+        utils::logging::info("Exported workspace: " + metadata.name + " (ID: " + workspaceId + ")");
         return result;
 
     } catch (const std::exception &e) {
@@ -234,8 +235,8 @@ services::WorkspaceService::listWorkspaces(const std::string &baseDir, const std
                 if (!deviceEntry.is_directory())
                     continue;
 
-                // Check if this is a valid device (has .metadata.json)
-                std::string deviceMetadataPath = deviceEntry.path().string() + "/.metadata.json";
+                // Check if this is a valid device (has .device.json)
+                std::string deviceMetadataPath = deviceEntry.path().string() + "/.device.json";
                 if (!fs::exists(deviceMetadataPath))
                     continue;
 
@@ -277,9 +278,9 @@ services::WorkspaceService::listWorkspaces(const std::string &baseDir, const std
         result.data["count"]      = (int)workspaces.size();
 
         if (deviceId.empty()) {
-            LOG_INFO << "Listed " << workspaces.size() << " workspaces from all devices";
+            utils::logging::info("Listed " + std::to_string(workspaces.size()) + " workspaces from all devices");
         } else {
-            LOG_INFO << "Listed " << workspaces.size() << " workspaces from device: " << deviceId;
+            utils::logging::info("Listed " + std::to_string(workspaces.size()) + " workspaces from device: " + deviceId);
         }
         return result;
 
@@ -332,7 +333,7 @@ Json::Value services::WorkspaceService::getDirectoryTree(const std::string &path
         tree["children"] = children;
 
     } catch (const std::exception &e) {
-        LOG_ERROR << "Failed to build directory tree: " << e.what();
+        utils::logging::error("Failed to build directory tree: " + std::string(e.what()));
     }
 
     return tree;
@@ -380,7 +381,7 @@ services::WorkspaceService::createWorkspace(const std::string       &baseDir,
         result.success = true;
         result.data    = newMetadata.toJson();
 
-        LOG_INFO << "Created workspace: " << metadata.name << " (ID: " << metadata.id << ")";
+        utils::logging::info("Created workspace: " + metadata.name + " (ID: " + metadata.id + ")");
         return result;
 
     } catch (const std::exception &e) {
@@ -412,7 +413,7 @@ services::WorkspaceService::readWorkspace(const std::string &baseDir,
     result.data["metadata"] = metadata.toJson();
     result.data["tree"]     = getDirectoryTree(workspacePath);
 
-    LOG_INFO << "Retrieved workspace: " << workspaceId;
+    utils::logging::info("Retrieved workspace: " + workspaceId);
     return result;
 }
 
@@ -452,7 +453,7 @@ services::WorkspaceService::updateWorkspace(const std::string       &baseDir,
         result.success = true;
         result.data    = updatedMetadata.toJson();
 
-        LOG_INFO << "Updated workspace: " << workspaceId;
+        utils::logging::info("Updated workspace: " + workspaceId);
         return result;
 
     } catch (const std::exception &e) {
@@ -487,7 +488,7 @@ services::WorkspaceService::deleteWorkspace(const std::string &baseDir,
         result.success = true;
         result.data    = metadata.toJson();
 
-        LOG_INFO << "Deleted workspace: " << workspaceId;
+        utils::logging::info("Deleted workspace: " + workspaceId);
         return result;
 
     } catch (const std::exception &e) {

@@ -3,6 +3,7 @@
 #include <bcrypt/BCrypt.hpp>
 
 #include "../utils/ConfigUtils.h"
+#include "../utils/logging/Logger.h"
 
 std::string services::AuthService::getPasswordHashFromConfig()
 {
@@ -12,14 +13,14 @@ std::string services::AuthService::getPasswordHashFromConfig()
 bool services::AuthService::verifyDevicePassword(const std::string &password)
 {
     if (password.empty()) {
-        LOG_WARN << "Empty password provided for verification";
+        utils::logging::warn("Empty password provided for verification");
         return false;
     }
 
     std::string storedHash = getPasswordHashFromConfig();
 
     if (storedHash.empty()) {
-        LOG_ERROR << "No password hash configured - authentication will fail";
+        utils::logging::error("No password hash configured - authentication will fail");
         return false;
     }
 
@@ -27,15 +28,15 @@ bool services::AuthService::verifyDevicePassword(const std::string &password)
         bool isValid = BCrypt::validatePassword(password, storedHash);
 
         if (isValid) {
-            LOG_INFO << "Device password verification successful";
+            utils::logging::info("Device password verification successful");
         } else {
-            LOG_WARN << "Device password verification failed - invalid password";
+            utils::logging::warn("Device password verification failed - invalid password");
         }
 
         return isValid;
 
     } catch (const std::exception &e) {
-        LOG_ERROR << "Bcrypt verification exception: " << e.what();
+        utils::logging::error("Bcrypt verification exception: " + std::string(e.what()));
         return false;
     }
 }
