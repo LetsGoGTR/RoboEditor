@@ -1,10 +1,10 @@
 #include "mainwindow.h"
 
 #include <QApplication>
+#include <QMessageBox>
 #include <QStatusBar>
 
 #include "ApplyPage.h"
-#include "BackupPage.h"
 #include "CenterStack.h"
 #include "LogManager.h"
 #include "ModifyPage.h"
@@ -18,14 +18,14 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 {
     resize(1200, 800);
 
-    // 최소만 먼저
-    ensureCenter();  // 중앙 스택만 우선
-    ensureMenu();    // 상단 메뉴(Show Log 서브메뉴 준비)
-    ensureLog();     // 로그(도킹/임베드 제어)
-    ensureNav();     // 좌측 네비
+    // 컴포넌트 초기화
+    ensureCenter();  // 중앙 위젯 (파일 트리 + 에디터)
+    ensureMenu();    // 상단 메뉴
+    ensureLog();     // 로그 관리자
+    ensureNav();     // 좌측 네비게이션
 
     wire();
-    statusBar()->showMessage("UI Ready (modular)");
+    statusBar()->showMessage("UI Ready");
 }
 
 void MainWindow::ensureMenu()
@@ -55,7 +55,6 @@ void MainWindow::ensureLog()
     if (!menu_)
         return;
     if (!logm_) {
-        // TopMenu에서 액션/그룹을 받아 LogManager에 주입
         logm_ = std::make_unique<LogManager>(this,
                                              menu_->logVisibleAction(),
                                              menu_->logPosGroup(),
