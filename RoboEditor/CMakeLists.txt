@@ -74,6 +74,7 @@ find_package(Qt6 REQUIRED COMPONENTS Core)
         src/app/CodeEditor.cpp
         src/app/CodeEditor.h
         src/app/ShortcutManager.h src/app/ShortcutManager.cpp
+        src/ui/BackupPage.ui
         # src/app/OpenFilePage.h src/app/OpenFilePage.cpp
     )
 # Define target properties for Android with Qt 6 as:

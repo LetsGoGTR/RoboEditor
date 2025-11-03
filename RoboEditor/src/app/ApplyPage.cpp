@@ -7,8 +7,6 @@
 #include "ConfirmSelection.h"
 #include "PasswordManager.h"
 #include "ui_ApplyPage.h"
-#include "ui_confirmselection.h"
-#include "ui_wrongpassword.h"
 
 ApplyPage::ApplyPage(QWidget *parent) : QWidget(parent), ui(new Ui::ApplyPage)
 {
@@ -97,6 +95,7 @@ void ApplyPage::showPasswordUI()
         qDebug() << "Password dialog cancelled";
     }
 }
+
 ApplyPage::~ApplyPage()
 {
     delete ui;
