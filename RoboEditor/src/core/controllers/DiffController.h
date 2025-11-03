@@ -1,24 +1,21 @@
 #pragma once
 
-#include <drogon/HttpController.h>
+#include <json/json.h>
+#include <string>
 
-namespace api
+#include "ControllerHelper.h"
+
+namespace core
 {
-    namespace v1
+    class Diff
     {
-        class Diff : public drogon::HttpController<Diff>
-        {
-          public:
-            METHOD_LIST_BEGIN
-            // use METHOD_ADD to add your custom processing function here;
-            METHOD_ADD(Diff::diffFiles, "/files", drogon::Post);
-            METHOD_ADD(Diff::diffWorkspaces, "/workspaces", drogon::Post);
-            METHOD_LIST_END
-            // your declaration of processing function maybe like this:
-            void diffFiles(const drogon::HttpRequestPtr                          &req,
-                           std::function<void(const drogon::HttpResponsePtr &)> &&callback);
-            void diffWorkspaces(const drogon::HttpRequestPtr                          &req,
-                                std::function<void(const drogon::HttpResponsePtr &)> &&callback);
-        };
-    }  // namespace v1
-}  // namespace api
+      public:
+        // 두 파일 간의 diff 수행
+        static helpers::CoreResult diffFiles(const std::string &filePathA,
+                                             const std::string &filePathB);
+
+        // 두 워크스페이스 간의 diff 수행
+        static helpers::CoreResult diffWorkspaces(const std::string &dirPathA,
+                                                  const std::string &dirPathB);
+    };
+}  // namespace core

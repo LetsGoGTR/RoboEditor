@@ -4,97 +4,90 @@
 
 #include "../services/FolderService.h"
 #include "../utils/ConfigUtils.h"
-#include "ControllerHelper.h"
 
-using helpers::sendError;
-using helpers::sendSuccess;
+using helpers::makeError;
+using helpers::makeSuccess;
 using utils::config::getBaseDir;
 
-void api::v1::Folder::folderRead(const drogon::HttpRequestPtr                          &req,
-                                 std::function<void(const drogon::HttpResponsePtr &)> &&callback)
+helpers::CoreResult core::Folder::readFolder(const std::string &path)
 {
-    auto path = getBaseDir() + req->getParameter("path");
+    std::string fullPath = getBaseDir() + path;
 
     if (path.empty()) {
-        return sendError(callback, drogon::k400BadRequest, "Missing 'path' query parameter");
+        return makeError("Missing 'path' parameter");
     }
 
-    auto result = services::FolderService::readFolder(path);
+    auto result = services::FolderService::readFolder(fullPath);
 
     if (!result.success) {
-        return sendError(
-                callback, drogon::k404NotFound, "Failed to list folder", result.errorMessage);
+        return makeError("Failed to list folder", result.errorMessage);
     }
 
-    sendSuccess(callback, drogon::k200OK, result.data);
-    std::cout << "Folder listed: " << path;
+    std::cout << "Folder listed: " << fullPath << std::endl;
+
+    return makeSuccess(result.data);
 }
 
-void api::v1::Folder::folderCreate(const drogon::HttpRequestPtr                          &req,
-                                   std::function<void(const drogon::HttpResponsePtr &)> &&callback)
+helpers::CoreResult core::Folder::createFolder(const std::string &path)
 {
-    auto path = getBaseDir() + req->getParameter("path");
+    std::string fullPath = getBaseDir() + path;
 
     if (path.empty()) {
-        return sendError(callback, drogon::k400BadRequest, "Missing 'path' query parameter");
+        return makeError("Missing 'path' parameter");
     }
 
-    auto result = services::FolderService::createFolder(path);
+    auto result = services::FolderService::createFolder(fullPath);
 
     if (!result.success) {
-        return sendError(
-                callback, drogon::k409Conflict, "Failed to create folder", result.errorMessage);
+        return makeError("Failed to create folder", result.errorMessage);
     }
 
-    sendSuccess(callback, drogon::k201Created, result.data, "Folder created successfully");
-    std::cout << "Folder created: " << path;
+    std::cout << "Folder created: " << fullPath << std::endl;
+
+    return makeSuccess(result.data, "Folder created successfully");
 }
 
-void api::v1::Folder::folderUpdate(const drogon::HttpRequestPtr                          &req,
-                                   std::function<void(const drogon::HttpResponsePtr &)> &&callback)
+helpers::CoreResult core::Folder::updateFolder(const std::string &path, const std::string &newPath)
 {
-    auto oldPath = getBaseDir() + req->getParameter("path");
-
-    if (oldPath.empty()) {
-        return sendError(callback, drogon::k400BadRequest, "Missing 'path' query parameter");
-    }
-
-    auto json = req->getJsonObject();
-    if (!json || !json->isMember("newPath")) {
-        return sendError(
-                callback, drogon::k400BadRequest, "Missing 'newPath' field in request body");
-    }
-
-    std::string newPath = getBaseDir() + (*json)["newPath"].asString();
-
-    auto result = services::FolderService::updateFolder(oldPath, newPath);
-
-    if (!result.success) {
-        return sendError(
-                callback, drogon::k404NotFound, "Failed to rename folder", result.errorMessage);
-    }
-
-    sendSuccess(callback, drogon::k200OK, result.data, "Folder renamed successfully");
-    std::cout << "Folder renamed from: " << oldPath << " to: " << newPath;
-}
-
-void api::v1::Folder::folderDelete(const drogon::HttpRequestPtr                          &req,
-                                   std::function<void(const drogon::HttpResponsePtr &)> &&callback)
-{
-    auto path = getBaseDir() + req->getParameter("path");
+    std::string oldPath = getBaseDir() + path;
 
     if (path.empty()) {
-        return sendError(callback, drogon::k400BadRequest, "Missing 'path' query parameter");
+        return makeError("Missing 'path' parameter");
     }
 
-    auto result = services::FolderService::deleteFolder(path);
+    if (newPath.empty()) {
+        return makeError("New path is required");
+    }
+
+    std::string fullNewPath = getBaseDir() + newPath;
+
+    auto result = services::FolderService::updateFolder(oldPath, fullNewPath);
 
     if (!result.success) {
-        return sendError(
-                callback, drogon::k404NotFound, "Failed to delete folder", result.errorMessage);
+        return makeError("Failed to rename folder", result.errorMessage);
+    }
+
+    std::cout << "Folder renamed from: " << oldPath << " to: " << fullNewPath << std::endl;
+
+    return makeSuccess(result.data, "Folder renamed successfully");
+}
+
+helpers::CoreResult core::Folder::deleteFolder(const std::string &path)
+{
+    std::string fullPath = getBaseDir() + path;
+
+    if (path.empty()) {
+        return makeError("Missing 'path' parameter");
+    }
+
+    auto result = services::FolderService::deleteFolder(fullPath);
+
+    if (!result.success) {
+        return makeError("Failed to delete folder", result.errorMessage);
     }
 
     Json::Value data;
-    sendSuccess(callback, drogon::k200OK, data, "Folder deleted successfully");
-    std::cout << "Folder deleted: " << path;
+    std::cout << "Folder deleted: " << fullPath << std::endl;
+
+    return makeSuccess(data, "Folder deleted successfully");
 }

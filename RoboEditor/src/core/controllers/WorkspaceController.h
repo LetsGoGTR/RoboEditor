@@ -1,42 +1,43 @@
 #pragma once
 
-#include <drogon/HttpController.h>
+#include <json/json.h>
+#include <string>
 
-namespace api
+#include "ControllerHelper.h"
+
+namespace core
 {
-    namespace v1
+    class Workspace
     {
-        class Workspace : public drogon::HttpController<Workspace>
-        {
-          public:
-            METHOD_LIST_BEGIN
-            // use METHOD_ADD to add your custom processing function here;
-            METHOD_ADD(Workspace::list, "", drogon::Get);
-            METHOD_ADD(Workspace::create, "", drogon::Post);
-            METHOD_ADD(Workspace::info, "/{workspaceId}", drogon::Get);
-            METHOD_ADD(Workspace::update, "/{workspaceId}", drogon::Put);
-            METHOD_ADD(Workspace::remove, "/{workspaceId}", drogon::Delete);
-            METHOD_ADD(Workspace::workspaceImport, "/import", drogon::Post);
-            METHOD_ADD(Workspace::workspaceExport, "/export", drogon::Post);
-            METHOD_LIST_END
-            // your declaration of processing function maybe like this:
-            void list(const drogon::HttpRequestPtr                          &req,
-                      std::function<void(const drogon::HttpResponsePtr &)> &&callback);
-            void create(const drogon::HttpRequestPtr                          &req,
-                        std::function<void(const drogon::HttpResponsePtr &)> &&callback);
-            void info(const drogon::HttpRequestPtr                          &req,
-                      std::function<void(const drogon::HttpResponsePtr &)> &&callback,
-                      const std::string                                     &workspaceId);
-            void update(const drogon::HttpRequestPtr                          &req,
-                        std::function<void(const drogon::HttpResponsePtr &)> &&callback,
-                        const std::string                                     &workspaceId);
-            void remove(const drogon::HttpRequestPtr                          &req,
-                        std::function<void(const drogon::HttpResponsePtr &)> &&callback,
-                        const std::string                                     &workspaceId);
-            void workspaceImport(const drogon::HttpRequestPtr                          &req,
-                                 std::function<void(const drogon::HttpResponsePtr &)> &&callback);
-            void workspaceExport(const drogon::HttpRequestPtr                          &req,
-                                 std::function<void(const drogon::HttpResponsePtr &)> &&callback);
-        };
-    }  // namespace v1
-}  // namespace api
+      public:
+        // 워크스페이스 목록 조회 (선택적으로 deviceId로 필터링)
+        static helpers::CoreResult listWorkspaces(const std::string &deviceId = "");
+
+        // 워크스페이스 생성
+        static helpers::CoreResult createWorkspace(const std::string &name,
+                                                   const std::string &target      = "",
+                                                   const std::string &description = "");
+
+        // 워크스페이스 정보 조회
+        static helpers::CoreResult getWorkspaceInfo(const std::string &workspaceId);
+
+        // 워크스페이스 업데이트
+        static helpers::CoreResult updateWorkspace(const std::string &workspaceId,
+                                                   const std::string &name        = "",
+                                                   const std::string &target      = "",
+                                                   const std::string &description = "");
+
+        // 워크스페이스 삭제
+        static helpers::CoreResult deleteWorkspace(const std::string &workspaceId);
+
+        // 워크스페이스 가져오기 (파일에서)
+        static helpers::CoreResult importWorkspace(const std::string &filePath,
+                                                   const std::string &name        = "",
+                                                   const std::string &target      = "",
+                                                   const std::string &description = "");
+
+        // 워크스페이스 내보내기
+        // Returns: { path: 출력 파일 경로 }
+        static helpers::CoreResult exportWorkspace(const std::string &workspaceId);
+    };
+}  // namespace core

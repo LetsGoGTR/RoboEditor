@@ -1,30 +1,27 @@
 #pragma once
 
-#include <drogon/HttpController.h>
+#include <json/json.h>
+#include <string>
 
-namespace api
+#include "ControllerHelper.h"
+
+namespace core
 {
-    namespace v1
+    class File
     {
-        class File : public drogon::HttpController<File>
-        {
-          public:
-            METHOD_LIST_BEGIN
-            // use METHOD_ADD to add your custom processing function here;
-            METHOD_ADD(File::fileRead, "", drogon::Get);
-            METHOD_ADD(File::fileCreate, "", drogon::Post);
-            METHOD_ADD(File::fileUpdate, "", drogon::Put);
-            METHOD_ADD(File::fileDelete, "", drogon::Delete);
-            METHOD_LIST_END
-            // your declaration of processing function maybe like this:
-            void fileRead(const drogon::HttpRequestPtr                          &req,
-                          std::function<void(const drogon::HttpResponsePtr &)> &&callback);
-            void fileCreate(const drogon::HttpRequestPtr                          &req,
-                            std::function<void(const drogon::HttpResponsePtr &)> &&callback);
-            void fileUpdate(const drogon::HttpRequestPtr                          &req,
-                            std::function<void(const drogon::HttpResponsePtr &)> &&callback);
-            void fileDelete(const drogon::HttpRequestPtr                          &req,
-                            std::function<void(const drogon::HttpResponsePtr &)> &&callback);
-        };
-    }  // namespace v1
-}  // namespace api
+      public:
+        // 파일 읽기
+        static helpers::CoreResult readFile(const std::string &path);
+
+        // 파일 생성
+        static helpers::CoreResult createFile(const std::string &path, const std::string &content);
+
+        // 파일 업데이트 (내용 변경 또는 이동)
+        static helpers::CoreResult updateFile(const std::string &path,
+                                              const std::string &content = "",
+                                              const std::string &newPath = "");
+
+        // 파일 삭제
+        static helpers::CoreResult deleteFile(const std::string &path);
+    };
+}  // namespace core

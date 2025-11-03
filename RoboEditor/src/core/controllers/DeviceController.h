@@ -1,51 +1,51 @@
 #pragma once
 
-#include <drogon/HttpController.h>
+#include <functional>
+#include <json/json.h>
+#include <string>
 
-namespace api
+#include "ControllerHelper.h"
+
+namespace core
 {
-    namespace v1
+    class Device
     {
-        class Device : public drogon::HttpController<Device>
-        {
-          public:
-            METHOD_LIST_BEGIN
-            // use METHOD_ADD to add your custom processing function here;
-            METHOD_ADD(Device::list, "", drogon::Get);
-            METHOD_ADD(Device::create, "", drogon::Post);
-            METHOD_ADD(Device::info, "/{deviceId}", drogon::Get);
-            METHOD_ADD(Device::update, "/{deviceId}", drogon::Put);
-            METHOD_ADD(Device::remove, "/{deviceId}", drogon::Delete);
-            METHOD_ADD(Device::apply, "/{deviceId}/apply", drogon::Post);
-            METHOD_ADD(Device::backup, "/{deviceId}/backup", drogon::Get);
-            METHOD_LIST_END
-            // your declaration of processing function maybe like this:
-            void list(const drogon::HttpRequestPtr                          &req,
-                      std::function<void(const drogon::HttpResponsePtr &)> &&callback);
-            void create(const drogon::HttpRequestPtr                          &req,
-                        std::function<void(const drogon::HttpResponsePtr &)> &&callback);
-            void info(const drogon::HttpRequestPtr                          &req,
-                      std::function<void(const drogon::HttpResponsePtr &)> &&callback,
-                      const std::string                                     &deviceId);
-            void update(const drogon::HttpRequestPtr                          &req,
-                        std::function<void(const drogon::HttpResponsePtr &)> &&callback,
-                        const std::string                                     &deviceId);
-            void remove(const drogon::HttpRequestPtr                          &req,
-                        std::function<void(const drogon::HttpResponsePtr &)> &&callback,
-                        const std::string                                     &deviceId);
-            void apply(const drogon::HttpRequestPtr                          &req,
-                       std::function<void(const drogon::HttpResponsePtr &)> &&callback,
-                       const std::string                                     &deviceId);
-            void backup(const drogon::HttpRequestPtr                          &req,
-                        std::function<void(const drogon::HttpResponsePtr &)> &&callback,
-                        const std::string                                     &deviceId);
+      public:
+        // 모든 디바이스 목록 조회
+        static helpers::CoreResult listDevices();
 
-          private:
-            // Helper function to check if robot is running
-            void checkRobotStatus(
-                    const std::string                                                      &ip,
-                    std::function<void()>                                                   onNotRunning,
-                    std::shared_ptr<std::function<void(const drogon::HttpResponsePtr &)>>   callbackPtr);
-        };
-    }  // namespace v1
-}  // namespace api
+        // 새 디바이스 생성
+        static helpers::CoreResult createDevice(const std::string &id,
+                                                const std::string &name,
+                                                const std::string &description = "",
+                                                const std::string &ip          = "");
+
+        // 디바이스 정보 조회
+        static helpers::CoreResult getDeviceInfo(const std::string &deviceId);
+
+        // 디바이스 정보 업데이트
+        static helpers::CoreResult updateDevice(const std::string &deviceId,
+                                                const std::string &name        = "",
+                                                const std::string &description = "",
+                                                const std::string &ip          = "");
+
+        // 디바이스 삭제
+        static helpers::CoreResult deleteDevice(const std::string &deviceId);
+
+        // 워크스페이스를 디바이스에 적용 (비동기)
+        static void applyToDevice(const std::string                       &deviceId,
+                                  const std::string                       &password,
+                                  const std::string                       &workspaceId,
+                                  std::function<void(helpers::CoreResult)> callback);
+
+        // 디바이스에서 워크스페이스 백업 (비동기)
+        static void backupFromDevice(const std::string                       &deviceId,
+                                     std::function<void(helpers::CoreResult)> callback);
+
+      private:
+        // 로봇 상태 확인 헬퍼 함수
+        static void checkRobotStatus(const std::string                       &ip,
+                                     std::function<void()>                    onNotRunning,
+                                     std::function<void(helpers::CoreResult)> onError);
+    };
+}  // namespace core

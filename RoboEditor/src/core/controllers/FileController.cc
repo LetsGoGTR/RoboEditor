@@ -4,107 +4,86 @@
 
 #include "../services/FileService.h"
 #include "../utils/ConfigUtils.h"
-#include "ControllerHelper.h"
 
-using helpers::sendError;
-using helpers::sendSuccess;
+using helpers::makeError;
+using helpers::makeSuccess;
 using utils::config::getBaseDir;
 
-void api::v1::File::fileRead(const drogon::HttpRequestPtr                          &req,
-                             std::function<void(const drogon::HttpResponsePtr &)> &&callback)
+helpers::CoreResult core::File::readFile(const std::string &path)
 {
-    auto path = getBaseDir() + req->getParameter("path");
+    std::string fullPath = getBaseDir() + path;
 
     if (path.empty()) {
-        return sendError(callback, drogon::k400BadRequest, "Missing 'path' query parameter");
+        return makeError("Missing 'path' parameter");
     }
 
-    auto result = services::FileService::readFile(path);
+    auto result = services::FileService::readFile(fullPath);
 
     if (!result.success) {
-        return sendError(
-                callback, drogon::k404NotFound, "Failed to read file", result.errorMessage);
+        return makeError("Failed to read file", result.errorMessage);
     }
 
-    sendSuccess(callback, drogon::k200OK, result.data);
-    std::cout << "File read: " << path;
+    std::cout << "File read: " << fullPath << std::endl;
+
+    return makeSuccess(result.data);
 }
 
-void api::v1::File::fileCreate(const drogon::HttpRequestPtr                          &req,
-                               std::function<void(const drogon::HttpResponsePtr &)> &&callback)
+helpers::CoreResult core::File::createFile(const std::string &path, const std::string &content)
 {
-    auto path = getBaseDir() + req->getParameter("path");
+    std::string fullPath = getBaseDir() + path;
 
     if (path.empty()) {
-        return sendError(callback, drogon::k400BadRequest, "Missing 'path' query parameter");
+        return makeError("Missing 'path' parameter");
     }
 
-    auto json = req->getJsonObject();
-    if (!json || !json->isMember("content")) {
-        return sendError(
-                callback, drogon::k400BadRequest, "Missing 'content' field in request body");
-    }
-
-    std::string content = (*json)["content"].asString();
-
-    auto result = services::FileService::createFile(path, content);
+    auto result = services::FileService::createFile(fullPath, content);
 
     if (!result.success) {
-        return sendError(
-                callback, drogon::k409Conflict, "Failed to create file", result.errorMessage);
+        return makeError("Failed to create file", result.errorMessage);
     }
 
-    sendSuccess(callback, drogon::k201Created, result.data, "File created successfully");
-    std::cout << "File created: " << path;
+    std::cout << "File created: " << fullPath << std::endl;
+
+    return makeSuccess(result.data, "File created successfully");
 }
 
-void api::v1::File::fileUpdate(const drogon::HttpRequestPtr                          &req,
-                               std::function<void(const drogon::HttpResponsePtr &)> &&callback)
+helpers::CoreResult core::File::updateFile(const std::string &path,
+                                           const std::string &content,
+                                           const std::string &newPath)
 {
-    auto path = getBaseDir() + req->getParameter("path");
+    std::string fullPath = getBaseDir() + path;
 
     if (path.empty()) {
-        return sendError(callback, drogon::k400BadRequest, "Missing 'path' query parameter");
+        return makeError("Missing 'path' parameter");
     }
 
-    auto json = req->getJsonObject();
-    if (!json) {
-        return sendError(callback, drogon::k400BadRequest, "Invalid JSON body");
-    }
-
-    bool hasContent = json->isMember("content");
-    bool hasNewPath = json->isMember("newPath");
+    bool hasContent = !content.empty();
+    bool hasNewPath = !newPath.empty();
 
     if (!hasContent && !hasNewPath) {
-        return sendError(
-                callback, drogon::k400BadRequest, "Either 'content' or 'newPath' must be provided");
+        return makeError("Either 'content' or 'newPath' must be provided");
     }
 
-    std::string currentPath = path;
+    std::string currentPath = fullPath;
 
     // Move file if newPath is provided
     if (hasNewPath) {
-        std::string newPath = getBaseDir() + (*json)["newPath"].asString();
-        auto        result  = services::FileService::moveFile(currentPath, newPath);
+        std::string fullNewPath = getBaseDir() + newPath;
+        auto        result      = services::FileService::moveFile(currentPath, fullNewPath);
 
         if (!result.success) {
-            return sendError(
-                    callback, drogon::k404NotFound, "Failed to move file", result.errorMessage);
+            return makeError("Failed to move file", result.errorMessage);
         }
 
-        currentPath = newPath;  // Update path for content update
+        currentPath = fullNewPath;  // Update path for content update
     }
 
     // Update content if provided
     if (hasContent) {
-        std::string content = (*json)["content"].asString();
-        auto        result  = services::FileService::updateFile(currentPath, content);
+        auto result = services::FileService::updateFile(currentPath, content);
 
         if (!result.success) {
-            return sendError(callback,
-                             drogon::k500InternalServerError,
-                             "Failed to update file content",
-                             result.errorMessage);
+            return makeError("Failed to update file content", result.errorMessage);
         }
     }
 
@@ -114,27 +93,28 @@ void api::v1::File::fileUpdate(const drogon::HttpRequestPtr                     
     data["path"] = currentPath;
     data["info"] = result;
 
-    sendSuccess(callback, drogon::k200OK, data, "File updated successfully");
-    std::cout << "File updated: " << path << (hasNewPath ? " -> " + currentPath : "");
+    std::cout << "File updated: " << fullPath << (hasNewPath ? " -> " + currentPath : "")
+              << std::endl;
+
+    return makeSuccess(data, "File updated successfully");
 }
 
-void api::v1::File::fileDelete(const drogon::HttpRequestPtr                          &req,
-                               std::function<void(const drogon::HttpResponsePtr &)> &&callback)
+helpers::CoreResult core::File::deleteFile(const std::string &path)
 {
-    auto path = getBaseDir() + req->getParameter("path");
+    std::string fullPath = getBaseDir() + path;
 
     if (path.empty()) {
-        return sendError(callback, drogon::k400BadRequest, "Missing 'path' query parameter");
+        return makeError("Missing 'path' parameter");
     }
 
-    auto result = services::FileService::deleteFile(path);
+    auto result = services::FileService::deleteFile(fullPath);
 
     if (!result.success) {
-        return sendError(
-                callback, drogon::k404NotFound, "Failed to delete file", result.errorMessage);
+        return makeError("Failed to delete file", result.errorMessage);
     }
 
     Json::Value data;
-    sendSuccess(callback, drogon::k200OK, data, "File deleted successfully");
-    std::cout << "File deleted: " << path;
+    std::cout << "File deleted: " << fullPath << std::endl;
+
+    return makeSuccess(data, "File deleted successfully");
 }
