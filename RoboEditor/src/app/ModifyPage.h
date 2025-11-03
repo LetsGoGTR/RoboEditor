@@ -135,6 +135,10 @@ class ModifyPage : public QWidget
       public slots:
         void showCompare();  // Compare 버튼 진입: "닫힘→파일선택", "열림→재비교"
         void closeCompare();  // ComparePane의 [X] 클릭 시 호출
+
+      protected:
+        void dragEnterEvent(QDragEnterEvent * event) override;
+        void dropEvent(QDropEvent * event) override;
 };
 
 #endif  // MODIFYPAGE_H

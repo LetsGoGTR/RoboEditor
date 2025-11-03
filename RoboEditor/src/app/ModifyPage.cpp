@@ -6,6 +6,7 @@
 #include <QHBoxLayout>
 #include <QKeySequence>
 #include <QMessageBox>
+#include <QMimeData>
 #include <QShortcut>
 
 #include "CodeEditor.h"
@@ -13,6 +14,7 @@
 
 ModifyPage::ModifyPage(QWidget *parent) : QWidget(parent), currentDoc(nullptr)
 {
+    setAcceptDrops(true);
     buildUi();
 
     // 탭 전환 시 현재 문서 갱신
@@ -481,4 +483,25 @@ void Document::setContent(const QString &newContent)
 {
     content    = newContent;
     isModified = true;
+}
+void ModifyPage::dragEnterEvent(QDragEnterEvent *event)
+{
+    if (event->mimeData()->hasUrls())
+        event->acceptProposedAction();  // ✅ 파일이면 허용
+}
+
+void ModifyPage::dropEvent(QDropEvent *event)
+{
+    const QMimeData *mime = event->mimeData();
+    if (mime->hasUrls()) {
+        QList<QUrl> urls     = mime->urls();
+        QString     filePath = urls.first().toLocalFile();
+        qDebug() << "Dropped file:" << filePath;
+
+        // 실제 처리 (파일 열기 등)
+        Document *doc = openDocument(filePath);
+        if (!doc)
+            return;
+    }
+    event->acceptProposedAction();
 }

@@ -7,6 +7,7 @@
 #include <QListView>
 #include <QSplitter>
 #include <QStackedWidget>
+#include <QStandardItemModel>
 #include <QWidget>
 
 #include "ModifyPage.h"
@@ -28,6 +29,7 @@ class Center : public QWidget
         {
             return modifyPage_;
         }
+        void updateControllerList();
       signals:
         void workspaceSelected(const QString &path);
         void fileOpened(const QString &filePath);
@@ -37,17 +39,22 @@ class Center : public QWidget
       private:
         void setupUI();
 
-        QSplitter        *splitter_;
-        QTabWidget       *treeTabWidget_;
-        QTreeView        *backupTree_;
-        QListView        *controllerList_;
-        QString           workspacePath_;
-        QString           backupRootPath_;
-        QTreeView        *workspaceTree_;
-        QFileSystemModel *controllerModel_;
-        QFileSystemModel *workspaceModel_;
-        ModifyPage       *modifyPage_;
-        QStackedWidget   *stack_;  // ✅ 추가
+        QSplitter          *splitter_;
+        QTabWidget         *treeTabWidget_;
+        QTreeView          *backupTree_;
+        QListView          *controllerList_;
+        QString             workspacePath_;
+        QString             backupRootPath_;
+        QTreeView          *workspaceTree_;
+        QStandardItemModel *controllerModel_;
+        QFileSystemModel   *backupModel_;
+        QFileSystemModel   *workspaceModel_;
+
+        ModifyPage     *modifyPage_;
+        QStackedWidget *stack_;
+      private slots:
+        void onEditController(const QString &serialNumber);    // ✅ 추가
+        void onRemoveController(const QString &serialNumber);  // ✅ 추가
 };
 
 #endif  // CENTER_H
