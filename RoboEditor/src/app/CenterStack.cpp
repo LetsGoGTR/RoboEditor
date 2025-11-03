@@ -15,15 +15,11 @@ CenterStack::CenterStack(QWidget *parent) : QWidget(parent)
 {
     stack_ = new QStackedWidget;
     cmp_   = new ComparePage;
-    bkp_   = new BackupPage;
     ofp_   = new OpenFilePage;
-    alp_   = new ApplyPage;
     mfp_   = new ModifyPage;
 
     idxC_ = stack_->addWidget(cmp_);
-    idxB_ = stack_->addWidget(bkp_);
     idxO_ = stack_->addWidget(ofp_);
-    idxA_ = stack_->addWidget(alp_);
     idxM_ = stack_->addWidget(mfp_);
 
     auto *layout = new QVBoxLayout(this);
@@ -34,9 +30,7 @@ CenterStack::CenterStack(QWidget *parent) : QWidget(parent)
         emit compareRequested(L, R);
         openCompareResult(L, R);
     });
-    connect(bkp_, &BackupPage::uiBackupClicked, this, &CenterStack::backupRequested);
     connect(ofp_, &OpenFilePage::uiOpenFileClicked, this, &CenterStack::openFileRequested);
-    connect(alp_, &ApplyPage::uiApplyClicked, this, &CenterStack::applyRequested);
     connect(mfp_, &ModifyPage::uiModifyClicked, this, &CenterStack::modifyRequested);
 }
 
@@ -54,28 +48,22 @@ void CenterStack::showCompare()
 {
     stack_->setCurrentIndex(idxC_);
 }
-void CenterStack::showBackup()
-{
-    stack_->setCurrentIndex(idxB_);
-}
+
 void CenterStack::showOpenFile()
 {
     stack_->setCurrentIndex(idxO_);
 }
+
 void CenterStack::showModify()
 {
     stack_->setCurrentIndex(idxM_);
-}
-void CenterStack::showApply()
-{
-    stack_->setCurrentIndex(idxA_);
 }
 
 void CenterStack::showModifyWithCompare()
 {
     // ModifyPage로 전환
     stack_->setCurrentIndex(idxM_);
-    
+
     // ModifyPage의 Compare 기능 활성화
     if (mfp_) {
         mfp_->showCompare();

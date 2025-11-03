@@ -3,6 +3,8 @@
 #include <QApplication>
 #include <QStatusBar>
 
+#include "ApplyPage.h"
+#include "BackupPage.h"
 #include "CenterStack.h"
 #include "LogManager.h"
 #include "ModifyPage.h"
@@ -68,12 +70,58 @@ void MainWindow::wire()
                  << "nav=" << nav_.get() << "center=" << center_.get() << "logm=" << logm_.get();
         return;
     }
-    // 왼쪽 네비 → 페이지 전환
+    // 상단 Nav UI 전환 연결
     connect(nav_.get(), &NavDock::clickCompare, center_.get(), &CenterStack::showModifyWithCompare);
-    connect(nav_.get(), &NavDock::clickBackup, this, [=] { center_->showBackup(); });
     connect(nav_.get(), &NavDock::clickOpenFile, this, [=] { center_->showOpenFile(); });
-    connect(nav_.get(), &NavDock::clickApply, this, [=] { center_->showApply(); });
     connect(nav_.get(), &NavDock::clickModify, this, [=] { center_->showModify(); });
+
+    // Nav 기능 -> Pop-up
+    connect(nav_.get(), &NavDock::clickApply, this, [this]() {
+        if (applyPopup_ && applyPopup_->isVisible()) {
+            applyPopup_->raise();
+            applyPopup_->activateWindow();
+            return;
+        }
+
+        applyPopup_ = new QWidget(nullptr, Qt::Window);
+        applyPopup_->setAttribute(Qt::WA_DeleteOnClose);
+        applyPopup_->setWindowTitle("Apply to Robot Controller");
+        applyPopup_->resize(900, 600);
+
+        auto *applyPage = new ApplyPage(applyPopup_);
+        auto *layout    = new QVBoxLayout(applyPopup_);
+        layout->setContentsMargins(0, 0, 0, 0);
+        layout->addWidget(applyPage);
+
+        // 닫힐 때 포인터 초기화
+        QObject::connect(
+                applyPopup_, &QWidget::destroyed, this, [this]() { applyPopup_ = nullptr; });
+
+        applyPopup_->show();
+    });
+    connect(nav_.get(), &NavDock::clickBackup, this, [this]() {
+        if (backupPopup_ && backupPopup_->isVisible()) {
+            backupPopup_->raise();
+            backupPopup_->activateWindow();
+            return;
+        }
+
+        backupPopup_ = new QWidget(nullptr, Qt::Window);
+        backupPopup_->setAttribute(Qt::WA_DeleteOnClose);
+        backupPopup_->setWindowTitle("Backup from Robot Controller");
+        backupPopup_->resize(900, 600);
+
+        auto *backupPage = new BackupPage(backupPopup_);
+        auto *layout     = new QVBoxLayout(backupPopup_);
+        layout->setContentsMargins(0, 0, 0, 0);
+        layout->addWidget(backupPage);
+
+        // 닫힐 때 포인터 초기화
+        QObject::connect(
+                backupPopup_, &QWidget::destroyed, this, [this]() { backupPopup_ = nullptr; });
+
+        backupPopup_->show();
+    });
 
     modifyPage = center_->getModifyPage();
 
@@ -100,9 +148,4 @@ void MainWindow::wire()
                     logm_->append(QString("[UI] Compare: %1 | %2").arg(L, R));
                 statusBar()->showMessage("Compare (stub)");
             });
-    connect(center_.get(), &CenterStack::backupRequested, this, [=](const QString &T) {
-        if (logm_)
-            logm_->append(QString("[UI] Backup target=%1").arg(T));
-        statusBar()->showMessage("Backup (stub)");
-    });
 }
