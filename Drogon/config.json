@@ -345,6 +345,17 @@
             }
         }
     ],
-    //custom_config: custom configuration for users. This object can be get by the app().getCustomConfig() method. 
-    "custom_config": {}
+    //custom_config: custom configuration for users. This object can be get by the app().getCustomConfig() method.
+    "custom_config": {
+        "auth": {
+            "device_password_hash": "$2b$12$V/CMuppdu98zKBfJOSKO/ueOcpAWVAyzBHzg9TAyqJ7Lqc/Pdm9yW"
+        },
+        "storage": {
+            "base_dir": "/tmp/drogon-app/storage/",
+            "temp_apply_dir": "/tmp/drogon-app/temp/apply/",
+            "temp_backup_dir": "/tmp/drogon-app/temp/backup/",
+            "temp_upload_dir": "/tmp/drogon-app/temp/upload/",
+            "temp_export_dir": "/tmp/drogon-app/temp/export/"
+        }
+    }
 }

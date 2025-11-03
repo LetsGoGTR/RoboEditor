@@ -1,262 +1,313 @@
 #include "DiffPython.h"
 
 #include <algorithm>
-#include <filesystem>
-#include <fstream>
-#include <regex>
-#include <sstream>
-#include <vector>
+#include <cctype>
+#include <json/json.h>
+#include <utility>
 
-namespace
+// 공백 문자 판정
+static inline bool isWs(unsigned char c)
 {
-    // Structure to hold line with context information
-    struct LineWithContext
-    {
-        std::string content;
-        int         lineNumber;
-        std::string context;  // Current function/class name
-
-        LineWithContext(const std::string &c, int line, const std::string &ctx) :
-            content(c),
-            lineNumber(line),
-            context(ctx)
-        {
-        }
-    };
-
-    // Parse content and extract lines with context information
-    std::vector<LineWithContext> parsePythonContent(const std::string &content)
-    {
-        std::istringstream           stream(content);
-        std::vector<LineWithContext> lines;
-        std::string                  line;
-        int                          lineNumber = 1;
-        std::string                  currentContext;
-
-        // Regular expressions to detect function and class definitions
-        std::regex  classRegex(R"(^\s*class\s+(\w+))");
-        std::regex  funcRegex(R"(^\s*def\s+(\w+))");
-        std::smatch match;
-
-        while (std::getline(stream, line)) {
-            // Update context if we find a class or function definition
-            if (std::regex_search(line, match, classRegex)) {
-                currentContext = "class " + match[1].str();
-            } else if (std::regex_search(line, match, funcRegex)) {
-                std::string funcName = match[1].str();
-                // If we're already in a class, append the function name
-                if (currentContext.find("class ") == 0) {
-                    currentContext = currentContext + "." + funcName;
-                } else {
-                    currentContext = "function " + funcName;
-                }
-            }
-
-            lines.emplace_back(line, lineNumber, currentContext);
-            lineNumber++;
-        }
-
-        return lines;
-    }
-
-    // Simple diff algorithm (Myers' diff algorithm - simplified version)
-    struct DiffOp
-    {
-        std::string type;  // "equal", "delete", "insert"
-        int         oldIdx;
-        int         newIdx;
-        std::string oldLine;
-        std::string newLine;
-        std::string context;
-    };
-
-    std::vector<DiffOp> computeDiff(const std::vector<LineWithContext> &linesA,
-                                    const std::vector<LineWithContext> &linesB)
-    {
-        std::vector<DiffOp> ops;
-
-        // Simple line-by-line comparison (can be enhanced with LCS algorithm)
-        size_t i = 0, j = 0;
-
-        while (i < linesA.size() || j < linesB.size()) {
-            if (i >= linesA.size()) {
-                // Remaining lines in B are additions
-                ops.push_back({"insert", -1, (int)j + 1, "", linesB[j].content, linesB[j].context});
-                j++;
-            } else if (j >= linesB.size()) {
-                // Remaining lines in A are deletions
-                ops.push_back({"delete", (int)i + 1, -1, linesA[i].content, "", linesA[i].context});
-                i++;
-            } else if (linesA[i].content == linesB[j].content) {
-                // Lines are equal
-                ops.push_back({"equal",
-                               (int)i + 1,
-                               (int)j + 1,
-                               linesA[i].content,
-                               linesB[j].content,
-                               linesA[i].context});
-                i++;
-                j++;
-            } else {
-                // Check if this is a modification or insert/delete
-                // Look ahead to see if we can find a match
-                bool foundMatch = false;
-
-                // Look ahead in B for current A line
-                for (size_t k = j + 1; k < std::min(j + 5, linesB.size()); k++) {
-                    if (linesA[i].content == linesB[k].content) {
-                        // Found a match - lines between are insertions
-                        while (j < k) {
-                            ops.push_back({"insert",
-                                           -1,
-                                           (int)j + 1,
-                                           "",
-                                           linesB[j].content,
-                                           linesB[j].context});
-                            j++;
-                        }
-                        foundMatch = true;
-                        break;
-                    }
-                }
-
-                if (!foundMatch) {
-                    // Look ahead in A for current B line
-                    for (size_t k = i + 1; k < std::min(i + 5, linesA.size()); k++) {
-                        if (linesA[k].content == linesB[j].content) {
-                            // Found a match - lines between are deletions
-                            while (i < k) {
-                                ops.push_back({"delete",
-                                               (int)i + 1,
-                                               -1,
-                                               linesA[i].content,
-                                               "",
-                                               linesA[i].context});
-                                i++;
-                            }
-                            foundMatch = true;
-                            break;
-                        }
-                    }
-                }
-
-                if (!foundMatch) {
-                    // This is a modification
-                    ops.push_back({"modified",
-                                   (int)i + 1,
-                                   (int)j + 1,
-                                   linesA[i].content,
-                                   linesB[j].content,
-                                   linesA[i].context});
-                    i++;
-                    j++;
-                }
-            }
-        }
-
-        return ops;
-    }
-
-}  // anonymous namespace
-
-Json::Value diff_utils::PythonDiffEntry::toJson() const
-{
-    Json::Value result(Json::objectValue);
-    result["type"]       = type;
-    result["lineNumber"] = lineNumber;
-    result["oldContent"] = oldContent;
-    result["newContent"] = newContent;
-    result["context"]    = context;
-    return result;
+    return c == ' ' || c == '\t' || c == '\n' ||
+           c == '\r' || c == '\f' || c == '\v';
 }
 
-std::vector<diff_utils::PythonDiffEntry> diff_utils::DiffPython::compareFiles(const std::string &contentA,
-                                                                               const std::string &contentB)
+// 공백 정규화(양끝 공백 제거 + 내부 연속 공백 하나로 축약) 및 rank 계산
+NormalizedLine DiffPython::normalizeOne(const std::string& content,
+                                        size_t start,
+                                        size_t endExcl,
+                                        std::vector<int>& deep)
 {
-    auto linesA = parsePythonContent(contentA);
-    auto linesB = parsePythonContent(contentB);
+    size_t i = start, j = endExcl;
 
-    auto diffOps = computeDiff(linesA, linesB);
+    while (i < j && isWs(static_cast<unsigned char>(content[i]))) ++i;
+    while (j > i && isWs(static_cast<unsigned char>(content[j - 1]))) --j;
 
-    std::vector<PythonDiffEntry> diffs;
+    std::string body;
+    body.reserve(j - i);
+    bool inSpace = false;
 
-    for (const auto &op : diffOps) {
-        if (op.type == "equal") {
-            continue;  // Skip equal lines
+    for (size_t k = i; k < j; ++k) {
+        unsigned char c = static_cast<unsigned char>(content[k]);
+        if (isWs(c)) {
+            if (!inSpace) {
+                body.push_back(' ');
+                inSpace = true;
+            }
+        } else {
+            body.push_back(static_cast<char>(c));
+            inSpace = false;
+        }
+    }
+
+    const int lead = static_cast<int>(i - start);
+    while (!deep.empty() && lead < deep.back()) {
+        deep.pop_back();
+    }
+    if (deep.empty() || lead > deep.back()) {
+        deep.push_back(lead);
+    }
+    const int rank = static_cast<int>(deep.size()) - 1;
+
+    return NormalizedLine{
+        start,
+        endExcl - start,
+        std::move(body),
+        rank
+    };
+}
+
+// 모든 라인 정규화
+// 원본 라인(spans) 128 예상, 깊이(deep) 64 예상
+std::vector<NormalizedLine> DiffPython::normalizeAll(const std::string& content)
+{
+    std::vector<NormalizedLine> out;
+    std::vector<size_t> spans;
+    std::vector<int> deep;
+
+    spans.reserve(128);
+    deep.reserve(64);
+
+    spans.push_back(0);
+    for (size_t i = 0; i < content.size(); ++i) {
+        if (content[i] == '\n') {
+            spans.push_back(i + 1);
+        }
+    }
+    if (spans.back() != content.size()) {
+        spans.push_back(content.size());
+    }
+
+    out.reserve(spans.size() - 1);
+
+    for (size_t i = 1; i < spans.size(); ++i) {
+        size_t start = spans[i - 1];
+        size_t endExcl = spans[i] - 1; // 기존 로직 보존
+
+        if (endExcl > start && content[endExcl - 1] == '\r') {
+            --endExcl;
         }
 
-        diff_utils::PythonDiffEntry entry;
-        if (op.type == "insert") {
-            entry.type       = "added";
-            entry.lineNumber = op.newIdx;
-            entry.oldContent = "";
-            entry.newContent = op.newLine;
-            entry.context    = op.context;
-        } else if (op.type == "delete") {
-            entry.type       = "removed";
-            entry.lineNumber = op.oldIdx;
-            entry.oldContent = op.oldLine;
-            entry.newContent = "";
-            entry.context    = op.context;
-        } else {  // modified
-            entry.type       = "modified";
-            entry.lineNumber = op.oldIdx;
-            entry.oldContent = op.oldLine;
-            entry.newContent = op.newLine;
-            entry.context    = op.context;
+        out.push_back(normalizeOne(content, start, endExcl, deep));
+    }
+
+    return out;
+}
+
+const char* DiffPython::kindToStr(Diff::Kind kind)
+{
+    switch (kind) {
+        case Diff::ADD: return "added";
+        case Diff::DEL: return "deleted";
+        case Diff::MOD: return "modified";
+        case Diff::SAME: return "same";
+    }
+    return "unknown";
+}
+
+// LCS 기반 엔진 구현
+std::vector<Diff> DiffPython::compute(const std::vector<NormalizedLine>& aNorm,
+                                      const std::vector<NormalizedLine>& bNorm,
+                                      const std::string& contentA,
+                                      const std::string& contentB)
+{
+    const int n = static_cast<int>(aNorm.size());
+    const int m = static_cast<int>(bNorm.size());
+
+    // LCS DP
+    std::vector<std::vector<int>> dp(n + 1, std::vector<int>(m + 1, 0));
+    for (int i = n - 1; i >= 0; --i) {
+        for (int j = m - 1; j >= 0; --j) {
+            if (aNorm[i].rank == bNorm[j].rank && aNorm[i].body == bNorm[j].body) {
+                dp[i][j] = dp[i + 1][j + 1] + 1;
+            } else {
+                dp[i][j] = std::max(dp[i + 1][j], dp[i][j + 1]);
+            }
+        }
+    }
+
+    // 경로 복원
+    struct Op { enum Kind { SAME, ADD, DEL } k; int i; int j; };
+
+    std::vector<Op> ops;
+    ops.reserve(n + m);
+    int i = 0, j = 0;
+
+    while (i < n && j < m) {
+        if (aNorm[i].rank == bNorm[j].rank && aNorm[i].body == bNorm[j].body) {
+            ops.push_back({Op::SAME, i, j});
+            ++i; ++j;
+        } else if (dp[i + 1][j] >= dp[i][j + 1]) {
+            ops.push_back({Op::DEL, i, j});
+            ++i;
+        } else {
+            ops.push_back({Op::ADD, i, j});
+            ++j;
+        }
+    }
+    while (i < n) { ops.push_back({Op::DEL, i, m}); ++i; }
+    while (j < m) { ops.push_back({Op::ADD, n, j}); ++j; }
+
+    // DEL/ADD 블록을 MOD로 페어링
+    std::vector<Diff> diffs;
+    diffs.reserve(ops.size());
+
+    for (size_t p = 0; p < ops.size(); ) {
+        if (ops[p].k == Op::SAME) {
+            int ai = ops[p].i;
+            int bj = ops[p].j;
+            const NormalizedLine& A = aNorm[ai];
+            const NormalizedLine& B = bNorm[bj];
+            diffs.push_back({
+                ai, bj,
+                contentA.substr(A.start, A.len),
+                contentB.substr(B.start, B.len),
+                Diff::SAME
+            });
+            ++p;
+            continue;
         }
 
-        diffs.push_back(entry);
+        size_t q = p;
+        std::vector<int> dels;
+        std::vector<int> adds;
+
+        while (q < ops.size() && ops[q].k != Op::SAME) {
+            if (ops[q].k == Op::DEL) {
+                dels.push_back(ops[q].i);
+            } else {
+                adds.push_back(ops[q].j);
+            }
+            ++q;
+        }
+
+        size_t pairCnt = std::min(dels.size(), adds.size());
+        for (size_t t = 0; t < pairCnt; ++t) {
+            int ai = dels[t];
+            int bj = adds[t];
+            const NormalizedLine& A = aNorm[ai];
+            const NormalizedLine& B = bNorm[bj];
+            diffs.push_back({
+                ai, bj,
+                contentA.substr(A.start, A.len),
+                contentB.substr(B.start, B.len),
+                Diff::MOD
+            });
+        }
+
+        for (size_t t = pairCnt; t < dels.size(); ++t) {
+            int ai = dels[t];
+            const NormalizedLine& A = aNorm[ai];
+            diffs.push_back({
+                ai, -1,
+                contentA.substr(A.start, A.len),
+                "",
+                Diff::DEL
+            });
+        }
+
+        for (size_t t = pairCnt; t < adds.size(); ++t) {
+            int bj = adds[t];
+            const NormalizedLine& B = bNorm[bj];
+            diffs.push_back({
+                -1, bj,
+                "",
+                contentB.substr(B.start, B.len),
+                Diff::ADD
+            });
+        }
+
+        p = q;
     }
 
     return diffs;
 }
 
-Json::Value diff_utils::DiffPython::generateResult(const std::vector<diff_utils::PythonDiffEntry> &diffs,
-                                                   const std::string                              &nameA,
-                                                   const std::string                              &nameB)
+void DiffPython::buildChangesJson(const std::vector<Diff>& diffs,
+                                  /*out*/ Json::Value& changes,
+                                  /*out*/ DiffStats& stats)
 {
-    Json::Value result(Json::objectValue);
+    changes = Json::Value(Json::arrayValue);
 
-    // File info
-    Json::Value file1Info(Json::objectValue);
-    file1Info["name"] = nameA;
+    for (const auto& d : diffs) {
+        // 통계 집계
+        switch (d.kind) {
+            case Diff::ADD: ++stats.added; break;
+            case Diff::DEL: ++stats.deleted; break;
+            case Diff::MOD: ++stats.modified; break;
+            case Diff::SAME: break;
+        }
 
-    Json::Value file2Info(Json::objectValue);
-    file2Info["name"] = nameB;
+        if (d.kind == Diff::SAME) {
+            continue;
+        }
 
-    result["file1"] = file1Info;
-    result["file2"] = file2Info;
+        Json::Value item(Json::objectValue);
+        item["type"] = kindToStr(d.kind);
 
-    // Statistics
-    int addedCount    = 0;
-    int removedCount  = 0;
-    int modifiedCount = 0;
+        if (d.baseLine >= 0) {
+            item["baseValue"]      = d.base;
+            item["baseLineNumber"] = d.baseLine + 1;
+            item["baseLineCount"]  = 1;
+        } else {
+            item["baseValue"]      = Json::nullValue;
+            item["baseLineNumber"] = Json::nullValue;
+            item["baseLineCount"]  = 0;
+        }
 
-    for (const auto &d : diffs) {
-        if (d.type == "added")
-            addedCount++;
-        else if (d.type == "removed")
-            removedCount++;
-        else if (d.type == "modified")
-            modifiedCount++;
+        if (d.compareLine >= 0) {
+            item["compareValue"]      = d.compare;
+            item["compareLineNumber"] = d.compareLine + 1;
+            item["compareLineCount"]  = 1;
+        } else {
+            item["compareValue"]      = Json::nullValue;
+            item["compareLineNumber"] = Json::nullValue;
+            item["compareLineCount"]  = 0;
+        }
+
+        item["path"] = Json::nullValue;
+        changes.append(std::move(item));
     }
+}
 
-    Json::Value statistics(Json::objectValue);
-    statistics["fileType"]     = "python";
-    statistics["added"]        = addedCount;
-    statistics["removed"]      = removedCount;
-    statistics["modified"]     = modifiedCount;
-    statistics["totalChanges"] = (int)diffs.size();
+Json::Value DiffPython::runFromText(const std::string& contentA,
+                                    const std::string& contentB,
+                                    const std::string& nameA,
+                                    const std::string& nameB)
+{
+    // 1) 정규화 (라인 분할 + 공백 축약 + rank 산출)
+    std::vector<NormalizedLine> aNorm = normalizeAll(contentA);
+    std::vector<NormalizedLine> bNorm = normalizeAll(contentB);
 
-    result["statistics"] = statistics;
+    // 2) LCS 기반 diff 생성
+    std::vector<Diff> diffs = compute(aNorm, bNorm, contentA, contentB);
 
-    // Changes
+    // 3) changes 배열 + 통계 집계
     Json::Value changes(Json::arrayValue);
-    for (const auto &d : diffs) {
-        changes.append(d.toJson());
-    }
-    result["changes"] = changes;
+    DiffStats stats{};
+    buildChangesJson(diffs, changes, stats);
 
-    return result;
+    // 4) 루트 JSON 조립
+    Json::Value root(Json::objectValue);
+
+    Json::Value base(Json::objectValue);
+    base["name"] = nameA;
+    root["base"] = std::move(base);
+
+    Json::Value compare(Json::objectValue);
+    compare["name"] = nameB;
+    root["compare"] = std::move(compare);
+
+    Json::Value jstats(Json::objectValue);
+    const Json::UInt64 total =
+        static_cast<Json::UInt64>(stats.added + stats.deleted + stats.modified);
+    jstats["added"]        = static_cast<Json::UInt64>(stats.added);
+    jstats["deleted"]      = static_cast<Json::UInt64>(stats.deleted);
+    jstats["modified"]     = static_cast<Json::UInt64>(stats.modified);
+    jstats["totalChanges"] = total;
+    root["statistics"]     = std::move(jstats);
+
+    root["changes"] = std::move(changes);
+
+    return root;
 }

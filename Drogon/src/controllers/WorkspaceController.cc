@@ -5,103 +5,66 @@
 #include <sstream>
 
 #include "../services/WorkspaceService.h"
+#include "../utils/ConfigUtils.h"
+#include "../utils/TimeUtils.h"
+#include "ControllerHelper.h"
 
 namespace fs = std::filesystem;
 
-static std::string baseDir = "/tmp/drogon-app/temp/";
+using helpers::sendError;
+using helpers::sendSuccess;
+using utils::config::getBaseDir;
+using utils::config::getTempExportDir;
+using utils::config::getTempUploadDir;
 
 void api::v1::Workspace::workspaceImport(
         const drogon::HttpRequestPtr                          &req,
         std::function<void(const drogon::HttpResponsePtr &)> &&callback)
 {
     drogon::MultiPartParser fileUpload;
-    if (fileUpload.parse(req) != 0) {
-        Json::Value error;
-        error["error"] = "Failed to parse multipart data";
-        auto resp      = drogon::HttpResponse::newHttpJsonResponse(error);
-        resp->setStatusCode(drogon::k400BadRequest);
-        callback(resp);
-        return;
-    }
+    if (fileUpload.parse(req) != 0)
+        return sendError(callback, drogon::k400BadRequest, "Failed to parse multipart data");
 
     auto files = fileUpload.getFiles();
-    if (files.empty()) {
-        Json::Value error;
-        error["error"] = "No file uploaded";
-        auto resp      = drogon::HttpResponse::newHttpJsonResponse(error);
-        resp->setStatusCode(drogon::k400BadRequest);
-        callback(resp);
-        return;
-    }
+    if (files.empty())
+        return sendError(callback, drogon::k400BadRequest, "No file uploaded");
 
-    auto       &file             = files[0];
-    std::string originalFilename = file.getFileName();
+    auto       &file     = files[0];
+    std::string filename = file.getFileName();
 
-    // Check if archive format is supported
-    if (!services::WorkspaceService::isSupportedArchive(originalFilename)) {
-        Json::Value error;
-        error["error"] = "Unsupported file format. Supported: .zip, .tar, .tar.gz, .tgz, etc.";
-        auto resp      = drogon::HttpResponse::newHttpJsonResponse(error);
-        resp->setStatusCode(drogon::k400BadRequest);
-        callback(resp);
-        return;
-    }
+    if (!services::WorkspaceService::isSupportedArchive(filename))
+        return sendError(callback, drogon::k400BadRequest, "Unsupported file format");
 
-    // Get workspace name from query parameter or use original filename
+    // Build metadata
     std::string workspaceName = req->getParameter("name");
-    if (workspaceName.empty()) {
-        // Use original filename without extension as workspace name
-        workspaceName = std::filesystem::path(originalFilename).stem().string();
-    }
+    if (workspaceName.empty())
+        workspaceName = fs::path(filename).stem().string();
 
-    std::string workspacePath = baseDir + workspaceName;
-
-    // Check if workspace already exists
-    if (std::filesystem::exists(workspacePath)) {
-        Json::Value error;
-        error["error"]   = "Workspace already exists";
-        error["message"] = "Workspace with name '" + workspaceName + "' already exists";
-        auto resp        = drogon::HttpResponse::newHttpJsonResponse(error);
-        resp->setStatusCode(drogon::k409Conflict);
-        callback(resp);
-        return;
-    }
+    services::WorkspaceMetadata metadata;
+    metadata.id          = drogon::utils::getUuid();
+    metadata.target      = req->getParameter("target");
+    metadata.name        = workspaceName;
+    metadata.description = req->getParameter("description");
+    metadata.createdAt   = utils::getCurrentTimestamp();
+    metadata.updatedAt   = metadata.createdAt;
 
     try {
-        // Create temporary directory for uploaded file
-        std::string tempDir = "/tmp/drogon-upload/";
-        if (!std::filesystem::exists(tempDir)) {
-            std::filesystem::create_directories(tempDir);
-        }
+        std::string tempDir = getTempUploadDir();
+        if (!fs::exists(tempDir))
+            fs::create_directories(tempDir);
 
-        std::string tempFilePath = tempDir + drogon::utils::getUuid() + "_" + originalFilename;
+        std::string tempFile = tempDir + drogon::utils::getUuid() + "_" + filename;
+        file.saveAs(tempFile);
 
-        // Save uploaded file
-        file.saveAs(tempFilePath);
-        LOG_INFO << "File saved to: " << tempFilePath;
+        auto result = services::WorkspaceService::importWorkspace(tempFile, getBaseDir(), metadata);
+        fs::remove(tempFile);
 
-        // Extract archive using WorkspaceService
-        auto result = services::WorkspaceService::importWorkspace(tempFilePath, workspacePath);
+        if (!result.success)
+            return sendError(callback,
+                             drogon::k500InternalServerError,
+                             "Failed to import workspace",
+                             result.errorMessage);
 
-        // Remove temporary file
-        std::filesystem::remove(tempFilePath);
-
-        if (!result.success) {
-            // Clean up workspace directory if extraction failed
-            if (std::filesystem::exists(workspacePath)) {
-                std::filesystem::remove_all(workspacePath);
-            }
-
-            Json::Value error;
-            error["error"]   = "Failed to import workspace";
-            error["message"] = result.errorMessage;
-            auto resp        = drogon::HttpResponse::newHttpJsonResponse(error);
-            resp->setStatusCode(drogon::k500InternalServerError);
-            callback(resp);
-            return;
-        }
-
-        // Success response
         Json::Value response;
         response["success"] = true;
         response["message"] = "Workspace imported successfully";
@@ -111,22 +74,11 @@ void api::v1::Workspace::workspaceImport(
         resp->setStatusCode(drogon::k201Created);
         callback(resp);
 
-        LOG_INFO << "Workspace imported: " << workspaceName;
+        LOG_INFO << "Imported: " << workspaceName << " (ID: " << metadata.id << ")";
 
     } catch (const std::exception &e) {
-        LOG_ERROR << "Exception during import: " << e.what();
-
-        // Clean up
-        if (std::filesystem::exists(workspacePath)) {
-            std::filesystem::remove_all(workspacePath);
-        }
-
-        Json::Value error;
-        error["error"]   = "Internal server error";
-        error["message"] = e.what();
-        auto resp        = drogon::HttpResponse::newHttpJsonResponse(error);
-        resp->setStatusCode(drogon::k500InternalServerError);
-        callback(resp);
+        LOG_ERROR << "Import exception: " << e.what();
+        sendError(callback, drogon::k500InternalServerError, "Internal server error", e.what());
     }
 }
 
@@ -135,107 +87,71 @@ void api::v1::Workspace::workspaceExport(
         std::function<void(const drogon::HttpResponsePtr &)> &&callback)
 {
     auto json = req->getJsonObject();
-    if (!json || !json->isMember("name")) {
-        Json::Value error;
-        error["error"] = "Missing 'name' field in request body";
-        auto resp      = drogon::HttpResponse::newHttpJsonResponse(error);
-        resp->setStatusCode(drogon::k400BadRequest);
-        callback(resp);
-        return;
-    }
+    if (!json || !json->isMember("id"))
+        return sendError(callback, drogon::k400BadRequest, "Missing 'id' field");
 
-    std::string workspaceName = (*json)["name"].asString();
-    std::string workspacePath = baseDir + workspaceName;
+    std::string workspaceId   = (*json)["id"].asString();
+    std::string workspacePath = getBaseDir() + workspaceId;
 
-    // Check if workspace exists
-    if (!std::filesystem::exists(workspacePath) || !std::filesystem::is_directory(workspacePath)) {
-        Json::Value error;
-        error["error"]   = "Workspace not found";
-        error["message"] = "Workspace '" + workspaceName + "' does not exist";
-        auto resp        = drogon::HttpResponse::newHttpJsonResponse(error);
-        resp->setStatusCode(drogon::k404NotFound);
-        callback(resp);
-        return;
-    }
+    if (!fs::exists(workspacePath) || !fs::is_directory(workspacePath))
+        return sendError(callback, drogon::k404NotFound, "Workspace not found", workspaceId);
 
     try {
-        // Create temporary directory for export
-        std::string tempDir = "/tmp/drogon-export/";
-        if (!std::filesystem::exists(tempDir)) {
-            std::filesystem::create_directories(tempDir);
-        }
+        auto        metadata      = services::WorkspaceService::loadMetadata(workspacePath);
+        std::string workspaceName = metadata.name.empty() ? workspaceId : metadata.name;
+
+        std::string tempDir = getTempExportDir();
+        if (!fs::exists(tempDir))
+            fs::create_directories(tempDir);
 
         std::string outputFilename = workspaceName + ".tar.gz";
         std::string outputPath     = tempDir + outputFilename;
 
-        // Export workspace using WorkspaceService
-        auto result = services::WorkspaceService::exportWorkspace(workspacePath, outputPath);
+        auto result = services::WorkspaceService::exportWorkspace(workspaceId, getBaseDir(), outputPath);
 
-        if (!result.success) {
-            Json::Value error;
-            error["error"]   = "Failed to export workspace";
-            error["message"] = result.errorMessage;
-            auto resp        = drogon::HttpResponse::newHttpJsonResponse(error);
-            resp->setStatusCode(drogon::k500InternalServerError);
-            callback(resp);
-            return;
-        }
+        if (!result.success)
+            return sendError(callback,
+                             drogon::k500InternalServerError,
+                             "Failed to export workspace",
+                             result.errorMessage);
 
-        // Read the compressed file
         std::ifstream file(outputPath, std::ios::binary);
-        if (!file) {
-            Json::Value error;
-            error["error"] = "Failed to read exported file";
-            auto resp      = drogon::HttpResponse::newHttpJsonResponse(error);
-            resp->setStatusCode(drogon::k500InternalServerError);
-            callback(resp);
-            return;
-        }
+        if (!file)
+            return sendError(
+                    callback, drogon::k500InternalServerError, "Failed to read exported file");
 
-        std::string fileContent((std::istreambuf_iterator<char>(file)),
-                                std::istreambuf_iterator<char>());
-        file.close();
+        std::string content((std::istreambuf_iterator<char>(file)),
+                            std::istreambuf_iterator<char>());
+        fs::remove(outputPath);
 
-        // Remove temporary file
-        std::filesystem::remove(outputPath);
-
-        // Return file as download
         auto resp = drogon::HttpResponse::newHttpResponse();
-        resp->setBody(fileContent);
+        resp->setBody(content);
         resp->setContentTypeCode(drogon::CT_APPLICATION_OCTET_STREAM);
         resp->addHeader("Content-Disposition", "attachment; filename=\"" + outputFilename + "\"");
         resp->setStatusCode(drogon::k200OK);
         callback(resp);
 
-        LOG_INFO << "Workspace exported: " << workspaceName;
+        LOG_INFO << "Exported: " << workspaceName << " (ID: " << workspaceId << ")";
 
     } catch (const std::exception &e) {
-        LOG_ERROR << "Exception during export: " << e.what();
-
-        Json::Value error;
-        error["error"]   = "Internal server error";
-        error["message"] = e.what();
-        auto resp        = drogon::HttpResponse::newHttpJsonResponse(error);
-        resp->setStatusCode(drogon::k500InternalServerError);
-        callback(resp);
+        LOG_ERROR << "Export exception: " << e.what();
+        sendError(callback, drogon::k500InternalServerError, "Internal server error", e.what());
     }
 }
 
-void api::v1::Workspace::workspaceList(
-        const drogon::HttpRequestPtr                          &req,
-        std::function<void(const drogon::HttpResponsePtr &)> &&callback)
+void api::v1::Workspace::list(const drogon::HttpRequestPtr                          &req,
+                              std::function<void(const drogon::HttpResponsePtr &)> &&callback)
 {
-    auto result = services::WorkspaceService::listWorkspaces(baseDir);
+    // Get optional deviceId query parameter
+    std::string deviceId = req->getParameter("id");
 
-    if (!result.success) {
-        Json::Value error;
-        error["error"]   = "Failed to list workspaces";
-        error["message"] = result.errorMessage;
-        auto resp        = drogon::HttpResponse::newHttpJsonResponse(error);
-        resp->setStatusCode(drogon::k500InternalServerError);
-        callback(resp);
-        return;
-    }
+    auto result = services::WorkspaceService::listWorkspaces(getBaseDir(), deviceId);
+
+    if (!result.success)
+        return sendError(callback,
+                         drogon::k500InternalServerError,
+                         "Failed to list workspaces",
+                         result.errorMessage);
 
     Json::Value response;
     response["success"] = true;
@@ -245,5 +161,153 @@ void api::v1::Workspace::workspaceList(
     resp->setStatusCode(drogon::k200OK);
     callback(resp);
 
-    LOG_INFO << "Listed workspaces: " << result.data["count"].asInt() << " workspaces found";
+    if (deviceId.empty()) {
+        LOG_INFO << "Listed " << result.data["count"].asInt() << " workspaces from all devices";
+    } else {
+        LOG_INFO << "Listed " << result.data["count"].asInt()
+                 << " workspaces from device: " << deviceId;
+    }
+}
+
+void api::v1::Workspace::create(const drogon::HttpRequestPtr                          &req,
+                                std::function<void(const drogon::HttpResponsePtr &)> &&callback)
+{
+    auto json = req->getJsonObject();
+    if (!json || !json->isMember("name"))
+        return sendError(callback, drogon::k400BadRequest, "Missing required field: name");
+
+    services::WorkspaceMetadata metadata;
+    metadata.id          = drogon::utils::getUuid();
+    metadata.name        = (*json)["name"].asString();
+    metadata.target      = json->isMember("target") ? (*json)["target"].asString() : "";
+    metadata.description = json->isMember("description") ? (*json)["description"].asString() : "";
+
+    try {
+        auto result = services::WorkspaceService::createWorkspace(getBaseDir(), metadata);
+
+        if (!result.success)
+            return sendError(callback,
+                             drogon::k500InternalServerError,
+                             "Failed to create workspace",
+                             result.errorMessage);
+
+        Json::Value response;
+        response["success"] = true;
+        response["message"] = "Workspace created successfully";
+        response["data"]    = result.data;
+
+        auto resp = drogon::HttpResponse::newHttpJsonResponse(response);
+        resp->setStatusCode(drogon::k201Created);
+        callback(resp);
+
+        LOG_INFO << "Created workspace: " << metadata.name << " (ID: " << metadata.id << ")";
+
+    } catch (const std::exception &e) {
+        LOG_ERROR << "Create exception: " << e.what();
+        sendError(callback, drogon::k500InternalServerError, "Internal server error", e.what());
+    }
+}
+
+void api::v1::Workspace::info(const drogon::HttpRequestPtr                          &req,
+                              std::function<void(const drogon::HttpResponsePtr &)> &&callback,
+                              const std::string                                     &workspaceId)
+{
+    try {
+        auto result = services::WorkspaceService::readWorkspace(getBaseDir(), workspaceId);
+
+        if (!result.success)
+            return sendError(
+                    callback, drogon::k404NotFound, "Workspace not found", result.errorMessage);
+
+        Json::Value response;
+        response["success"] = true;
+        response["data"]    = result.data;
+
+        auto resp = drogon::HttpResponse::newHttpJsonResponse(response);
+        resp->setStatusCode(drogon::k200OK);
+        callback(resp);
+
+        LOG_INFO << "Retrieved workspace: " << workspaceId;
+
+    } catch (const std::exception &e) {
+        LOG_ERROR << "Get exception: " << e.what();
+        sendError(callback, drogon::k500InternalServerError, "Internal server error", e.what());
+    }
+}
+
+void api::v1::Workspace::update(const drogon::HttpRequestPtr                          &req,
+                                std::function<void(const drogon::HttpResponsePtr &)> &&callback,
+                                const std::string                                     &workspaceId)
+{
+    auto json = req->getJsonObject();
+    if (!json)
+        return sendError(callback, drogon::k400BadRequest, "Invalid JSON body");
+
+    try {
+        // Load existing metadata first
+        auto existingResult = services::WorkspaceService::readWorkspace(getBaseDir(), workspaceId);
+        if (!existingResult.success) {
+            return sendError(callback, drogon::k404NotFound, "Workspace not found", workspaceId);
+        }
+
+        // Prepare updated metadata, keeping existing values if not provided
+        services::WorkspaceMetadata metadata;
+        metadata.name        = json->isMember("name") ? (*json)["name"].asString()
+                                                      : existingResult.data["metadata"]["name"].asString();
+        metadata.target      = json->isMember("target")
+                                       ? (*json)["target"].asString()
+                                       : existingResult.data["metadata"]["target"].asString();
+        metadata.description = json->isMember("description")
+                                       ? (*json)["description"].asString()
+                                       : existingResult.data["metadata"]["description"].asString();
+
+        auto result = services::WorkspaceService::updateWorkspace(getBaseDir(), workspaceId, metadata);
+
+        if (!result.success)
+            return sendError(
+                    callback, drogon::k404NotFound, "Workspace not found", result.errorMessage);
+
+        Json::Value response;
+        response["success"] = true;
+        response["message"] = "Workspace updated successfully";
+        response["data"]    = result.data;
+
+        auto resp = drogon::HttpResponse::newHttpJsonResponse(response);
+        resp->setStatusCode(drogon::k200OK);
+        callback(resp);
+
+        LOG_INFO << "Updated workspace: " << workspaceId;
+
+    } catch (const std::exception &e) {
+        LOG_ERROR << "Update exception: " << e.what();
+        sendError(callback, drogon::k500InternalServerError, "Internal server error", e.what());
+    }
+}
+
+void api::v1::Workspace::remove(const drogon::HttpRequestPtr                          &req,
+                                std::function<void(const drogon::HttpResponsePtr &)> &&callback,
+                                const std::string                                     &workspaceId)
+{
+    try {
+        auto result = services::WorkspaceService::deleteWorkspace(getBaseDir(), workspaceId);
+
+        if (!result.success)
+            return sendError(
+                    callback, drogon::k404NotFound, "Workspace not found", result.errorMessage);
+
+        Json::Value response;
+        response["success"] = true;
+        response["message"] = "Workspace deleted successfully";
+        response["data"]    = result.data;
+
+        auto resp = drogon::HttpResponse::newHttpJsonResponse(response);
+        resp->setStatusCode(drogon::k200OK);
+        callback(resp);
+
+        LOG_INFO << "Deleted workspace: " << workspaceId;
+
+    } catch (const std::exception &e) {
+        LOG_ERROR << "Delete exception: " << e.what();
+        sendError(callback, drogon::k500InternalServerError, "Internal server error", e.what());
+    }
 }
