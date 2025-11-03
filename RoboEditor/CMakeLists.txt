@@ -11,7 +11,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets LinguistTools)
 find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets LinguistTools)
-
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Network)
 set(CMAKE_AUTOUIC_SEARCH_PATHS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ui
 )
@@ -21,27 +21,63 @@ set(TS_FILES RoboEditor_ko_KR.ts)
 set(PROJECT_SOURCES
         src/main.cpp
         src/app/BackupPage.cpp
+        src/app/OpenFilePage.cpp
         src/app/CenterStack.cpp
         src/app/ComparePage.cpp
+        src/app/DropTextEdit.cpp
         src/app/LogManager.cpp
         src/app/mainwindow.cpp
         src/app/NavDock.cpp
         src/app/TopMenu.cpp
+        src/app/ApplyPage.cpp
+        src/app/ConfirmSelection.cpp
+        src/app/ModifyPage.cpp
+        src/app/PasswordManager.cpp
+        src/app/SelectController.cpp
+        src/app/SelectStorage.cpp
+
         src/app/BackupPage.h
+        src/app/OpenFilePage.h
         src/app/CenterStack.h
         src/app/ComparePage.h
+        src/app/DropTextEdit.h
         src/app/LogManager.h
         src/app/mainwindow.h
         src/app/NavDock.h
         src/app/TopMenu.h
+        src/app/ApplyPage.h
+        src/app/ConfirmSelection.h
+        src/app/ModifyPage.h
+        src/app/PasswordManager.h
+        src/app/SelectController.h
+        src/app/SelectStorage.h
+
         src/ui/mainwindow.ui
+        src/ui/ApplyPage.ui
+        src/ui/confirmselection.ui
+        src/ui/ModifyPage.ui
+        src/ui/PasswordInput.ui
+        src/ui/wrongpassword.ui
+
         ${TS_FILES}
 )
 
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
+    find_package(Qt6 REQUIRED COMPONENTS Widgets)
+find_package(Qt6 REQUIRED COMPONENTS Widgets)
+
     qt_add_executable(RoboEditor
         MANUAL_FINALIZATION
         ${PROJECT_SOURCES}
+        src/app/ControllerManager.h src/app/ControllerManager.cpp
+        src/app/CodeEditor.cpp
+        src/app/CodeEditor.h
+        src/app/ShortcutManager.h src/app/ShortcutManager.cpp
+        src/ui/BackupPage.ui
+        src/app/ControllerSetting.h src/app/ControllerSetting.cpp
+        src/ui/ControllerSettings.ui
+
+        # src/app/OpenFilePage.h src/app/OpenFilePage.cpp
     )
 # Define target properties for Android with Qt 6 as:
 #    set_property(TARGET RoboEditor APPEND PROPERTY QT_ANDROID_PACKAGE_SOURCE_DIR
@@ -66,6 +102,10 @@ else()
 endif()
 
 target_link_libraries(RoboEditor PRIVATE Qt${QT_VERSION_MAJOR}::Widgets)
+target_link_libraries(RoboEditor PRIVATE Qt6::Widgets)
+target_link_libraries(RoboEditor PRIVATE Qt6::Widgets)
+target_link_libraries(RoboEditor PRIVATE Qt6::Network)
+
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
 # If you are developing for iOS or macOS you should consider setting an

@@ -1,15 +1,39 @@
 #ifndef BACKUPPAGE_H
 #define BACKUPPAGE_H
 #pragma once
-#include <QWidget>
-class QLineEdit;
 
-class BackupPage : public QWidget {
+#include <QWidget>
+
+#include "SelectController.h"
+
+namespace Ui
+{
+    class BackupPage;
+}
+
+class BackupPage : public QWidget
+{
     Q_OBJECT
-public:
-    explicit BackupPage(QWidget* parent=nullptr);
-signals:
-    void uiBackupClicked(const QString& target);
+
+      public:
+        explicit BackupPage(QWidget *parent = nullptr);
+        ~BackupPage() override;
+        QString        selectedBackupDir;
+        QList<QString> selectedControllerList;
+
+      private:
+        Ui::BackupPage *ui;
+
+        selectcontroller *selectcontrollerWidget;
+
+        void confirmSelection();
+        void importAnySpace();
+        void updateConfirmState();
+
+      signals:
+        void uiBackupClicked(const QString &target);
+
+      private slots:
 };
 
-#endif // BACKUPPAGE_H
+#endif  // BACKUPPAGE_H
