@@ -70,9 +70,6 @@ find_package(Qt6 REQUIRED COMPONENTS Widgets)
         MANUAL_FINALIZATION
         ${PROJECT_SOURCES}
         src/app/ControllerManager.h src/app/ControllerManager.cpp
-
-        src/app/Center.h src/app/Center.cpp
-
         src/app/CodeEditor.cpp
         src/app/CodeEditor.h
         src/app/ShortcutManager.h src/app/ShortcutManager.cpp

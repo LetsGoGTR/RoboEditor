@@ -33,8 +33,8 @@ class ControllerManager : public QObject
         explicit ControllerManager(QObject *parent = nullptr);
         ~ControllerManager();
 
-        bool isConnected();                              // 제어기 연결 여부 확인
-        bool isRunning();                                // 제어기 동작 상태 확인
+        //bool isConnected();                              // 제어기 연결 여부 확인
+        //bool isRunning();                                // 제어기 동작 상태 확인
         bool isDuplicatedSN(const QString &SN);          // 중복 SN 검사
         int  sendFile();                                 // 제어기로 파일 전송
         void registerController();                       // 제어기 등록

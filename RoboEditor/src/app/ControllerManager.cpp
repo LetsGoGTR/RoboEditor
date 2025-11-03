@@ -143,8 +143,8 @@ void ControllerManager::updateState()
 {
     // isRunning, isConnected 확인
 }
-bool ControllerManager::isConnected() {}
-bool ControllerManager::isRunning() {}
+// bool ControllerManager::isConnected() {}
+// bool ControllerManager::isRunning() {}
 bool ControllerManager::isDuplicatedSN(const QString &SN)
 {
     for (int idx = 0; idx < controllers_.size(); idx++) {
