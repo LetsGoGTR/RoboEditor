@@ -1,9 +1,0 @@
-[submodule "Drogon/external/libbcrypt"]
-	path = Drogon/external/libbcrypt
-	url = https://github.com/trusch/libbcrypt.git
-[submodule "RoboEditor/external/jsoncpp"]
-	path = RoboEditor/external/jsoncpp
-	url = https://github.com/open-source-parsers/jsoncpp.git
-[submodule "RoboEditor/external/libbcrypt"]
-	path = RoboEditor/external/libbcrypt
-	url = https://github.com/trusch/libbcrypt.git
