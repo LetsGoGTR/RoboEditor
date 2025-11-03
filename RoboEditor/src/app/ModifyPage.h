@@ -11,10 +11,9 @@
 #include <QMessageBox>
 #include <QObject>
 #include <QPlainTextEdit>
-#include <QWidget>
 #include <QSplitter>
-#include <QTabWidget>
 #include <QVBoxLayout>
+#include <QWidget>
 
 //Document : 개별 파일 관리
 //FileManager : 여러 Document 관리
@@ -85,31 +84,33 @@ class ModifyPage : public QWidget
         void              setCurrentDocument(int index);
         void              closeDocument(int index);
         void              closeDocument(Document * doc);
-        void              buildUi();
-        void              ensureCompare(const QString& targetPath);
-        QString           currentLeftText() const;
-        QSplitter*        mainSplit_{nullptr};   // [0] editorHost, [1] comparePane(옵션)
-        QWidget*          editorHost_{nullptr};
-        QPlainTextEdit*   editor_{nullptr};      // 현재 탭의 에디터(CodeEditor)
-        ComparePage*      comparePane_{nullptr};
-        QString           lastComparedPath_;     // 마지막으로 비교한 파일 경로 저장
+
+        void            buildUi();
+        void            ensureCompare(const QString &targetPath);
+        QString         currentLeftText() const;
+        QSplitter      *mainSplit_{nullptr};  // [0] editorHost, [1] comparePane(옵션)
+        QWidget        *editorHost_{nullptr};
+        QPlainTextEdit *editor_{nullptr};  // 현재 탭의 에디터(CodeEditor)
+        ComparePage    *comparePane_{nullptr};
+        QString         lastComparedPath_;  // 마지막으로 비교한 파일 경로 저장
         // 라인번호
-        LineNumberArea*   lineArea_{nullptr};
-        int               lineNumberAreaWidth() const;
-        void              lineNumberAreaPaintEvent(QPaintEvent*);
-        Document           *currentDocument();
+        LineNumberArea *lineArea_{nullptr};
+        int             lineNumberAreaWidth() const;
+        void            lineNumberAreaPaintEvent(QPaintEvent *);
 
       signals:
         void uiModifyClicked(const QString &target);
-        void editorFileDropped(const QString& path);      // DropTextEdit 드롭 중계
-        void editorTextChangedForDiff();                  // (선택) 편집 변경→디프 갱신
+        void editorFileDropped(const QString &path);  // DropTextEdit 드롭 중계
+        void editorTextChangedForDiff();              // (선택) 편집 변경→디프 갱신
 
       public:
         void setEditorManager(EditorManager * manager);
         explicit ModifyPage(QWidget *parent = nullptr);
         QTabWidget *tabWidget;
 
+        // 외부에서 접근 가능한 메서드들
         Document *openDocument(const QString &path);
+        Document *currentDocument();  // private에서 public으로 이동
         void      closeFile(int index);
         void      openFile();
         void      saveFile();
@@ -118,8 +119,8 @@ class ModifyPage : public QWidget
         void      updateTitle();
         void      onTabChanged(int index);
         // 트리뷰 연동용 (함수만 준비)
-        void      openFromTree(const QString& path);
-        void      compareWithFromTree(const QString& path);
+        void openFromTree(const QString &path);
+        void compareWithFromTree(const QString &path);
 
       private:
         int cursorLine;
@@ -132,8 +133,12 @@ class ModifyPage : public QWidget
         void onTextChanged();
 
       public slots:
-        void showCompare();    // Compare 버튼 진입: "닫힘→파일선택", "열림→재비교"
-        void closeCompare();   // ComparePane의 [X] 클릭 시 호출
+        void showCompare();  // Compare 버튼 진입: "닫힘→파일선택", "열림→재비교"
+        void closeCompare();  // ComparePane의 [X] 클릭 시 호출
+
+      protected:
+        void dragEnterEvent(QDragEnterEvent * event) override;
+        void dropEvent(QDropEvent * event) override;
 };
 
 #endif  // MODIFYPAGE_H

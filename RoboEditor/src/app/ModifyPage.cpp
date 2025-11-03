@@ -1,6 +1,4 @@
 #include "ModifyPage.h"
-#include "CodeEditor.h"
-#include "ComparePage.h"
 
 #include <QAbstractButton>
 #include <QApplication>
@@ -8,24 +6,29 @@
 #include <QHBoxLayout>
 #include <QKeySequence>
 #include <QMessageBox>
+#include <QMimeData>
 #include <QShortcut>
+
+#include "CodeEditor.h"
+#include "ComparePage.h"
 
 ModifyPage::ModifyPage(QWidget *parent) : QWidget(parent), currentDoc(nullptr)
 {
+    setAcceptDrops(true);
     buildUi();
 
     // 탭 전환 시 현재 문서 갱신
     connect(tabWidget, &QTabWidget::currentChanged, [=](int index) {
         if (index < 0 || index >= documents.size()) {
             currentDoc           = nullptr;
-            editor_               = nullptr;
+            editor_              = nullptr;
             currentDocumentIndex = -1;
             return;
         }
 
         currentDocumentIndex = index;
         currentDoc           = documents[index];
-        editor_               = qobject_cast<QPlainTextEdit *>(tabWidget->widget(index));
+        editor_              = qobject_cast<QPlainTextEdit *>(tabWidget->widget(index));
 
         updateTitle();
     });
@@ -82,13 +85,15 @@ Document *ModifyPage::openDocument(const QString &path)
         emit editorTextChangedForDiff();
     });
 
-    connect(neweditor_, &DropTextEdit::fileDroppedToLeft,
-            this, [this](const QString& p){ emit editorFileDropped(p); });
-    connect(neweditor_, &DropTextEdit::fileDroppedToRight,
-            this, [this](const QString& p){ emit editorFileDropped(p); });
+    connect(neweditor_, &DropTextEdit::fileDroppedToLeft, this, [this](const QString &p) {
+        emit editorFileDropped(p);
+    });
+    connect(neweditor_, &DropTextEdit::fileDroppedToRight, this, [this](const QString &p) {
+        emit editorFileDropped(p);
+    });
 
     currentDoc = doc;
-    editor_     = neweditor_;
+    editor_    = neweditor_;
     updateTitle();
     documents.append(doc);
     setCurrentDocument(documents.size() - 1);
@@ -96,22 +101,25 @@ Document *ModifyPage::openDocument(const QString &path)
     return doc;
 }
 
-QString ModifyPage::currentLeftText() const {
+QString ModifyPage::currentLeftText() const
+{
     // Document를 신뢰해서 문자열 스냅샷만 전달
-    if (currentDoc) return currentDoc->gcontent();
+    if (currentDoc)
+        return currentDoc->gcontent();
     // (혹은 탭 위젯에서 직접 읽어도 됨)
-    auto *ed = qobject_cast<QPlainTextEdit*>(tabWidget->currentWidget());
+    auto *ed = qobject_cast<QPlainTextEdit *>(tabWidget->currentWidget());
     return ed ? ed->toPlainText() : QString();
 }
 
-void ModifyPage::buildUi() {
+void ModifyPage::buildUi()
+{
     auto outer = new QVBoxLayout(this);
-    outer->setContentsMargins(0,0,0,0);
+    outer->setContentsMargins(0, 0, 0, 0);
 
     mainSplit_  = new QSplitter(Qt::Horizontal, this);
     editorHost_ = new QWidget(mainSplit_);
-    auto ev = new QVBoxLayout(editorHost_);
-    ev->setContentsMargins(0,0,0,0);
+    auto ev     = new QVBoxLayout(editorHost_);
+    ev->setContentsMargins(0, 0, 0, 0);
 
     // 여기서 탭을 **한 번만** 만든다
     tabWidget = new QTabWidget(editorHost_);
@@ -122,31 +130,33 @@ void ModifyPage::buildUi() {
     outer->addWidget(mainSplit_);
 }
 
-void ModifyPage::showCompare() {
+void ModifyPage::showCompare()
+{
     // 케이스 1: 이미 ComparePage가 열려있으면 -> 즉시 재비교
     if (comparePane_ && comparePane_->isVisible()) {
         comparePane_->recalcDiff(currentLeftText());
         return;
     }
-    
+
     // 케이스 2: ComparePage가 닫혀있거나 없음
     QString targetPath;
-    
+
     // 이전에 비교한 파일이 있으면 선택창 표시
     if (!lastComparedPath_.isEmpty()) {
         // 간단한 질문 다이얼로그
         QMessageBox msgBox(this);
         msgBox.setWindowTitle(tr("파일 비교"));
-        msgBox.setText(tr("이전에 비교한 파일이 있습니다:\n%1\n\n이전 파일을 다시 사용하시겠습니까?")
-                          .arg(QFileInfo(lastComparedPath_).fileName()));
+        msgBox.setText(
+                tr("이전에 비교한 파일이 있습니다:\n%1\n\n이전 파일을 다시 사용하시겠습니까?")
+                        .arg(QFileInfo(lastComparedPath_).fileName()));
         msgBox.setIcon(QMessageBox::Question);
         msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel);
         msgBox.button(QMessageBox::Yes)->setText(tr("이전 파일 사용"));
         msgBox.button(QMessageBox::No)->setText(tr("새 파일 선택"));
         msgBox.button(QMessageBox::Cancel)->setText(tr("취소"));
-        
+
         int result = msgBox.exec();
-        
+
         if (result == QMessageBox::Yes) {
             // 이전 파일 재사용
             targetPath = lastComparedPath_;
@@ -161,23 +171,25 @@ void ModifyPage::showCompare() {
         // 이전 파일이 없으면 바로 파일 선택
         targetPath = QFileDialog::getOpenFileName(this, tr("Select file to compare"));
     }
-    
-    if (targetPath.isEmpty()) return;
-    
+
+    if (targetPath.isEmpty())
+        return;
+
     // ComparePage 생성 및 비교 실행
     lastComparedPath_ = targetPath;
     ensureCompare(targetPath);
     comparePane_->recalcDiff(currentLeftText());
 }
 
-void ModifyPage::ensureCompare(const QString& targetPath) {
+void ModifyPage::ensureCompare(const QString &targetPath)
+{
     if (comparePane_) {
         // 이미 존재하면 경로만 업데이트
         comparePane_->setTargetPath(targetPath);
         comparePane_->show();
         return;
     }
-    
+
     // 새로 생성
     comparePane_ = new ComparePage(this);
     comparePane_->setTargetPath(targetPath);
@@ -186,34 +198,37 @@ void ModifyPage::ensureCompare(const QString& targetPath) {
     mainSplit_->setStretchFactor(1, 0);
 
     connect(comparePane_, &ComparePage::closed, this, &ModifyPage::closeCompare);
-    connect(comparePane_, &ComparePage::targetPathChanged, this, [this](const QString& path) {
+    connect(comparePane_, &ComparePage::targetPathChanged, this, [this](const QString &path) {
         lastComparedPath_ = path;
     });
-    connect(this, &ModifyPage::editorTextChangedForDiff, this, [this]{
+    connect(this, &ModifyPage::editorTextChangedForDiff, this, [this] {
         if (comparePane_ && comparePane_->isVisible()) {
             comparePane_->recalcDiff(currentLeftText());
         }
     });
 }
 
-void ModifyPage::closeCompare() {
-    if (!comparePane_) return;
-    
+void ModifyPage::closeCompare()
+{
+    if (!comparePane_)
+        return;
+
     // 경로는 보존 (lastComparedPath_에 이미 저장되어 있음)
     comparePane_->hide();
-    comparePane_->setParent(nullptr); // 스플리터에서 분리
+    comparePane_->setParent(nullptr);  // 스플리터에서 분리
     comparePane_->deleteLater();
     comparePane_ = nullptr;
 }
 
-void ModifyPage::openFromTree(const QString& path) {
+void ModifyPage::openFromTree(const QString &path)
+{
     QFile f(path);
     if (f.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        QTextStream in(&f);
+        QTextStream   in(&f);
         const QString text = in.readAll();
         f.close();
 
-        auto *ed = qobject_cast<QPlainTextEdit*>(tabWidget->currentWidget());
+        auto *ed = qobject_cast<QPlainTextEdit *>(tabWidget->currentWidget());
         if (ed) {
             ed->setPlainText(text);
             if (currentDoc) {
@@ -225,20 +240,25 @@ void ModifyPage::openFromTree(const QString& path) {
     }
 }
 
-void ModifyPage::compareWithFromTree(const QString& path) {
+void ModifyPage::compareWithFromTree(const QString &path)
+{
     lastComparedPath_ = path;
     ensureCompare(path);
     comparePane_->recalcDiff(currentLeftText());
 }
 
-int ModifyPage::lineNumberAreaWidth() const {
-    auto *ed = editor_ ? editor_ : qobject_cast<QPlainTextEdit*>(tabWidget->currentWidget());
-    if (!ed) return 12;
+int ModifyPage::lineNumberAreaWidth() const
+{
+    auto *ed = editor_ ? editor_ : qobject_cast<QPlainTextEdit *>(tabWidget->currentWidget());
+    if (!ed)
+        return 12;
     int digits = 1, max = qMax(1, ed->blockCount());
-    while (max >= 10) { max /= 10; ++digits; }
+    while (max >= 10) {
+        max /= 10;
+        ++digits;
+    }
     return 6 + 3 + ed->fontMetrics().horizontalAdvance(QLatin1Char('9')) * digits;
 }
-
 
 void ModifyPage::closeDocument(int index)
 {
@@ -278,10 +298,10 @@ void ModifyPage::closeFile(int index)
 
     if (!documents.isEmpty()) {
         currentDoc = documents.last();
-        editor_     = qobject_cast<QPlainTextEdit *>(tabWidget->widget(tabWidget->count() - 1));
+        editor_    = qobject_cast<QPlainTextEdit *>(tabWidget->widget(tabWidget->count() - 1));
     } else {
         currentDoc = nullptr;
-        editor_     = nullptr;
+        editor_    = nullptr;
     }
     updateTitle();
 }
@@ -463,4 +483,25 @@ void Document::setContent(const QString &newContent)
 {
     content    = newContent;
     isModified = true;
+}
+void ModifyPage::dragEnterEvent(QDragEnterEvent *event)
+{
+    if (event->mimeData()->hasUrls())
+        event->acceptProposedAction();  // ✅ 파일이면 허용
+}
+
+void ModifyPage::dropEvent(QDropEvent *event)
+{
+    const QMimeData *mime = event->mimeData();
+    if (mime->hasUrls()) {
+        QList<QUrl> urls     = mime->urls();
+        QString     filePath = urls.first().toLocalFile();
+        qDebug() << "Dropped file:" << filePath;
+
+        // 실제 처리 (파일 열기 등)
+        Document *doc = openDocument(filePath);
+        if (!doc)
+            return;
+    }
+    event->acceptProposedAction();
 }
