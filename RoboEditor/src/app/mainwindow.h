@@ -8,10 +8,15 @@
 #include <memory>
 
 // Forward declarations
-class Center;
-class LogManager;
-class NavDock;
+#include "BackupPage.h"
+#include "ModifyPage.h"
+#include "ShortcutManager.h"
+
 class TopMenu;
+class NavDock;
+class CenterStack;
+class LogManager;
+class Center;
 
 class MainWindow : public QMainWindow
 {
@@ -22,7 +27,15 @@ class MainWindow : public QMainWindow
         ~MainWindow();
 
       private:
-        void ensureMenu();
+        // lazy objects
+
+        ModifyPage      *modifyPage;
+        BackupPage      *backupPage;
+        ShortcutManager *shortcutMgr;
+
+        QWidget *applyPopup_  = nullptr;
+        QWidget *backupPopup_ = nullptr;
+
         void ensureCenter();
         void ensureNav();
         void ensureLog();

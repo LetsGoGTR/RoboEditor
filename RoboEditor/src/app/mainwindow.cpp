@@ -75,8 +75,12 @@ void MainWindow::wire()
                  << "nav=" << nav_.get() << "center=" << center_.get() << "logm=" << logm_.get();
         return;
     }
-
     // 왼쪽 네비 → 페이지 전환
+    connect(nav_.get(), &NavDock::clickCompare, center_.get(), &CenterStack::showModifyWithCompare);
+    connect(nav_.get(), &NavDock::clickBackup, this, [=] { center_->showBackup(); });
+    connect(nav_.get(), &NavDock::clickOpenFile, this, [=] { center_->showOpenFile(); });
+    connect(nav_.get(), &NavDock::clickApply, this, [=] { center_->showApply(); });
+    connect(nav_.get(), &NavDock::clickModify, this, [=] { center_->showModify(); });
 
     // 네비게이션 버튼 → 다이얼로그/새 위젯 생성
 
