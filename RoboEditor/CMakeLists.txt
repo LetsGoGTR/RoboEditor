@@ -58,6 +58,7 @@ set(PROJECT_SOURCES
         src/ui/ModifyPage.ui
         src/ui/PasswordInput.ui
         src/ui/wrongpassword.ui
+
         ${TS_FILES}
 )
 
@@ -69,12 +70,15 @@ find_package(Qt6 REQUIRED COMPONENTS Widgets)
         MANUAL_FINALIZATION
         ${PROJECT_SOURCES}
         src/app/ControllerManager.h src/app/ControllerManager.cpp
-        src/app/SettingController.ui
+
         src/app/Center.h src/app/Center.cpp
-        src/app/ControllerTreeWidget.h src/app/ControllerTreeWidget.cpp
+
         src/app/CodeEditor.cpp
         src/app/CodeEditor.h
         src/app/ShortcutManager.h src/app/ShortcutManager.cpp
+        src/app/ControllerSetting.h src/app/ControllerSetting.cpp
+        src/ui/ControllerSettings.ui
+
         # src/app/OpenFilePage.h src/app/OpenFilePage.cpp
     )
 # Define target properties for Android with Qt 6 as:
