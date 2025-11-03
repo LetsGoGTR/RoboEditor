@@ -73,6 +73,7 @@ find_package(Qt6 REQUIRED COMPONENTS Widgets)
         src/app/CodeEditor.cpp
         src/app/CodeEditor.h
         src/app/ShortcutManager.h src/app/ShortcutManager.cpp
+        src/ui/BackupPage.ui
         src/app/ControllerSetting.h src/app/ControllerSetting.cpp
         src/ui/ControllerSettings.ui
 
