@@ -4,7 +4,8 @@
 #include <QMessageBox>
 #include <QStatusBar>
 
-#include "Center.h"
+#include "ApplyPage.h"
+#include "CenterStack.h"
 #include "LogManager.h"
 #include "ModifyPage.h"
 #include "NavDock.h"
@@ -36,15 +37,8 @@ void MainWindow::ensureMenu()
 void MainWindow::ensureCenter()
 {
     if (!center_) {
-        center_ = std::make_unique<Center>(this);
+        center_ = std::make_unique<CenterStack>(this);
         setCentralWidget(center_.get());
-
-        // Center 시그널 연결
-        connect(center_.get(), &Center::fileOpened, this, [=](const QString &path) {
-            if (logm_)
-                logm_->append(QString("[Editor] Opened: %1").arg(path));
-            statusBar()->showMessage(QString("Opened: %1").arg(path), 3000);
-        });
     }
 }
 
@@ -75,72 +69,82 @@ void MainWindow::wire()
                  << "nav=" << nav_.get() << "center=" << center_.get() << "logm=" << logm_.get();
         return;
     }
-    // 왼쪽 네비 → 페이지 전환
+    // 상단 Nav UI 전환 연결
     connect(nav_.get(), &NavDock::clickCompare, center_.get(), &CenterStack::showModifyWithCompare);
-    connect(nav_.get(), &NavDock::clickBackup, this, [=] { center_->showBackup(); });
     connect(nav_.get(), &NavDock::clickOpenFile, this, [=] { center_->showOpenFile(); });
-    connect(nav_.get(), &NavDock::clickApply, this, [=] { center_->showApply(); });
     connect(nav_.get(), &NavDock::clickModify, this, [=] { center_->showModify(); });
 
-    // 네비게이션 버튼 → 다이얼로그/새 위젯 생성
-
-    connect(nav_.get(), &NavDock::clickCompare, this, [=]() {
-        if (logm_)
-            logm_->append("[Nav] Compare clicked");
-
-        // TODO: CompareDialog 구현 필요
-        QMessageBox::information(this, "Compare", "Compare 기능 (구현 예정)");
-        statusBar()->showMessage("Compare dialog");
-    });
-
-    connect(nav_.get(), &NavDock::clickBackup, this, [=]() {
-        if (logm_)
-            logm_->append("[Nav] Backup clicked");
-
-        // TODO: BackupDialog 구현 필요
-        QMessageBox::information(this, "Backup", "Backup 기능 (구현 예정)");
-        statusBar()->showMessage("Backup dialog");
-    });
-
-    connect(nav_.get(), &NavDock::clickOpenFile, this, [=]() {
-        if (logm_)
-            logm_->append("[Nav] OpenFile clicked");
-
-        // TODO: 파일 선택 다이얼로그
-        // Center의 setRootPath() 호출하거나
-        // 파일 다이얼로그로 특정 파일 열기
-        QString path =
-                QFileDialog::getExistingDirectory(this, "Select Directory", QDir::homePath());
-
-        if (!path.isEmpty()) {
-            center_->setBackupPath(path);
-            statusBar()->showMessage(QString("Root changed: %1").arg(path));
+    // Nav 기능 -> Pop-up
+    connect(nav_.get(), &NavDock::clickApply, this, [this]() {
+        if (applyPopup_ && applyPopup_->isVisible()) {
+            applyPopup_->raise();
+            applyPopup_->activateWindow();
+            return;
         }
+
+        applyPopup_ = new QWidget(nullptr, Qt::Window);
+        applyPopup_->setAttribute(Qt::WA_DeleteOnClose);
+        applyPopup_->setWindowTitle("Apply to Robot Controller");
+        applyPopup_->resize(900, 600);
+
+        auto *applyPage = new ApplyPage(applyPopup_);
+        auto *layout    = new QVBoxLayout(applyPopup_);
+        layout->setContentsMargins(0, 0, 0, 0);
+        layout->addWidget(applyPage);
+
+        // 닫힐 때 포인터 초기화
+        QObject::connect(
+                applyPopup_, &QWidget::destroyed, this, [this]() { applyPopup_ = nullptr; });
+
+        applyPopup_->show();
     });
-
-    connect(nav_.get(), &NavDock::clickApply, this, [=]() {
-        if (logm_)
-            logm_->append("[Nav] Apply clicked");
-
-        // TODO: ApplyDialog 구현 필요
-        QMessageBox::information(this, "Apply", "Apply 기능 (구현 예정)");
-        statusBar()->showMessage("Apply dialog");
-    });
-
-    connect(nav_.get(), &NavDock::clickModify, this, [=]() {
-        if (logm_)
-            logm_->append("[Nav] Modify clicked");
-
-        // ModifyPage의 현재 Document 확인
-        Document *currentDoc = center_->modifyPage()->currentDocument();
-        if (!currentDoc) {
-            QMessageBox::warning(this, "Modify", "열린 파일이 없습니다.");
-        } else {
-            QMessageBox::information(
-                    this,
-                    "Modify",
-                    QString("Modify 기능 (구현 예정)\n현재 파일: %1").arg(currentDoc->gfilePath()));
+    connect(nav_.get(), &NavDock::clickBackup, this, [this]() {
+        if (backupPopup_ && backupPopup_->isVisible()) {
+            backupPopup_->raise();
+            backupPopup_->activateWindow();
+            return;
         }
-        statusBar()->showMessage("Modify dialog");
+
+        backupPopup_ = new QWidget(nullptr, Qt::Window);
+        backupPopup_->setAttribute(Qt::WA_DeleteOnClose);
+        backupPopup_->setWindowTitle("Backup from Robot Controller");
+        backupPopup_->resize(900, 600);
+
+        auto *backupPage = new BackupPage(backupPopup_);
+        auto *layout     = new QVBoxLayout(backupPopup_);
+        layout->setContentsMargins(0, 0, 0, 0);
+        layout->addWidget(backupPage);
+
+        // 닫힐 때 포인터 초기화
+        QObject::connect(
+                backupPopup_, &QWidget::destroyed, this, [this]() { backupPopup_ = nullptr; });
+
+        backupPopup_->show();
     });
+
+    modifyPage = center_->getModifyPage();
+
+    // 단축키 manager 등록
+    shortcutMgr = new ShortcutManager(this);
+    shortcutMgr->registerTo(this);
+
+    // 단축키 mapping
+    connect(shortcutMgr, &ShortcutManager::openRequested, modifyPage, &ModifyPage::openFile);
+    connect(shortcutMgr, &ShortcutManager::saveRequested, modifyPage, &ModifyPage::saveFile);
+    connect(shortcutMgr, &ShortcutManager::saveAsRequested, modifyPage, &ModifyPage::saveAsFile);
+    connect(shortcutMgr,
+            &ShortcutManager::closeRequested,
+            modifyPage,
+            &ModifyPage::closeCurrentTab);
+    connect(shortcutMgr, &ShortcutManager::quitRequested, this, []() { QApplication::quit(); });
+
+    // 그 외 기능 추가
+    connect(center_.get(),
+            &CenterStack::compareRequested,
+            this,
+            [=](const QString &L, const QString &R) {
+                if (logm_)
+                    logm_->append(QString("[UI] Compare: %1 | %2").arg(L, R));
+                statusBar()->showMessage("Compare (stub)");
+            });
 }

@@ -36,15 +36,16 @@ class MainWindow : public QMainWindow
         QWidget *applyPopup_  = nullptr;
         QWidget *backupPopup_ = nullptr;
 
+        void ensureMenu();
         void ensureCenter();
         void ensureNav();
         void ensureLog();
         void wire();
 
-        std::unique_ptr<TopMenu>    menu_;
-        std::unique_ptr<Center>     center_;  // CenterStack → Center
-        std::unique_ptr<NavDock>    nav_;
-        std::unique_ptr<LogManager> logm_;
+        std::unique_ptr<TopMenu>     menu_;
+        std::unique_ptr<CenterStack> center_;  // CenterStack → Center
+        std::unique_ptr<NavDock>     nav_;
+        std::unique_ptr<LogManager>  logm_;
 };
 
 #endif  // MAINWINDOW_H
