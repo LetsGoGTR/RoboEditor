@@ -1,6 +1,7 @@
 #include "FolderService.h"
 
 #include "../utils/PathValidator.h"
+#include "../utils/logging/Logger.h"
 
 #include <filesystem>
 
@@ -36,7 +37,7 @@ Json::Value services::FolderService::getFolderInfo(const std::string &folderPath
         info["directoryCount"] = dirCount;
 
     } catch (const std::exception &e) {
-        LOG_ERROR << "Error getting folder info: " << e.what();
+        utils::logging::error("Error getting folder info: " + std::string(e.what()));
     }
 
     return info;
@@ -49,13 +50,13 @@ services::ServiceResult services::FolderService::createFolder(const std::string 
 
     if (!utils::validatePath(folderPath)) {
         result.errorMessage = "Invalid folder path";
-        LOG_WARN << "Invalid folder path: " << folderPath;
+        utils::logging::warn("Invalid folder path: " + folderPath);
         return result;
     }
 
     if (utils::isValidDirectory(folderPath)) {
         result.errorMessage = "Folder already exists";
-        LOG_WARN << "Folder already exists: " << folderPath;
+        utils::logging::warn("Folder already exists: " + folderPath);
         return result;
     }
 
@@ -64,11 +65,11 @@ services::ServiceResult services::FolderService::createFolder(const std::string 
         result.data["info"] = getFolderInfo(folderPath);
         result.success      = true;
 
-        LOG_INFO << "Successfully created folder: " << folderPath;
+        utils::logging::info("Successfully created folder: " + folderPath);
 
     } catch (const std::exception &e) {
         result.errorMessage = "Failed to create folder: " + std::string(e.what());
-        LOG_ERROR << result.errorMessage;
+        utils::logging::error(result.errorMessage);
     }
 
     return result;
@@ -82,19 +83,19 @@ services::ServiceResult services::FolderService::updateFolder(const std::string 
 
     if (!utils::validatePath(oldPath) || !utils::validatePath(newPath)) {
         result.errorMessage = "Invalid folder path";
-        LOG_WARN << "Invalid folder path: " << oldPath << " or " << newPath;
+        utils::logging::warn("Invalid folder path: " + oldPath + " or " + newPath);
         return result;
     }
 
     if (!utils::isValidDirectory(oldPath)) {
         result.errorMessage = "Source folder does not exist";
-        LOG_WARN << "Source folder does not exist: " << oldPath;
+        utils::logging::warn("Source folder does not exist: " + oldPath);
         return result;
     }
 
     if (utils::isValidDirectory(newPath)) {
         result.errorMessage = "Destination folder already exists";
-        LOG_WARN << "Destination folder already exists: " << newPath;
+        utils::logging::warn("Destination folder already exists: " + newPath);
         return result;
     }
 
@@ -103,11 +104,11 @@ services::ServiceResult services::FolderService::updateFolder(const std::string 
         result.data["info"] = getFolderInfo(newPath);
         result.success      = true;
 
-        LOG_INFO << "Successfully renamed folder from " << oldPath << " to " << newPath;
+        utils::logging::info("Successfully renamed folder from " + oldPath + " to " + newPath);
 
     } catch (const std::exception &e) {
         result.errorMessage = "Failed to rename folder: " + std::string(e.what());
-        LOG_ERROR << result.errorMessage;
+        utils::logging::error(result.errorMessage);
     }
 
     return result;
@@ -120,13 +121,13 @@ services::ServiceResult services::FolderService::deleteFolder(const std::string 
 
     if (!utils::validatePath(folderPath)) {
         result.errorMessage = "Invalid folder path";
-        LOG_WARN << "Invalid folder path: " << folderPath;
+        utils::logging::warn("Invalid folder path: " + folderPath);
         return result;
     }
 
     if (!utils::isValidDirectory(folderPath)) {
         result.errorMessage = "Folder does not exist";
-        LOG_WARN << "Folder does not exist: " << folderPath;
+        utils::logging::warn("Folder does not exist: " + folderPath);
         return result;
     }
 
@@ -134,11 +135,11 @@ services::ServiceResult services::FolderService::deleteFolder(const std::string 
         fs::remove_all(folderPath);
         result.success = true;
 
-        LOG_INFO << "Successfully deleted folder: " << folderPath;
+        utils::logging::info("Successfully deleted folder: " + folderPath);
 
     } catch (const std::exception &e) {
         result.errorMessage = "Failed to delete folder: " + std::string(e.what());
-        LOG_ERROR << result.errorMessage;
+        utils::logging::error(result.errorMessage);
     }
 
     return result;
@@ -151,13 +152,13 @@ services::ServiceResult services::FolderService::readFolder(const std::string &f
 
     if (!utils::validatePath(folderPath)) {
         result.errorMessage = "Invalid folder path";
-        LOG_WARN << "Invalid folder path: " << folderPath;
+        utils::logging::warn("Invalid folder path: " + folderPath);
         return result;
     }
 
     if (!utils::isValidDirectory(folderPath)) {
         result.errorMessage = "Folder does not exist";
-        LOG_WARN << "Folder does not exist: " << folderPath;
+        utils::logging::warn("Folder does not exist: " + folderPath);
         return result;
     }
 
@@ -185,11 +186,11 @@ services::ServiceResult services::FolderService::readFolder(const std::string &f
         result.data["info"]        = getFolderInfo(folderPath);
         result.success             = true;
 
-        LOG_INFO << "Successfully listed folder: " << folderPath;
+        utils::logging::info("Successfully listed folder: " + folderPath);
 
     } catch (const std::exception &e) {
         result.errorMessage = "Failed to list folder: " + std::string(e.what());
-        LOG_ERROR << result.errorMessage;
+        utils::logging::error(result.errorMessage);
     }
 
     return result;

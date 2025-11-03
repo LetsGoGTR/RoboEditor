@@ -1,14 +1,13 @@
 #include "DiffService.h"
 
+#include "../utils/diff/DiffPython.h"
+#include "../utils/diff/DiffText.h"
+#include "../utils/diff/DiffYaml.h"
+#include "../utils/logging/Logger.h"
 
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
-
-
-#include "../utils/diff/DiffPython.h"
-#include "../utils/diff/DiffText.h"
-#include "../utils/diff/DiffYaml.h"
 #include "../utils/diff/treediff.h"
 
 
@@ -63,7 +62,7 @@ services::ServiceResult services::DiffService::diffYaml(const std::string &conte
     } catch (const std::exception &e) {
         result.success      = false;
         result.errorMessage = "YAML diff error: " + std::string(e.what());
-        LOG_ERROR << "YAML diff failed: " << e.what();
+        utils::logging::error("YAML diff failed: " + std::string(e.what()));
     }
     return result;
 }
@@ -81,7 +80,7 @@ services::ServiceResult services::DiffService::diffPython(const std::string &con
     } catch (const std::exception &e) {
         result.success      = false;
         result.errorMessage = "Python diff error: " + std::string(e.what());
-        LOG_ERROR << "Python diff failed: " << e.what();
+        utils::logging::error("Python diff failed: " + std::string(e.what()));
     }
     return result;
 }
@@ -100,7 +99,7 @@ services::ServiceResult services::DiffService::diffText(const std::string &conte
     } catch (const std::exception &e) {
         result.success      = false;
         result.errorMessage = "Text diff error: " + std::string(e.what());
-        LOG_ERROR << "Text diff failed: " << e.what();
+        utils::logging::error("Text diff failed: " + std::string(e.what()));
     }
     return result;
 }
@@ -158,14 +157,14 @@ services::ServiceResult services::DiffService::diff(const std::string &contentA,
     // Validate content is not empty
     if (contentA.empty()) {
         result.errorMessage = "Content A is empty";
-        LOG_ERROR << result.errorMessage;
+        utils::logging::error(result.errorMessage);
         return result;
     }
 
 
     if (contentB.empty()) {
         result.errorMessage = "Content B is empty";
-        LOG_ERROR << result.errorMessage;
+        utils::logging::error(result.errorMessage);
         return result;
     }
 
@@ -179,7 +178,7 @@ services::ServiceResult services::DiffService::diff(const std::string &contentA,
 
     if (extA != extB) {
         result.errorMessage = "File extensions do not match: " + extA + " vs " + extB;
-        LOG_WARN << result.errorMessage;
+        utils::logging::warn(result.errorMessage);
         // Continue anyway, but warn the user
     }
 
@@ -187,7 +186,7 @@ services::ServiceResult services::DiffService::diff(const std::string &contentA,
     // Check if format is supported
     if (!isSupportedFormat(nameA)) {
         result.errorMessage = "Unsupported file format: " + extA;
-        LOG_ERROR << result.errorMessage;
+        utils::logging::error(result.errorMessage);
         return result;
     }
 
@@ -196,9 +195,9 @@ services::ServiceResult services::DiffService::diff(const std::string &contentA,
     std::string fileType = detectFileType(nameA);
 
 
-    LOG_INFO << "Diffing files with type: " << fileType;
-    LOG_INFO << "File A: " << nameA;
-    LOG_INFO << "File B: " << nameB;
+    utils::logging::info("Diffing files with type: " + fileType);
+    utils::logging::info("File A: " + nameA);
+    utils::logging::info("File B: " + nameB);
 
 
     if (fileType == "yaml") {
@@ -209,7 +208,7 @@ services::ServiceResult services::DiffService::diff(const std::string &contentA,
         return diffText(contentA, contentB, nameA, nameB);
     } else {
         result.errorMessage = "Unknown file type: " + fileType;
-        LOG_ERROR << result.errorMessage;
+        utils::logging::error(result.errorMessage);
         return result;
     }
 }

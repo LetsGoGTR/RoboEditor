@@ -1,6 +1,8 @@
 #pragma once
 
-#include <drogon/drogon.h>
+#include "../utils/logging/Logger.h"
+
+#include <json/json.h>
 #include <string>
 
 namespace services
@@ -23,7 +25,7 @@ namespace services
             result.data    = resultData;
 
             if (!logMessage.empty()) {
-                LOG_INFO << logMessage;
+                utils::logging::info(logMessage);
             }
 
             return result;
@@ -37,7 +39,7 @@ namespace services
             result.errorMessage = message;
 
             if (autoLog) {
-                LOG_ERROR << message;
+                utils::logging::error(message);
             }
 
             return result;

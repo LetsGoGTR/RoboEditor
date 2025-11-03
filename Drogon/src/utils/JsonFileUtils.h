@@ -1,8 +1,10 @@
 #pragma once
 
-#include <drogon/drogon.h>
+#include "logging/Logger.h"
+
 #include <filesystem>
 #include <fstream>
+#include <json/json.h>
 #include <string>
 #include <type_traits>
 
@@ -15,7 +17,7 @@ namespace utils
         try {
             std::ofstream file(filePath);
             if (!file.is_open()) {
-                LOG_ERROR << "Failed to open file for writing: " << filePath;
+                utils::logging::error("Failed to open file for writing: " + filePath);
                 return false;
             }
 
@@ -27,11 +29,11 @@ namespace utils
             file << jsonStr;
             file.close();
 
-            LOG_INFO << "JSON saved: " << filePath;
+            utils::logging::info("JSON saved: " + filePath);
             return true;
 
         } catch (const std::exception &e) {
-            LOG_ERROR << "Failed to save JSON: " << e.what();
+            utils::logging::error("Failed to save JSON: " + std::string(e.what()));
             return false;
         }
     }
@@ -43,13 +45,13 @@ namespace utils
             namespace fs = std::filesystem;
 
             if (!fs::exists(filePath)) {
-                LOG_WARN << "JSON file not found: " << filePath;
+                utils::logging::warn("JSON file not found: " + filePath);
                 return defaultValue;
             }
 
             std::ifstream file(filePath);
             if (!file.is_open()) {
-                LOG_ERROR << "Failed to open JSON file: " << filePath;
+                utils::logging::error("Failed to open JSON file: " + filePath);
                 return defaultValue;
             }
 
@@ -58,7 +60,7 @@ namespace utils
             std::string             errors;
 
             if (!Json::parseFromStream(reader, file, &json, &errors)) {
-                LOG_ERROR << "Failed to parse JSON: " << errors;
+                utils::logging::error("Failed to parse JSON: " + errors);
                 file.close();
                 return defaultValue;
             }
@@ -66,11 +68,11 @@ namespace utils
             file.close();
             T result = T::fromJson(json);
 
-            LOG_INFO << "JSON loaded: " << filePath;
+            utils::logging::info("JSON loaded: " + filePath);
             return result;
 
         } catch (const std::exception &e) {
-            LOG_ERROR << "Failed to load JSON: " << e.what();
+            utils::logging::error("Failed to load JSON: " + std::string(e.what()));
             return defaultValue;
         }
     }
