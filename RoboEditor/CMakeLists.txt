@@ -32,10 +32,10 @@ set(TS_FILES RoboEditor_ko_KR.ts)
 set(PROJECT_SOURCES
         src/main.cpp
         src/app/BackupPage.cpp
-        src/app/OpenFilePage.cpp
+
         src/app/CenterStack.cpp
         src/app/ComparePage.cpp
-        src/app/DropTextEdit.cpp
+        src/core/DropTextEdit.cpp
         src/app/LogManager.cpp
         src/app/mainwindow.cpp
         src/app/NavDock.cpp
@@ -43,17 +43,17 @@ set(PROJECT_SOURCES
         src/app/ApplyPage.cpp
         src/app/ConfirmSelection.cpp
         src/app/ModifyPage.cpp
-        src/app/PasswordManager.cpp
+        src/core/PasswordManager.cpp
         src/app/SelectController.cpp
         src/app/SelectStorage.cpp
-        src/app/SftpClient.cpp
-        src/app/ApiClient.cpp
+        src/core/SftpClient.cpp
+        src/core/ApiClient.cpp
 
         src/app/BackupPage.h
-        src/app/OpenFilePage.h
+
         src/app/CenterStack.h
         src/app/ComparePage.h
-        src/app/DropTextEdit.h
+        src/core/DropTextEdit.h
         src/app/LogManager.h
         src/app/mainwindow.h
         src/app/NavDock.h
@@ -61,18 +61,18 @@ set(PROJECT_SOURCES
         src/app/ApplyPage.h
         src/app/ConfirmSelection.h
         src/app/ModifyPage.h
-        src/app/PasswordManager.h
+        src/core/PasswordManager.h
         src/app/SelectController.h
         src/app/SelectStorage.h
-        src/app/SftpClient.h
-        src/app/ApiClient.h
+        src/core/SftpClient.h
+        src/core/ApiClient.h
 
         src/ui/mainwindow.ui
         src/ui/ApplyPage.ui
-        src/ui/confirmselection.ui
+        src/ui/ConfirmSelection.ui
         src/ui/ModifyPage.ui
         src/ui/PasswordInput.ui
-        src/ui/wrongpassword.ui
+
 
         ${TS_FILES}
 )
@@ -84,17 +84,15 @@ find_package(Qt6 REQUIRED COMPONENTS Widgets)
     qt_add_executable(RoboEditor
         MANUAL_FINALIZATION
         ${PROJECT_SOURCES}
-        src/app/ControllerManager.h src/app/ControllerManager.cpp
+        src/core/ControllerManager.h src/core/ControllerManager.cpp
 
         src/app/CodeEditor.cpp
         src/app/CodeEditor.h
-        src/app/ShortcutManager.h src/app/ShortcutManager.cpp
-        src/app/ControllerSetting.h
-        src/app/ControllerSetting.cpp
+        src/core/ShortcutManager.h src/core/ShortcutManager.cpp
+        src/core/ControllerSetting.h
+        src/core/ControllerSetting.cpp
         src/ui/ControllerSettings.ui
 
-
-        # src/app/OpenFilePage.h src/app/OpenFilePage.cpp
     )
 # Define target properties for Android with Qt 6 as:
 #    set_property(TARGET RoboEditor APPEND PROPERTY QT_ANDROID_PACKAGE_SOURCE_DIR
@@ -122,7 +120,12 @@ target_link_libraries(RoboEditor PRIVATE Qt${QT_VERSION_MAJOR}::Widgets)
 target_link_libraries(RoboEditor PRIVATE Qt6::Widgets)
 target_link_libraries(RoboEditor PRIVATE Qt6::Widgets)
 target_link_libraries(RoboEditor PRIVATE Qt6::Network)
-
+target_include_directories(RoboEditor PRIVATE
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/src/app
+    ${CMAKE_SOURCE_DIR}/src/core
+    ${CMAKE_SOURCE_DIR}/src/network
+)
 # Link additional libraries
 if(WIN32)
     target_link_libraries(RoboEditor PRIVATE ${BCRYPT_LIBRARIES})

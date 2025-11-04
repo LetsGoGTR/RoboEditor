@@ -20,7 +20,6 @@
 #include "ComparePage.h"
 #include "ControllerManager.h"
 #include "ModifyPage.h"
-#include "OpenFilePage.h"
 
 static QIcon makeCircleIcon(const QColor &color, int size = 12)
 {
@@ -50,11 +49,9 @@ CenterStack::CenterStack(QWidget *parent) :
 {
     stack_ = new QStackedWidget;
     cmp_   = new ComparePage;
-    ofp_   = new OpenFilePage;
     mfp_   = new ModifyPage;
 
     idxC_ = stack_->addWidget(cmp_);
-    idxO_ = stack_->addWidget(ofp_);
     idxM_ = stack_->addWidget(mfp_);
 
     // auto *layout = new QVBoxLayout(this);
@@ -65,7 +62,6 @@ CenterStack::CenterStack(QWidget *parent) :
         emit compareRequested(L, R);
         openCompareResult(L, R);
     });
-    connect(ofp_, &OpenFilePage::uiOpenFileClicked, this, &CenterStack::openFileRequested);
     connect(mfp_, &ModifyPage::uiModifyClicked, this, &CenterStack::modifyRequested);
 
     connect(m_pollingTimer, &QTimer::timeout, this, &CenterStack::onPollingTimeout);
@@ -92,11 +88,6 @@ void CenterStack::openCompareResult(const QString &left, const QString &right)
 void CenterStack::showCompare()
 {
     stack_->setCurrentIndex(idxC_);
-}
-
-void CenterStack::showOpenFile()
-{
-    stack_->setCurrentIndex(idxO_);
 }
 
 void CenterStack::showModify()

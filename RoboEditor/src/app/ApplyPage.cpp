@@ -7,8 +7,7 @@
 #include "ConfirmSelection.h"
 #include "PasswordManager.h"
 #include "ui_ApplyPage.h"
-#include "ui_confirmselection.h"
-#include "ui_wrongpassword.h"
+#include "ui_ConfirmSelection.h"
 
 ApplyPage::ApplyPage(QWidget *parent) : QWidget(parent), ui(new Ui::ApplyPage)
 {
