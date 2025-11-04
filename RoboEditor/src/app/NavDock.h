@@ -16,8 +16,6 @@ class NavDock : public QToolBar
         void clickCompare();
         void clickBackup();
         void clickApply();
-        void clickModify();
-        void clickOpenFile();
       private slots:
         void onRegisterClicked();
 

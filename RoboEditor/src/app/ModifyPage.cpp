@@ -161,15 +161,15 @@ void ModifyPage::showCompare()
             // 이전 파일 재사용
             targetPath = lastComparedPath_;
         } else if (result == QMessageBox::No) {
-            // 새 파일 선택
-            targetPath = QFileDialog::getOpenFileName(this, tr("Select file to compare"));
+            // 새 파일 선택 - C:/backup에서 시작
+            targetPath = QFileDialog::getOpenFileName(this, tr("Select file to compare"), "C:/backup");
         } else {
             // 취소
             return;
         }
     } else {
-        // 이전 파일이 없으면 바로 파일 선택
-        targetPath = QFileDialog::getOpenFileName(this, tr("Select file to compare"));
+        // 이전 파일이 없으면 바로 파일 선택 - C:/backup에서 시작
+        targetPath = QFileDialog::getOpenFileName(this, tr("Select file to compare"), "C:/backup");
     }
 
     if (targetPath.isEmpty())
@@ -201,9 +201,26 @@ void ModifyPage::ensureCompare(const QString &targetPath)
     connect(comparePane_, &ComparePage::targetPathChanged, this, [this](const QString &path) {
         lastComparedPath_ = path;
     });
+    
+    // Debouncing 타이머 초기화
+    if (!diffDebounceTimer_) {
+        diffDebounceTimer_ = new QTimer(this);
+        diffDebounceTimer_->setSingleShot(true);  // 한 번만 실행
+        diffDebounceTimer_->setInterval(500);     // 500ms 대기
+        
+        // 타이머 timeout 시 실제 diff 실행
+        connect(diffDebounceTimer_, &QTimer::timeout, this, [this] {
+            if (comparePane_ && comparePane_->isVisible()) {
+                comparePane_->recalcDiff(currentLeftText());
+            }
+        });
+    }
+    
+    // 텍스트 변경 시 타이머 재시작 (Debouncing)
     connect(this, &ModifyPage::editorTextChangedForDiff, this, [this] {
-        if (comparePane_ && comparePane_->isVisible()) {
-            comparePane_->recalcDiff(currentLeftText());
+        if (comparePane_ && comparePane_->isVisible() && diffDebounceTimer_) {
+            diffDebounceTimer_->stop();   // 기존 타이머 중지
+            diffDebounceTimer_->start();  // 새로 시작 (500ms 후 실행)
         }
     });
 }
@@ -212,6 +229,11 @@ void ModifyPage::closeCompare()
 {
     if (!comparePane_)
         return;
+
+    // Debounce 타이머 정리
+    if (diffDebounceTimer_) {
+        diffDebounceTimer_->stop();  // 실행 중인 타이머 중지
+    }
 
     // 경로는 보존 (lastComparedPath_에 이미 저장되어 있음)
     comparePane_->hide();

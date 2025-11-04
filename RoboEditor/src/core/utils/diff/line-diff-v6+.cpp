@@ -183,7 +183,6 @@
 //         int ai, bj;
 //     };
 
-    
 //     vector<string> baseRaw_, compareRaw_;
 //     vector<int> Ai_, Bi_;
 //     vector<Op> ops_;

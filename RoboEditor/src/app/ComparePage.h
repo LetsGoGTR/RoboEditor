@@ -8,6 +8,9 @@
 #include <QStringList>
 #include <QWidget>
 
+// Core services 포함
+#include "../core/services/DiffService.h"
+
 class QComboBox;
 class QPushButton;
 class QLabel;
@@ -18,6 +21,7 @@ class QFileSystemModel;
 class QTreeView;
 class QTabWidget;
 class DropTextEdit;
+class CodeEditor;
 
 class ComparePage : public QWidget
 {
@@ -29,21 +33,15 @@ class ComparePage : public QWidget
         QWidget *buildDiffPanel();
         struct DiffRow
         {
+            int     line;   // 라인 번호 (YAML용)
             QString key;
             QString origin;
             QString target;
             QString state;  // "SAME", "CHANGED", "ADDED", "REMOVED"
         };
 
+
       public slots:
-        void onOpenLeftFolderClicked();
-        void onOpenRightFolderClicked();
-        void onLeftTreeDoubleClicked(const QModelIndex &idx);
-        void onRightTreeDoubleClicked(const QModelIndex &idx);
-
-        void refreshTreeView(const QString &side, const QString &path);
-        void loadLocalFolder(const QString &side, const QString &path);
-
         void recalcDiff(const QString &leftText);  // 좌 텍스트 받아 재계산
 
       signals:
@@ -53,63 +51,40 @@ class ComparePage : public QWidget
         void targetPathChanged(const QString &newPath);  // 비교 대상 파일 변경됨
 
       private slots:
-        void onCompareClicked();
         void onCloseClicked();
 
       private:
         QWidget      *dock_{nullptr};              // 헤더+[X]+rightSplit
         QSplitter    *rightSplit_{nullptr};        // (좌) rightText_ | (우) diffPanel_
         QTabWidget   *compareTabWidget_{nullptr};  // 비교 파일들을 탭으로 관리
-        DropTextEdit *rightText_{nullptr};  // 읽기 전용 (비교대상) - 현재 활성 탭
+        CodeEditor   *rightText_{nullptr};  // 읽기 전용 (비교대상) - 현재 활성 탭 (라인 번호 포함)
         QWidget      *diffPanel_{nullptr};  // 기존 "테이블+상단 버튼" 위젯
         QTableWidget *diffTable_ = nullptr;
         QLabel       *statLabel_ = nullptr;
         QString       targetPath_;
 
-        QLineEdit *leftFileSelect_{nullptr};
-        QLineEdit *rightFileSelect_{nullptr};
-
         QWidget *buildDock();
-        // 현재 선택된 루트 경로
-        QString currentLeftRoot_;
-        QString currentRightRoot_;
 
-        // 현재 폴더에서 받은 파일 리스트 캐시
-        QStringList leftFiles_;
-        QStringList rightFiles_;
-
-        // 좌측 사이드: 폴더 브라우저 탭
-        QTabWidget *dirTabs_;
-        QWidget    *leftTabPage_;
-        QWidget    *rightTabPage_;
-
-        // 본문 텍스트 뷰
-        DropTextEdit *leftText_;
-        //DropTextEdit *rightText_;
-
-        // diff 영역
-        QLineEdit *keySearchEdit_;
-        QCheckBox *chkOnlyChanged_;
-        QCheckBox *chkHideSame_;
-        QCheckBox *chkOnlyAddDel_;
+        // 현재 필터 상태
+        QString currentFilter_;  // "All", "Added", "Removed", "Changed"
+        QList<DiffRow> allDiffRows_;  // 필터링 전 전체 데이터
 
         // 내부 유틸
-        void setRoots(const QString &leftRoot, const QString &rightRoot);
-        void populateFileSelects(const QStringList &leftFiles, const QStringList &rightFiles);
-        void updateFolderListing(const QString     &side,
-                                 const QString     &basePath,
-                                 const QStringList &folders,
-                                 const QStringList &files);
-
-        void setFileContents(const QString &leftText, const QString &rightText);
         void setDiffRows(const QList<DiffRow> &rows);
         void refreshDiffTable(const QList<DiffRow> &rows);
 
-        void loadRightText(const QString &path);
-        // 나중에 REST 붙일 자리 (지금은 더미)
-        void fetchFolderFromApiDummy(const QString &side, const QString &basePathHint);
-        void fetchCompareFromApiDummy(const QString &leftFilePath, const QString &rightFilePath);
-        void loadFileIntoEditor(const QString &fullPath, bool isLeft);
+        // Diff 수행 (DiffService 사용)
+        void performDiff(const QString &leftPath, const QString &rightPath);
+        
+        // DiffService 결과를 DiffRow로 변환
+        QList<DiffRow> parseDiffResult(const Json::Value &result, const QString &fileType);
+        
+        // 테이블 컬럼 조정
+        void updateTableColumns(const QString &fileType);
+
+        // 필터 관련
+        void applyFilter(const QString &filterType);
+        QList<DiffRow> filterRows(const QList<DiffRow> &rows, const QString &filterType) const;
 };
 
 #endif  // COMPAREPAGE_H

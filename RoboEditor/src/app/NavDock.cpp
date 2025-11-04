@@ -26,16 +26,12 @@ void NavDock::build()
     QAction *actCompare  = mk("비교하기", ":/icons/compare.png");
     QAction *actBackup   = mk("백업하기", ":/icons/backup.png");
     QAction *actApply    = mk("적용하기", ":/icons/apply.png");
-    QAction *actModify   = mk("수정하기", ":/icons/modify.png");
-    QAction *actOpen     = mk("확인하기", ":/icons/open.png");
 
     // 신호 연결
     connect(actRegister, &QAction::triggered, this, &NavDock::onRegisterClicked);
     connect(actCompare, &QAction::triggered, this, &NavDock::clickCompare);
     connect(actBackup, &QAction::triggered, this, &NavDock::clickBackup);
     connect(actApply, &QAction::triggered, this, &NavDock::clickApply);
-    connect(actModify, &QAction::triggered, this, &NavDock::clickModify);
-    connect(actOpen, &QAction::triggered, this, &NavDock::clickOpenFile);
 }
 
 void NavDock::onRegisterClicked()

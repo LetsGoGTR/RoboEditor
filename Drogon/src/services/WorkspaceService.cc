@@ -1,9 +1,5 @@
 #include "WorkspaceService.h"
 
-#include "../utils/JsonFileUtils.h"
-#include "../utils/TimeUtils.h"
-#include "../utils/logging/Logger.h"
-
 #include <algorithm>
 #include <archive.h>
 #include <archive_entry.h>
@@ -13,6 +9,9 @@
 #include <iomanip>
 #include <sstream>
 
+#include "../utils/JsonFileUtils.h"
+#include "../utils/TimeUtils.h"
+#include "../utils/logging/Logger.h"
 #include "DeviceService.h"
 #include "FolderService.h"
 
@@ -152,8 +151,9 @@ services::WorkspaceService::importWorkspace(const std::string       &archivePath
     }
 }
 
-services::ServiceResult services::WorkspaceService::exportWorkspace(
-        const std::string &workspaceId, const std::string &baseDir, const std::string &outputPath)
+services::ServiceResult services::WorkspaceService::exportWorkspace(const std::string &workspaceId,
+                                                                    const std::string &baseDir,
+                                                                    const std::string &outputPath)
 {
     std::string workspacePath = baseDir + workspaceId;
 
@@ -215,14 +215,15 @@ services::ServiceResult services::WorkspaceService::exportWorkspace(
     }
 }
 
-services::ServiceResult
-services::WorkspaceService::listWorkspaces(const std::string &baseDir, const std::string &deviceId)
+services::ServiceResult services::WorkspaceService::listWorkspaces(const std::string &baseDir,
+                                                                   const std::string &deviceId)
 {
     if (!fs::exists(baseDir)) {
         try {
             fs::create_directories(baseDir);
         } catch (const std::exception &e) {
-            return ServiceResult::createError("Failed to create base directory: " + std::string(e.what()));
+            return ServiceResult::createError("Failed to create base directory: " +
+                                              std::string(e.what()));
         }
     }
 
@@ -278,9 +279,11 @@ services::WorkspaceService::listWorkspaces(const std::string &baseDir, const std
         result.data["count"]      = (int)workspaces.size();
 
         if (deviceId.empty()) {
-            utils::logging::info("Listed " + std::to_string(workspaces.size()) + " workspaces from all devices");
+            utils::logging::info("Listed " + std::to_string(workspaces.size()) +
+                                 " workspaces from all devices");
         } else {
-            utils::logging::info("Listed " + std::to_string(workspaces.size()) + " workspaces from device: " + deviceId);
+            utils::logging::info("Listed " + std::to_string(workspaces.size()) +
+                                 " workspaces from device: " + deviceId);
         }
         return result;
 
@@ -361,7 +364,7 @@ services::WorkspaceService::createWorkspace(const std::string       &baseDir,
         auto folderResult = services::FolderService::createFolder(workspacePath);
         if (!folderResult.success) {
             return ServiceResult::createError("Failed to create workspace directory: " +
-                               folderResult.errorMessage);
+                                              folderResult.errorMessage);
         }
 
         // Prepare metadata with timestamps
@@ -392,9 +395,8 @@ services::WorkspaceService::createWorkspace(const std::string       &baseDir,
 }
 
 // Get workspace metadata and tree structure
-services::ServiceResult
-services::WorkspaceService::readWorkspace(const std::string &baseDir,
-                                          const std::string &workspaceId)
+services::ServiceResult services::WorkspaceService::readWorkspace(const std::string &baseDir,
+                                                                  const std::string &workspaceId)
 {
     std::string workspacePath = baseDir + workspaceId;
 
@@ -462,9 +464,8 @@ services::WorkspaceService::updateWorkspace(const std::string       &baseDir,
 }
 
 // Delete workspace directory
-services::ServiceResult
-services::WorkspaceService::deleteWorkspace(const std::string &baseDir,
-                                            const std::string &workspaceId)
+services::ServiceResult services::WorkspaceService::deleteWorkspace(const std::string &baseDir,
+                                                                    const std::string &workspaceId)
 {
     std::string workspacePath = baseDir + workspaceId;
 
@@ -481,7 +482,7 @@ services::WorkspaceService::deleteWorkspace(const std::string &baseDir,
         auto folderResult = services::FolderService::deleteFolder(workspacePath);
         if (!folderResult.success) {
             return ServiceResult::createError("Failed to delete workspace directory: " +
-                               folderResult.errorMessage);
+                                              folderResult.errorMessage);
         }
 
         ServiceResult result;

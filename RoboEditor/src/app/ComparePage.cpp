@@ -29,8 +29,12 @@
 #include <QVBoxLayout>
 
 #include "DropTextEdit.h"
+#include "CodeEditor.h"
 
-ComparePage::ComparePage(QWidget *parent) : QWidget(parent)
+#include <json/json.h>
+#include <sstream>
+
+ComparePage::ComparePage(QWidget *parent) : QWidget(parent), currentFilter_("All")
 {
     dock_  = buildDock();
     auto v = new QVBoxLayout(this);
@@ -89,7 +93,7 @@ QWidget *ComparePage::buildDock()
         if (compareTabWidget_->count() > 0) {
             int currentIndex = compareTabWidget_->currentIndex();
             if (currentIndex >= 0) {
-                rightText_ = qobject_cast<DropTextEdit *>(compareTabWidget_->currentWidget());
+                rightText_ = qobject_cast<CodeEditor *>(compareTabWidget_->currentWidget());
                 // 남아있는 탭의 경로로 신호 발송 (diff 재계산)
                 QString tabPath = compareTabWidget_->tabToolTip(currentIndex);
                 if (!tabPath.isEmpty()) {
@@ -105,7 +109,7 @@ QWidget *ComparePage::buildDock()
     // 탭 변경 시 현재 활성 탭 업데이트
     connect(compareTabWidget_, &QTabWidget::currentChanged, this, [this](int index) {
         if (index >= 0) {
-            rightText_ = qobject_cast<DropTextEdit *>(compareTabWidget_->widget(index));
+            rightText_ = qobject_cast<CodeEditor *>(compareTabWidget_->widget(index));
             // 탭이 변경될 때 targetPath 업데이트 및 신호 발송 (diff 재계산 트리거)
             QString tabPath = compareTabWidget_->tabToolTip(index);
             if (!tabPath.isEmpty()) {
@@ -122,8 +126,8 @@ QWidget *ComparePage::buildDock()
 
     rightSplit_->addWidget(compareTabWidget_);
     rightSplit_->addWidget(diffPanel_);
-    rightSplit_->setStretchFactor(0, 1);
-    rightSplit_->setStretchFactor(1, 1);
+    rightSplit_->setStretchFactor(0, 4);  // compareTabWidget_ (파일 내용) - 2배 공간
+    rightSplit_->setStretchFactor(1, 1);  // diffPanel_ (비교 테이블) - 1배 공간
 
     v->addWidget(rightSplit_);
     return w;
@@ -149,9 +153,9 @@ QWidget *ComparePage::buildDiffPanel()
     topLayout->setContentsMargins(0, 0, 0, 4);
     topLayout->setSpacing(6);
 
-    // 파일 선택 버튼
-    auto btnSelectFile = new QPushButton(tr("Select File"), topBar);
-    btnSelectFile->setFixedSize(90, 26);
+    // 파일 선택 버튼 (두 파일 비교)
+    auto btnSelectFile = new QPushButton(tr("Compare Files"), topBar);
+    btnSelectFile->setFixedSize(110, 26);
     btnSelectFile->setStyleSheet("QPushButton { "
                                  "  background-color: #f0f0f0; "
                                  "  border: 1px solid #b0b0b0; "
@@ -169,11 +173,26 @@ QWidget *ComparePage::buildDiffPanel()
     topLayout->addWidget(btnSelectFile);
 
     connect(btnSelectFile, &QPushButton::clicked, this, [this]() {
-        QString path = QFileDialog::getOpenFileName(this, tr("Select file to compare"));
-        if (!path.isEmpty()) {
-            setTargetPath(path);
-            emit targetPathChanged(path);
+        // 왼쪽 파일 선택 (비교 대상) - C:/backup 시작
+        QString leftPath = QFileDialog::getOpenFileName(this, 
+                                                        tr("Select left file (compare)"),
+                                                        "C:/backup",
+                                                        tr("All Files (*.*)"));
+        if (leftPath.isEmpty()) {
+            return;
         }
+
+        // 오른쪽 파일 선택 (기준) - C:/backup 시작
+        QString rightPath = QFileDialog::getOpenFileName(this, 
+                                                         tr("Select right file (base)"),
+                                                         "C:/backup",
+                                                         tr("All Files (*.*)"));
+        if (rightPath.isEmpty()) {
+            return;
+        }
+
+        // 두 파일 비교 수행
+        performDiff(leftPath, rightPath);
     });
 
     // 구분선
@@ -255,33 +274,33 @@ QWidget *ComparePage::buildDiffPanel()
     v->addWidget(topBar);
 
     // 필터 버튼 연결 (상호 배타적)
-    connect(btnAll, &QPushButton::clicked, this, [=]() {
+    connect(btnAll, &QPushButton::clicked, this, [=, this]() {
         btnAll->setChecked(true);
         btnAdded->setChecked(false);
         btnRemoved->setChecked(false);
         btnChanged->setChecked(false);
-        // TODO: 필터 적용
+        applyFilter("All");
     });
-    connect(btnAdded, &QPushButton::clicked, this, [=]() {
+    connect(btnAdded, &QPushButton::clicked, this, [=, this]() {
         btnAll->setChecked(false);
         btnAdded->setChecked(true);
         btnRemoved->setChecked(false);
         btnChanged->setChecked(false);
-        // TODO: ADDED만 필터
+        applyFilter("Added");
     });
-    connect(btnRemoved, &QPushButton::clicked, this, [=]() {
+    connect(btnRemoved, &QPushButton::clicked, this, [=, this]() {
         btnAll->setChecked(false);
         btnAdded->setChecked(false);
         btnRemoved->setChecked(true);
         btnChanged->setChecked(false);
-        // TODO: REMOVED만 필터
+        applyFilter("Removed");
     });
-    connect(btnChanged, &QPushButton::clicked, this, [=]() {
+    connect(btnChanged, &QPushButton::clicked, this, [=, this]() {
         btnAll->setChecked(false);
         btnAdded->setChecked(false);
         btnRemoved->setChecked(false);
         btnChanged->setChecked(true);
-        // TODO: CHANGED만 필터
+        applyFilter("Changed");
     });
 
     // ===== Diff 테이블 =====
@@ -296,7 +315,7 @@ QWidget *ComparePage::buildDiffPanel()
     // 가로 헤더 설정
     QHeaderView *hHeader = diffTable_->horizontalHeader();
     hHeader->setVisible(true);                                // 헤더 항상 표시
-    hHeader->setStretchLastSection(true);                     // 마지막 컬럼 늘림
+    hHeader->setStretchLastSection(false);                    // 마지막 컬럼 자동 늘림 OFF (테이블 크기 줄이기)
     hHeader->setSectionResizeMode(QHeaderView::Interactive);  // 사용자가 컬럼 크기 조절 가능
     hHeader->setDefaultAlignment(Qt::AlignLeft | Qt::AlignVCenter);
     hHeader->setHighlightSections(false);
@@ -311,7 +330,7 @@ QWidget *ComparePage::buildDiffPanel()
     // 세로 헤더 설정
     QHeaderView *vHeader = diffTable_->verticalHeader();
     vHeader->setVisible(true);
-    vHeader->setDefaultSectionSize(28);  // 행 높이 통일
+    vHeader->setDefaultSectionSize(20);  // 행 높이 통일
     vHeader->setSectionResizeMode(QHeaderView::Fixed);
 
     // 테이블 동작 설정
@@ -394,11 +413,11 @@ QWidget *ComparePage::buildDiffPanel()
                               "  background: none; "
                               "}");
 
-    // 초기 컬럼 너비 설정
-    diffTable_->setColumnWidth(0, 200);  // Key
-    diffTable_->setColumnWidth(1, 200);  // Left
-    diffTable_->setColumnWidth(2, 200);  // Right
-    // State는 자동으로 늘어남 (stretchLastSection)
+    // 초기 컬럼 너비 설정 (최소 크기)
+    diffTable_->setColumnWidth(0, 60);   // Key/Line
+    diffTable_->setColumnWidth(1, 250);  // Left (Compare)
+    diffTable_->setColumnWidth(2, 250);  // Right (Base)
+    diffTable_->setColumnWidth(3, 100);  // State
 
     v->addWidget(diffTable_);
 
@@ -434,8 +453,8 @@ void ComparePage::setTargetPath(const QString &path)
             widget->deleteLater();
     }
 
-    // 새 탭 추가
-    auto *newTextEdit = new DropTextEdit(compareTabWidget_);
+    // 새 탭 추가 (CodeEditor 사용 - 라인 번호 포함)
+    auto *newTextEdit = new CodeEditor(compareTabWidget_);
     newTextEdit->setReadOnly(true);
     newTextEdit->setStyleSheet("QPlainTextEdit { background-color: white; border: none; }");
 
@@ -474,33 +493,60 @@ void ComparePage::recalcDiff(const QString &leftText)
     if (!diffTable_)
         return;
 
-    // TODO: 이후 실제 diff 로직으로 교체
+    // targetPath_가 없으면 미리보기만 표시
+    if (targetPath_.isEmpty()) {
     QList<DiffRow> rows;
     if (!leftText.isEmpty() || !rightText.isEmpty()) {
-        rows.push_back({"(preview)",
+        rows.push_back({-1,  // line
+                        "(preview)",
                         QString::number(leftText.size()),
                         QString::number(rightText.size()),
                         leftText == rightText ? "SAME" : "CHANGED"});
     }
     setDiffRows(rows);
+        return;
+    }
+
+    // DiffService를 사용하여 diff 수행
+    // 주의: right가 기준(base), left가 비교 대상(compare)
+    std::string rightContentStr = rightText.toStdString();
+    std::string leftContentStr  = leftText.toStdString();
+    std::string rightNameStr    = targetPath_.toStdString();
+    std::string leftNameStr     = "ModifyPage"; // 임시 이름
+    
+    services::ServiceResult result = services::DiffService::diff(rightContentStr, 
+                                                                  leftContentStr,
+                                                                  rightNameStr,
+                                                                  leftNameStr);
+    
+    if (!result.success) {
+        QList<DiffRow> rows;
+        rows.push_back({-1, "Error", QString::fromStdString(result.errorMessage), "", "ERROR"});
+        setDiffRows(rows);
+        return;
+    }
+    
+    // 파일 타입 감지 (확장자 기반)
+    QFileInfo fileInfo(targetPath_);
+    QString ext = fileInfo.suffix().toLower();
+    QString fileType;
+    
+    if (ext == "yaml" || ext == "yml" || ext == "pts") {
+        fileType = "yaml";
+    } else if (ext == "py" || ext == "srl" || ext == "sbp") {
+        fileType = "python";
+    } else {
+        fileType = "text";
+    }
+    
+    // 테이블 컬럼 업데이트
+    updateTableColumns(fileType);
+    
+    // 결과 파싱 및 표시
+    QList<DiffRow> diffRows = parseDiffResult(result.data, fileType);
+    setDiffRows(diffRows);
 }
 
-// 내부 상태 업데이트용
-void ComparePage::setRoots(const QString &leftRoot, const QString &rightRoot)
-{
-    currentLeftRoot_  = leftRoot;
-    currentRightRoot_ = rightRoot;
-    // fileInfoLabel_ 제거됨
-}
-
-// 좌/우 본문 텍스트 채우기
-void ComparePage::setFileContents(const QString &leftText, const QString &rightText)
-{
-    // leftText는 이제 ModifyPage가 가진다. 여기서는 우측만 갱신.
-    Q_UNUSED(leftText);
-    if (rightText_)
-        rightText_->setPlainText(rightText);
-}
 
 // diff 테이블 갱신
 void ComparePage::refreshDiffTable(const QList<DiffRow> &rows)
@@ -514,9 +560,18 @@ void ComparePage::refreshDiffTable(const QList<DiffRow> &rows)
     for (int i = 0; i < rows.size(); i++) {
         const auto &r = rows[i];
 
+        // YAML(5컬럼)과 Python/Text(4컬럼)를 구분
+        bool isYaml = (diffTable_->columnCount() == 5);
+        
+        QTableWidgetItem *itemLine = nullptr;
+        if (isYaml) {
+            // Line 컬럼 생성 (YAML만)
+            itemLine = new QTableWidgetItem(r.line >= 0 ? QString::number(r.line) : "");
+        }
+        
         auto *itemKey   = new QTableWidgetItem(r.key);
-        auto *itemLeft  = new QTableWidgetItem(r.origin);
-        auto *itemRight = new QTableWidgetItem(r.target);
+        auto *itemLeft  = new QTableWidgetItem(r.target);  // target = Left (Compare)
+        auto *itemRight = new QTableWidgetItem(r.origin);  // origin = Right (Base)
         auto *itemState = new QTableWidgetItem(r.state);
 
         // State에 따라 명확한 색상과 아이콘 적용
@@ -525,6 +580,7 @@ void ComparePage::refreshDiffTable(const QList<DiffRow> &rows)
             QColor bgColor(255, 250, 205);   // 레몬 크림색
             QColor textColor(184, 134, 11);  // 어두운 황금색
 
+            if (itemLine) itemLine->setBackground(bgColor);
             itemKey->setBackground(bgColor);
             itemLeft->setBackground(bgColor);
             itemRight->setBackground(bgColor);
@@ -544,6 +600,7 @@ void ComparePage::refreshDiffTable(const QList<DiffRow> &rows)
             QColor bgColor(220, 252, 231);  // 연한 민트색
             QColor textColor(22, 163, 74);  // 진한 초록색
 
+            if (itemLine) itemLine->setBackground(bgColor);
             itemKey->setBackground(bgColor);
             itemLeft->setBackground(bgColor);
             itemRight->setBackground(bgColor);
@@ -563,6 +620,7 @@ void ComparePage::refreshDiffTable(const QList<DiffRow> &rows)
             QColor bgColor(254, 226, 226);  // 연한 핑크색
             QColor textColor(220, 38, 38);  // 진한 빨강색
 
+            if (itemLine) itemLine->setBackground(bgColor);
             itemKey->setBackground(bgColor);
             itemLeft->setBackground(bgColor);
             itemRight->setBackground(bgColor);
@@ -582,6 +640,7 @@ void ComparePage::refreshDiffTable(const QList<DiffRow> &rows)
             QColor bgColor(249, 250, 251);    // 아주 연한 회색
             QColor textColor(107, 114, 128);  // 중간 회색
 
+            if (itemLine) itemLine->setBackground(bgColor);
             itemKey->setBackground(bgColor);
             itemLeft->setBackground(bgColor);
             itemRight->setBackground(bgColor);
@@ -592,15 +651,27 @@ void ComparePage::refreshDiffTable(const QList<DiffRow> &rows)
         }
 
         // 텍스트 정렬
+        if (itemLine) itemLine->setTextAlignment(Qt::AlignCenter | Qt::AlignVCenter);
         itemKey->setTextAlignment(Qt::AlignLeft | Qt::AlignVCenter);
         itemLeft->setTextAlignment(Qt::AlignLeft | Qt::AlignVCenter);
         itemRight->setTextAlignment(Qt::AlignLeft | Qt::AlignVCenter);
         itemState->setTextAlignment(Qt::AlignCenter | Qt::AlignVCenter);
 
-        diffTable_->setItem(i, 0, itemKey);
-        diffTable_->setItem(i, 1, itemLeft);
-        diffTable_->setItem(i, 2, itemRight);
-        diffTable_->setItem(i, 3, itemState);
+        // 테이블에 아이템 설정
+        if (isYaml) {
+            // YAML: Line, Path, Left Value, Right Value, State
+            diffTable_->setItem(i, 0, itemLine);
+            diffTable_->setItem(i, 1, itemKey);
+            diffTable_->setItem(i, 2, itemLeft);   // Column 2: Left Content (Compare)
+            diffTable_->setItem(i, 3, itemRight);  // Column 3: Right Content (Base)
+            diffTable_->setItem(i, 4, itemState);
+        } else {
+            // Python/Text: Line, Left Content, Right Content, State
+            diffTable_->setItem(i, 0, itemKey);
+            diffTable_->setItem(i, 1, itemLeft);   // Column 1: Left Content (Compare)
+            diffTable_->setItem(i, 2, itemRight);  // Column 2: Right Content (Base)
+            diffTable_->setItem(i, 3, itemState);
+        }
     }
 
     // 통계 업데이트
@@ -615,188 +686,362 @@ void ComparePage::refreshDiffTable(const QList<DiffRow> &rows)
 
 void ComparePage::setDiffRows(const QList<DiffRow> &rows)
 {
-    refreshDiffTable(rows);
+    allDiffRows_ = rows;  // 전체 데이터 저장
+    
+    // 현재 필터 적용
+    QList<DiffRow> filteredRows = filterRows(rows, currentFilter_);
+    refreshDiffTable(filteredRows);
 }
 
-// ------------------------
-// "API 자리 더미"
-// ------------------------
 
-// 더미 API: GET api/v1/folder?path=
-void ComparePage::fetchFolderFromApiDummy(const QString &side, const QString &basePathHint)
+// ========================================
+// DiffService를 사용한 diff 수행 구현
+// ========================================
+
+void ComparePage::performDiff(const QString &leftPath, const QString &rightPath)
 {
-    QString path =
-            basePathHint.isEmpty() ? (side == "left" ? "/robot/A" : "/robot/B") : basePathHint;
-
-    QStringList dummyFolders = {"cfg", "prog", "logs"};
-    QStringList dummyFiles;
-
-    if (side == "left") {
-        dummyFiles = {"main.yaml", "task.srl", "io_map.yaml"};
-    } else {
-        dummyFiles = {"main.yaml", "task.srl", "io_map_v2.yaml"};
+    // 파일 내용 읽기
+    QFile leftFile(leftPath);
+    QFile rightFile(rightPath);
+    
+    if (!leftFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        QMessageBox::critical(this, tr("오류"), tr("왼쪽 파일을 열 수 없습니다: %1").arg(leftPath));
+        return;
     }
-
-    updateFolderListing(side, path, dummyFolders, dummyFiles);
+    
+    if (!rightFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        QMessageBox::critical(this, tr("오류"), tr("오른쪽 파일을 열 수 없습니다: %1").arg(rightPath));
+        leftFile.close();
+        return;
+    }
+    
+    QTextStream leftStream(&leftFile);
+    QTextStream rightStream(&rightFile);
+    
+    QString leftContent  = leftStream.readAll();
+    QString rightContent = rightStream.readAll();
+    
+    leftFile.close();
+    rightFile.close();
+    
+    // DiffService를 사용하여 diff 수행
+    // 주의: right가 기준(base), left가 비교 대상(compare)
+    std::string rightContentStr = rightContent.toStdString();
+    std::string leftContentStr  = leftContent.toStdString();
+    std::string rightNameStr    = rightPath.toStdString();
+    std::string leftNameStr     = leftPath.toStdString();
+    
+    services::ServiceResult result = services::DiffService::diff(rightContentStr, 
+                                                                  leftContentStr,
+                                                                  rightNameStr,
+                                                                  leftNameStr);
+    
+    // 오류 처리
+    if (!result.success) {
+        QMessageBox::critical(this, 
+                            tr("Diff 오류"), 
+                            QString::fromStdString(result.errorMessage));
+        return;
+    }
+    
+    // 오른쪽 파일을 탭에 표시
+    if (compareTabWidget_) {
+        // 기존 탭을 모두 닫음
+        while (compareTabWidget_->count() > 0) {
+            auto *widget = compareTabWidget_->widget(0);
+            compareTabWidget_->removeTab(0);
+            if (widget)
+                widget->deleteLater();
+        }
+        
+        // 오른쪽 파일을 새 탭으로 추가 (CodeEditor 사용 - 라인 번호 포함)
+        auto *newTextEdit = new CodeEditor(compareTabWidget_);
+        newTextEdit->setReadOnly(true);
+        newTextEdit->setStyleSheet("QPlainTextEdit { background-color: white; border: none; }");
+        newTextEdit->setPlainText(rightContent);
+        
+        QFileInfo rightFileInfo(rightPath);
+        QString   rightFileName     = rightFileInfo.fileName();
+        QString   rightAbsolutePath = rightFileInfo.absoluteFilePath();
+        
+        int index = compareTabWidget_->addTab(newTextEdit, rightFileName);
+        compareTabWidget_->setTabToolTip(index, rightAbsolutePath);
+        compareTabWidget_->setCurrentIndex(index);
+        rightText_ = newTextEdit;
+        
+        targetPath_ = rightAbsolutePath;
+    }
+    
+    // 파일 타입 감지
+    QFileInfo fileInfo(rightPath);
+    QString ext = fileInfo.suffix().toLower();
+    QString fileType;
+    
+    if (ext == "yaml" || ext == "yml" || ext == "pts") {
+        fileType = "yaml";
+    } else if (ext == "py" || ext == "srl" || ext == "sbp") {
+        fileType = "python";
+    } else {
+        fileType = "text";
+    }
+    
+    // 테이블 컬럼 업데이트
+    updateTableColumns(fileType);
+    
+    // 결과 파싱 및 표시
+    QList<DiffRow> diffRows = parseDiffResult(result.data, fileType);
+    setDiffRows(diffRows);
+    
+    // 왼쪽 파일도 표시하고 싶다면 신호를 발생시킴
+    emit uiCompareClicked(leftPath, rightPath);
 }
 
-// 더미 API: GET api/v1/file?path=... 2번 호출 + diff 결과
-void ComparePage::fetchCompareFromApiDummy(const QString &leftFilePath,
-                                           const QString &rightFilePath)
+void ComparePage::updateTableColumns(const QString &fileType)
 {
-    Q_UNUSED(leftFilePath)
-    Q_UNUSED(rightFilePath)
+    if (!diffTable_) return;
+    
+    if (fileType == "yaml") {
+        // YAML: Line, Path, Left Value, Right Value, State
+        diffTable_->setColumnCount(5);
+        diffTable_->setHorizontalHeaderLabels({"Line", "Path", "Left Value (Compare)", "Right Value (Base)", "State"});
+        diffTable_->setColumnWidth(0, 50);   // Line
+        diffTable_->setColumnWidth(1, 120);  // Path
+        diffTable_->setColumnWidth(2, 150);  // Left Value
+        diffTable_->setColumnWidth(3, 150);  // Right Value
+        diffTable_->setColumnWidth(4, 100);  // State
+    } else if (fileType == "python" || fileType == "text") {
+        // Python/Text: Line, Left Content, Right Content, State (순서 변경)
+        diffTable_->setColumnCount(4);
+        diffTable_->setHorizontalHeaderLabels({"Line", "Left Content (Compare)", "Right Content (Base)", "State"});
+        diffTable_->setColumnWidth(0, 50);   // Line (줄임)
+        diffTable_->setColumnWidth(1, 150);  // Left Content (줄임)
+        diffTable_->setColumnWidth(2, 150);  // Right Content (줄임)
+        diffTable_->setColumnWidth(3, 100);  // State
+    } else {
+        // 기본값
+        diffTable_->setColumnCount(4);
+        diffTable_->setHorizontalHeaderLabels({"Key", "Left", "Right", "State"});
+        diffTable_->setColumnWidth(0, 50);
+        diffTable_->setColumnWidth(1, 150);
+        diffTable_->setColumnWidth(2, 150);
+        diffTable_->setColumnWidth(3, 100);
+    }
+}
 
-    QString leftContent = "paramA=10\n"
-                          "paramB=20\n"
-                          "paramC=OFF\n";
-
-    QString rightContent = "paramA=10\n"
-                           "paramB=22\n"
-                           "paramC=OFF\n"
-                           "paramD=EXTRA\n";
-
-    setFileContents(leftContent, rightContent);
-
+// DiffService 결과를 DiffRow로 변환
+QList<ComparePage::DiffRow> ComparePage::parseDiffResult(const Json::Value &result, 
+                                                          const QString &fileType)
+{
     QList<DiffRow> rows;
-    rows.push_back({"paramA", "10", "10", ""});
-    rows.push_back({"paramB", "20", "22", "CHANGED"});
-    rows.push_back({"paramC", "OFF", "OFF", ""});
-    rows.push_back({"paramD", "", "EXTRA", "ADDED"});
-
-    setDiffRows(rows);
-}
-
-// ------------------------
-// 버튼 핸들러
-// ------------------------
-
-void ComparePage::onCompareClicked()
-{
-    // QLineEdit에서 파일명 읽기
-    const QString leftFileName  = leftFileSelect_ ? leftFileSelect_->text().trimmed() : QString();
-    const QString rightFileName = rightFileSelect_ ? rightFileSelect_->text().trimmed() : QString();
-
-    if (leftFileName.isEmpty() || rightFileName.isEmpty()) {
-        qWarning() << "[Compare] file name is empty" << leftFileName << rightFileName;
-        return;
-    }
-    if (currentLeftRoot_.isEmpty() || currentRightRoot_.isEmpty()) {
-        qWarning() << "[Compare] root path not set" << currentLeftRoot_ << currentRightRoot_;
-        return;
-    }
-
-    // full path 조립
-    const QString leftFullPath  = QDir(currentLeftRoot_).filePath(leftFileName);
-    const QString rightFullPath = QDir(currentRightRoot_).filePath(rightFileName);
-
-    // 로그/신호
-    emit uiCompareClicked(leftFullPath, rightFullPath);
-
-    // 좌/우 에디터 로딩
-    loadFileIntoEditor(leftFullPath, /*isLeft=*/true);
-    loadFileIntoEditor(rightFullPath, /*isLeft=*/false);
-
-    // 임시 diff
-    fetchCompareFromApiDummy(leftFullPath, rightFullPath);
-}
-
-// 실제 로컬 디렉토리를 스캔해서 현재 콤보박스 갱신용으로 넘겨주는 헬퍼
-void ComparePage::loadLocalFolder(const QString &side, const QString &path)
-{
-    // path 안의 파일 목록 가져오기
-    QDir dir(path);
-
-    // 안전장치: 폴더가 유효하지 않으면 그냥 리턴
-    if (!dir.exists()) {
-        qWarning() << "[ComparePage] Directory does not exist:" << path;
-        return;
-    }
-
-    // 폴더 내부의 "파일들"만 뽑자 (지금은 1차 버전: 재귀 안 하고 바로 아래 것만)
-    // 추후에는 YAML, SRL 등 필터링 가능
-    QStringList   fileNames;
-    QFileInfoList entries = dir.entryInfoList(QDir::Files | QDir::NoDotAndDotDot);
-
-    for (const QFileInfo &info : entries) {
-        fileNames << info.fileName();
-    }
-
-    // 서브폴더 목록도 원하면 뽑을 수 있어 (지금은 UI 왼쪽 탭쪽에 붙일 예정)
-    QStringList   folderNames;
-    QFileInfoList subdirs = dir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot);
-    for (const QFileInfo &info : subdirs) {
-        folderNames << info.fileName();
-    }
-
-    // 기존 updateFolderListing() 재사용해서
-    // - currentLeftRoot_ / currentRightRoot_ 갱신
-    // - leftFileSelect_ / rightFileSelect_ 갱신
-    updateFolderListing(side, path, folderNames, fileNames);
-
-    refreshTreeView(side, path);
-}
-
-void ComparePage::loadRightText(const QString &path)
-{
-    QFile f(path);
-    if (f.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        QTextStream   in(&f);
-        const QString content = in.readAll();
-        f.close();
-        if (rightText_)
-            rightText_->setPlainText(content);
+    
+    try {
+        if (fileType == "yaml") {
+            // YAML diff 결과 파싱
+            if (result.isMember("changes") && result["changes"].isArray()) {
+                const Json::Value &changes = result["changes"];
+                
+                for (Json::ArrayIndex i = 0; i < changes.size(); ++i) {
+                    const Json::Value &change = changes[i];
+                    
+                    DiffRow row;
+                    
+                    // 라인 번호 추출 (oldLineNumber 또는 newLineNumber)
+                    row.line = -1;
+                    if (change.isMember("oldLineNumber") && !change["oldLineNumber"].isNull()) {
+                        row.line = change["oldLineNumber"].asInt();
+                    } else if (change.isMember("newLineNumber") && !change["newLineNumber"].isNull()) {
+                        row.line = change["newLineNumber"].asInt();
+                    }
+                    
+                    // path 추출
+                    if (change.isMember("path")) {
+                        row.key = QString::fromStdString(change["path"].asString());
+                    }
+                    
+                    // oldValue (right - base)
+                    if (change.isMember("oldValue") && !change["oldValue"].isNull()) {
+                        Json::StreamWriterBuilder builder;
+                        builder["indentation"] = "";
+                        row.origin = QString::fromStdString(Json::writeString(builder, change["oldValue"]));
+                        // JSON 따옴표 제거
+                        if (row.origin.startsWith('"') && row.origin.endsWith('"')) {
+                            row.origin = row.origin.mid(1, row.origin.length() - 2);
+                        }
+                    }
+                    
+                    // newValue (left - compare)
+                    if (change.isMember("newValue") && !change["newValue"].isNull()) {
+                        Json::StreamWriterBuilder builder;
+                        builder["indentation"] = "";
+                        row.target = QString::fromStdString(Json::writeString(builder, change["newValue"]));
+                        // JSON 따옴표 제거
+                        if (row.target.startsWith('"') && row.target.endsWith('"')) {
+                            row.target = row.target.mid(1, row.target.length() - 2);
+                        }
+                    }
+                    
+                    // type을 state로 변환
+                    if (change.isMember("type")) {
+                        std::string type = change["type"].asString();
+                        if (type == "added") {
+                            row.state = "ADDED";
+                        } else if (type == "removed") {
+                            row.state = "REMOVED";
+                        } else if (type == "modified") {
+                            row.state = "CHANGED";
+                        } else {
+                            row.state = "SAME";
+                        }
+                    }
+                    
+                    rows.append(row);
+                }
+                
+                // 라인 번호로 정렬
+                std::sort(rows.begin(), rows.end(), [](const DiffRow &a, const DiffRow &b) {
+                    return a.line < b.line;
+                });
+            }
+        } else if (fileType == "python") {
+            // Python diff 결과 파싱
+            if (result.isMember("changes") && result["changes"].isArray()) {
+                const Json::Value &changes = result["changes"];
+                
+                for (Json::ArrayIndex i = 0; i < changes.size(); ++i) {
+                    const Json::Value &change = changes[i];
+                    
+                    DiffRow row;
+                    
+                    // baseLineNumber 또는 compareLineNumber를 Line과 Key로 사용
+                    row.line = -1;
+                    if (change.isMember("baseLineNumber") && !change["baseLineNumber"].isNull()) {
+                        row.line = change["baseLineNumber"].asInt();
+                        row.key = QString::number(row.line);
+                    } else if (change.isMember("compareLineNumber") && !change["compareLineNumber"].isNull()) {
+                        row.line = change["compareLineNumber"].asInt();
+                        row.key = QString::number(row.line);
+                    } else {
+                        row.line = i + 1;
+                        row.key = QString::number(row.line);
+                    }
+                    
+                    // baseValue (right - base)
+                    if (change.isMember("baseValue") && !change["baseValue"].isNull()) {
+                        row.origin = QString::fromStdString(change["baseValue"].asString());
+                    }
+                    
+                    // compareValue (left - compare)
+                    if (change.isMember("compareValue") && !change["compareValue"].isNull()) {
+                        row.target = QString::fromStdString(change["compareValue"].asString());
+                    }
+                    
+                    // type을 state로 변환
+                    if (change.isMember("type")) {
+                        std::string type = change["type"].asString();
+                        if (type == "added") {
+                            row.state = "ADDED";
+                        } else if (type == "deleted") {
+                            row.state = "REMOVED";
+                        } else if (type == "modified") {
+                            row.state = "CHANGED";
     } else {
-        if (rightText_)
-            rightText_->setPlainText(tr("Failed to open: %1").arg(path));
-    }
-}
-
-void ComparePage::loadFileIntoEditor(const QString &fullPath, bool isLeft)
-{
-    QFile f(fullPath);
-    if (!f.open(QIODevice::ReadOnly | QIODevice::Text))
-        return;
-    QTextStream   ts(&f);
-    const QString content = ts.readAll();
-    f.close();
-
-    if (isLeft) {
-        // 좌측은 ModifyPage 영역. 필요하면 시그널로 위임하도록 변경 가능.
-        // 현재는 무시.
-        return;
+                            row.state = "SAME";
+                        }
+                    }
+                    
+                    rows.append(row);
+                }
+            }
+        } else if (fileType == "text") {
+            // Text diff 결과 파싱
+            if (result.isMember("changes") && result["changes"].isArray()) {
+                const Json::Value &changes = result["changes"];
+                
+                for (Json::ArrayIndex i = 0; i < changes.size(); ++i) {
+                    const Json::Value &change = changes[i];
+                    
+                    DiffRow row;
+                    
+                    // lineNumber를 Line과 Key로 사용
+                    row.line = -1;
+                    if (change.isMember("lineNumber")) {
+                        row.line = change["lineNumber"].asInt();
+                        row.key = QString::number(row.line);
+                    }
+                    
+                    // oldLine (right - base)
+                    if (change.isMember("oldLine")) {
+                        row.origin = QString::fromStdString(change["oldLine"].asString());
+                    }
+                    
+                    // newLine (left - compare)
+                    if (change.isMember("newLine")) {
+                        row.target = QString::fromStdString(change["newLine"].asString());
+                    }
+                    
+                    // type을 state로 변환
+                    if (change.isMember("type")) {
+                        std::string type = change["type"].asString();
+                        if (type == "added") {
+                            row.state = "ADDED";
+                        } else if (type == "removed") {
+                            row.state = "REMOVED";
+                        } else if (type == "modified") {
+                            row.state = "CHANGED";
     } else {
-        if (rightText_)
-            rightText_->setPlainText(content);
+                            row.state = "SAME";
+                        }
+                    }
+                    
+                    rows.append(row);
+                }
+            }
+        }
+        
+    } catch (const std::exception &e) {
+        qWarning() << "Parse diff result error:" << e.what();
+        DiffRow errorRow;
+        errorRow.key    = "Error";
+        errorRow.origin = QString::fromUtf8(e.what());
+        errorRow.target = "";
+        errorRow.state  = "ERROR";
+        rows.append(errorRow);
     }
-}
-// ----- 선언만 있던 슬롯/헬퍼의 최소 구현 -----
-void ComparePage::onOpenLeftFolderClicked()
-{ /* TODO: hook later */
-}
-void ComparePage::onOpenRightFolderClicked()
-{ /* TODO: hook later */
-}
-void ComparePage::onLeftTreeDoubleClicked(const QModelIndex &)
-{ /* TODO */
-}
-void ComparePage::onRightTreeDoubleClicked(const QModelIndex &)
-{ /* TODO */
-}
-void ComparePage::refreshTreeView(const QString &side, const QString &path)
-{
-    Q_UNUSED(side);
-    Q_UNUSED(path);
+    
+    return rows;
 }
 
-void ComparePage::updateFolderListing(const QString &side,
-                                      const QString &basePath,
-                                      const QStringList & /*folders*/,
-                                      const QStringList & /*files*/)
+// ========================================
+// 필터 기능 구현
+// ========================================
+
+void ComparePage::applyFilter(const QString &filterType)
 {
-    if (side == "left")
-        currentLeftRoot_ = basePath;
-    else
-        currentRightRoot_ = basePath;
-    // fileInfoLabel_ 제거됨
+    currentFilter_ = filterType;
+    
+    // 전체 데이터에 필터 적용
+    QList<DiffRow> filteredRows = filterRows(allDiffRows_, filterType);
+    refreshDiffTable(filteredRows);
+}
+
+QList<ComparePage::DiffRow> ComparePage::filterRows(const QList<DiffRow> &rows, 
+                                                     const QString &filterType) const
+{
+    if (filterType == "All") {
+        return rows;
+    }
+    
+    QList<DiffRow> filtered;
+    
+    for (const auto &row : rows) {
+        if (filterType == "Added" && row.state == "ADDED") {
+            filtered.append(row);
+        } else if (filterType == "Removed" && row.state == "REMOVED") {
+            filtered.append(row);
+        } else if (filterType == "Changed" && row.state == "CHANGED") {
+            filtered.append(row);
+        }
+    }
+    
+    return filtered;
 }

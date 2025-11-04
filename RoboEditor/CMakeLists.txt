@@ -13,8 +13,37 @@ find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets LinguistTools)
 find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets LinguistTools)
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Network)
 
+include(FetchContent)
+FetchContent_Declare(
+    yaml-cpp
+    GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
+    GIT_TAG    0.8.0
+)
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+FetchContent_MakeAvailable(yaml-cpp)
+
+FetchContent_Declare(
+    libarchive
+    GIT_REPOSITORY https://github.com/libarchive/libarchive.git
+    GIT_TAG        v3.7.4 # 안정적인 최신 태그
+)
+# libarchive가 zlib 등 다른 라이브러리를 찾지 못하도록 옵션을 켭니다.
+set(ENABLE_TEST OFF CACHE BOOL "")
+set(ENABLE_ZLIB OFF CACHE BOOL "")
+set(ENABLE_BZIP2 OFF CACHE BOOL "")
+set(ENABLE_LZMA OFF CACHE BOOL "")
+set(ENABLE_ZSTD OFF CACHE BOOL "")
+set(ENABLE_ICONV OFF CACHE BOOL "")
+set(ENABLE_CNG OFF CACHE BOOL "")
+FetchContent_MakeAvailable(libarchive)
+
 # jsoncpp
+set(JSONCPP_WITH_TESTS OFF CACHE BOOL "Disable jsoncpp tests")
 add_subdirectory(external/jsoncpp)
+
+set_target_properties(jsoncpp_static PROPERTIES
+    CXX_STANDARD ${CMAKE_CXX_STANDARD}
+)
 
 # libbcrypt
 add_subdirectory(external/libbcrypt)
@@ -29,10 +58,8 @@ set(TS_FILES RoboEditor_ko_KR.ts)
 set(PROJECT_SOURCES
         src/main.cpp
         src/app/BackupPage.cpp
-        src/app/OpenFilePage.cpp
         src/app/CenterStack.cpp
         src/app/ComparePage.cpp
-        src/app/DropTextEdit.cpp
         src/app/LogManager.cpp
         src/app/mainwindow.cpp
         src/app/NavDock.cpp
@@ -40,15 +67,13 @@ set(PROJECT_SOURCES
         src/app/ApplyPage.cpp
         src/app/ConfirmSelection.cpp
         src/app/ModifyPage.cpp
-        src/app/PasswordManager.cpp
+
         src/app/SelectController.cpp
         src/app/SelectStorage.cpp
 
         src/app/BackupPage.h
-        src/app/OpenFilePage.h
         src/app/CenterStack.h
         src/app/ComparePage.h
-        src/app/DropTextEdit.h
         src/app/LogManager.h
         src/app/mainwindow.h
         src/app/NavDock.h
@@ -56,9 +81,24 @@ set(PROJECT_SOURCES
         src/app/ApplyPage.h
         src/app/ConfirmSelection.h
         src/app/ModifyPage.h
-        src/app/PasswordManager.h
         src/app/SelectController.h
         src/app/SelectStorage.h
+
+        src/core/ApiClient.cpp
+        src/core/ApiClient.h
+        src/core/ControllerManager.cpp
+        src/core/ControllerManager.h
+        src/core/ControllerSetting.cpp
+        src/core/ControllerSetting.h
+        src/core/DropTextEdit.cpp
+        src/core/DropTextEdit.h
+        src/core/PasswordManager.cpp
+        src/core/PasswordManager.h
+        src/core/SftpClient.cpp
+        src/core/SftpClient.h
+        src/core/ShortcutManager.cpp
+        src/core/ShortcutManager.h
+
 
         # Core Controllers
         src/core/controllers/ControllerHelper.h
@@ -112,27 +152,21 @@ set(PROJECT_SOURCES
         src/ui/confirmselection.ui
         src/ui/ModifyPage.ui
         src/ui/PasswordInput.ui
-        src/ui/wrongpassword.ui
-
         ${TS_FILES}
 )
 
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
     find_package(Qt6 REQUIRED COMPONENTS Widgets)
-find_package(Qt6 REQUIRED COMPONENTS Widgets)
 
     qt_add_executable(RoboEditor
         MANUAL_FINALIZATION
         ${PROJECT_SOURCES}
-        src/app/ControllerManager.h src/app/ControllerManager.cpp
         src/app/CodeEditor.cpp
         src/app/CodeEditor.h
-        src/app/ShortcutManager.h src/app/ShortcutManager.cpp
         src/ui/BackupPage.ui
-        src/app/ControllerSetting.h src/app/ControllerSetting.cpp
+
         src/ui/ControllerSettings.ui
 
-        # src/app/OpenFilePage.h src/app/OpenFilePage.cpp
     )
 # Define target properties for Android with Qt 6 as:
 #    set_property(TARGET RoboEditor APPEND PROPERTY QT_ANDROID_PACKAGE_SOURCE_DIR
@@ -156,8 +190,11 @@ else()
     qt5_create_translation(QM_FILES ${CMAKE_SOURCE_DIR} ${TS_FILES})
 endif()
 
+target_include_directories(RoboEditor PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/app
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/core
+)
 target_link_libraries(RoboEditor PRIVATE Qt${QT_VERSION_MAJOR}::Widgets)
-target_link_libraries(RoboEditor PRIVATE Qt6::Widgets)
 target_link_libraries(RoboEditor PRIVATE Qt6::Widgets)
 target_link_libraries(RoboEditor PRIVATE Qt6::Network)
 
@@ -168,7 +205,7 @@ target_link_libraries(RoboEditor PRIVATE jsoncpp_static)
 target_link_libraries(RoboEditor PRIVATE bcrypt)
 
 # libarchive (for WorkspaceService)
-target_link_libraries(RoboEditor PRIVATE archive)
+target_link_libraries(RoboEditor PRIVATE archive_static)
 
 # yaml-cpp (for DiffYaml)
 target_link_libraries(RoboEditor PRIVATE yaml-cpp)
