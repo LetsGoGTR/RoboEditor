@@ -48,6 +48,11 @@
 		background: #fff;
 	}
 
+	ul > li > hr {
+		margin: 2px 0;
+		padding: 0;
+	}
+
 	/* 드롭다운 숨김 */
 	.dropdown {
 		display: none;

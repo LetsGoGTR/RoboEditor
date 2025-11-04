@@ -1,5 +1,6 @@
 import { defineConfig } from 'vitest/config';
 import { sveltekit } from '@sveltejs/kit/vite';
+import path from 'path';
 
 export default defineConfig({
 	plugins: [sveltekit()],
@@ -31,5 +32,14 @@ export default defineConfig({
 				}
 			}
 		]
+	},
+	resolve: {
+		alias: {
+			'@': path.resolve(__dirname, './src'),
+			'@components': path.resolve(__dirname, './src/lib/components'),
+			'@utils': path.resolve(__dirname, './src/lib/utils'),
+			'@routes': path.resolve(__dirname, './src/routes'),
+			'@styles': path.resolve(__dirname, './src/styles')
+		}
 	}
 });
