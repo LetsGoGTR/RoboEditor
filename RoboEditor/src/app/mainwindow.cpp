@@ -71,8 +71,6 @@ void MainWindow::wire()
     }
     // 상단 Nav UI 전환 연결
     connect(nav_.get(), &NavDock::clickCompare, center_.get(), &CenterStack::showModifyWithCompare);
-    connect(nav_.get(), &NavDock::clickOpenFile, this, [=] { center_->showOpenFile(); });
-    connect(nav_.get(), &NavDock::clickModify, this, [=] { center_->showModify(); });
 
     // Nav 기능 -> Pop-up
     connect(nav_.get(), &NavDock::clickApply, this, [this]() {

@@ -15,7 +15,7 @@ namespace fs = std::filesystem;
 
 
 const std::vector<std::string> services::DiffService::supportedFormats_ = {
-        ".yaml", ".yml", ".srl", ".py", ".txt", ".log", ".cfg", ".conf", ".ini", ".md", ".json"};
+        ".yaml", ".yml", ".srl", ".py", ".txt", ".log", ".cfg", ".conf", ".ini", ".md", ".json", ".sbp", ".pts"};
 
 
 std::string services::DiffService::detectFileType(const std::string &fileName)
@@ -27,9 +27,9 @@ std::string services::DiffService::detectFileType(const std::string &fileName)
     std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
 
 
-    if (ext == ".yaml" || ext == ".yml") {
+    if (ext == ".yaml" || ext == ".yml" || ext == ".pts") {
         return "yaml";
-    } else if (ext == ".srl" || ext == ".py") {
+    } else if (ext == ".srl" || ext == ".py" || ext == ".sbp") {
         return "python";
     } else {
         // Default to text-based diff for other formats
