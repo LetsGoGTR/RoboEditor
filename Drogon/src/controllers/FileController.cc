@@ -11,7 +11,7 @@ using utils::config::getBaseDir;
 void api::v1::File::fileRead(const drogon::HttpRequestPtr                          &req,
                              std::function<void(const drogon::HttpResponsePtr &)> &&callback)
 {
-    auto path = getBaseDir() + req->getParameter("path");
+    auto path = req->getParameter("path");
 
     if (path.empty()) {
         return sendError(callback, drogon::k400BadRequest, "Missing 'path' query parameter");
@@ -31,7 +31,7 @@ void api::v1::File::fileRead(const drogon::HttpRequestPtr                       
 void api::v1::File::fileCreate(const drogon::HttpRequestPtr                          &req,
                                std::function<void(const drogon::HttpResponsePtr &)> &&callback)
 {
-    auto path = getBaseDir() + req->getParameter("path");
+    auto path = req->getParameter("path");
 
     if (path.empty()) {
         return sendError(callback, drogon::k400BadRequest, "Missing 'path' query parameter");
@@ -59,7 +59,7 @@ void api::v1::File::fileCreate(const drogon::HttpRequestPtr                     
 void api::v1::File::fileUpdate(const drogon::HttpRequestPtr                          &req,
                                std::function<void(const drogon::HttpResponsePtr &)> &&callback)
 {
-    auto path = getBaseDir() + req->getParameter("path");
+    auto path = req->getParameter("path");
 
     if (path.empty()) {
         return sendError(callback, drogon::k400BadRequest, "Missing 'path' query parameter");
@@ -83,7 +83,7 @@ void api::v1::File::fileUpdate(const drogon::HttpRequestPtr                     
 
     // Move file if newPath is provided
     if (hasNewPath) {
-        std::string newPath = getBaseDir() + (*json)["newPath"].asString();
+        std::string newPath = (*json)["newPath"].asString();
         result              = services::FileService::moveFile(currentPath, newPath);
 
         if (!result.success) {
@@ -119,7 +119,7 @@ void api::v1::File::fileUpdate(const drogon::HttpRequestPtr                     
 void api::v1::File::fileDelete(const drogon::HttpRequestPtr                          &req,
                                std::function<void(const drogon::HttpResponsePtr &)> &&callback)
 {
-    auto path = getBaseDir() + req->getParameter("path");
+    auto path = req->getParameter("path");
 
     if (path.empty()) {
         return sendError(callback, drogon::k400BadRequest, "Missing 'path' query parameter");
