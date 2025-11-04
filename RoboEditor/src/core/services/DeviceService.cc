@@ -1,14 +1,14 @@
 #include "DeviceService.h"
 
-#include "../utils/JsonFileUtils.h"
-#include "../utils/TimeUtils.h"
-#include "../utils/logging/Logger.h"
-
 #include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <sstream>
+
+#include "../utils/JsonFileUtils.h"
+#include "../utils/TimeUtils.h"
+#include "../utils/logging/Logger.h"
 
 namespace fs = std::filesystem;
 
@@ -52,8 +52,8 @@ services::DeviceMetadata services::DeviceService::loadMetadata(const std::string
     return utils::loadJsonFromFile<DeviceMetadata>(metadataPath);
 }
 
-services::ServiceResult
-services::DeviceService::createDevice(const std::string &baseDir, const DeviceMetadata &metadata)
+services::ServiceResult services::DeviceService::createDevice(const std::string    &baseDir,
+                                                              const DeviceMetadata &metadata)
 {
     // Validation
     if (metadata.id.empty()) {
@@ -99,7 +99,7 @@ services::DeviceService::createDevice(const std::string &baseDir, const DeviceMe
 }
 
 services::ServiceResult services::DeviceService::readDevice(const std::string &baseDir,
-                                                                    const std::string &deviceId)
+                                                            const std::string &deviceId)
 {
     std::string devicePath = baseDir + deviceId;
 
@@ -121,8 +121,9 @@ services::ServiceResult services::DeviceService::readDevice(const std::string &b
     return result;
 }
 
-services::ServiceResult services::DeviceService::updateDevice(
-        const std::string &baseDir, const std::string &deviceId, const DeviceMetadata &metadata)
+services::ServiceResult services::DeviceService::updateDevice(const std::string    &baseDir,
+                                                              const std::string    &deviceId,
+                                                              const DeviceMetadata &metadata)
 {
     std::string devicePath = baseDir + deviceId;
 
@@ -163,7 +164,7 @@ services::ServiceResult services::DeviceService::updateDevice(
 }
 
 services::ServiceResult services::DeviceService::deleteDevice(const std::string &baseDir,
-                                                                      const std::string &deviceId)
+                                                              const std::string &deviceId)
 {
     std::string devicePath = baseDir + deviceId;
 
@@ -197,7 +198,8 @@ services::ServiceResult services::DeviceService::listDevices(const std::string &
         try {
             fs::create_directories(baseDir);
         } catch (const std::exception &e) {
-            return ServiceResult::createError("Failed to create base directory: " + std::string(e.what()));
+            return ServiceResult::createError("Failed to create base directory: " +
+                                              std::string(e.what()));
         }
     }
 

@@ -1,9 +1,9 @@
 #include "FolderService.h"
 
+#include <filesystem>
+
 #include "../utils/PathValidator.h"
 #include "../utils/logging/Logger.h"
-
-#include <filesystem>
 
 namespace fs = std::filesystem;
 

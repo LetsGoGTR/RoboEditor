@@ -20,7 +20,6 @@
 #include "ComparePage.h"
 #include "ControllerManager.h"
 #include "ModifyPage.h"
-#include "OpenFilePage.h"
 
 static QIcon makeCircleIcon(const QColor &color, int size = 12)
 {
@@ -37,6 +36,7 @@ static QIcon makeCircleIcon(const QColor &color, int size = 12)
 
 CenterStack::CenterStack(QWidget *parent) :
     QWidget(parent),
+    m_pollingTimer(new QTimer(this)),
     splitter_(nullptr),
     treeTabWidget_(nullptr),
     controllerList_(nullptr),
@@ -49,11 +49,9 @@ CenterStack::CenterStack(QWidget *parent) :
 {
     stack_ = new QStackedWidget;
     cmp_   = new ComparePage;
-    ofp_   = new OpenFilePage;
     mfp_   = new ModifyPage;
 
     idxC_ = stack_->addWidget(cmp_);
-    idxO_ = stack_->addWidget(ofp_);
     idxM_ = stack_->addWidget(mfp_);
 
     // auto *layout = new QVBoxLayout(this);
@@ -64,10 +62,17 @@ CenterStack::CenterStack(QWidget *parent) :
         emit compareRequested(L, R);
         openCompareResult(L, R);
     });
-    connect(ofp_, &OpenFilePage::uiOpenFileClicked, this, &CenterStack::openFileRequested);
     connect(mfp_, &ModifyPage::uiModifyClicked, this, &CenterStack::modifyRequested);
 
+    connect(m_pollingTimer, &QTimer::timeout, this, &CenterStack::onPollingTimeout);
+
+    connect(ControllerManager::instance(),
+            &ControllerManager::controllerStateUpdated,
+            this,
+            &CenterStack::updateControllerList);
+
     setupUI();
+    startPolling(5000);
 }
 
 void CenterStack::openCompareResult(const QString &left, const QString &right)
@@ -83,11 +88,6 @@ void CenterStack::openCompareResult(const QString &left, const QString &right)
 void CenterStack::showCompare()
 {
     stack_->setCurrentIndex(idxC_);
-}
-
-void CenterStack::showOpenFile()
-{
-    stack_->setCurrentIndex(idxO_);
 }
 
 void CenterStack::showModify()
@@ -281,6 +281,7 @@ void CenterStack::setupUI()
 
     // [6] refresh버튼 클릭 -> 제어기 리스트 업데이트
     connect(refreshButton, &QToolButton::clicked, this, [=]() {
+        ControllerManager::instance()->updateControllersStates();
         this->updateControllerList();
         qDebug() << "[CenterStack] Controller list refreshed.";
     });
@@ -296,7 +297,7 @@ void CenterStack::updateControllerList()
     // 1. ControllerManager의 싱글톤 인스턴스 가져오기
     ControllerManager *manager = ControllerManager::instance();
 
-    // 2. controllers_ 리스트 가져오기 (thread-safe 스냅샷)
+    // 2. controllers_ 리스트 가져오기
     QList<ControllerInfo> controllers = manager->getControllers();
 
     // 3. 리스트가 비어있는 경우
@@ -307,35 +308,27 @@ void CenterStack::updateControllerList()
         return;
     }
 
-    // 4. 제어기별 항목 추가
+    // 4. 제어기 상태 표시
     for (const auto &c : controllers) {
         QStandardItem *item = new QStandardItem(c.serialNumber);
-
-        // 상태 색상 결정
-        QColor color;
-        if (!c.isConnected)
-            item->setForeground(QBrush(Qt::gray));
-        else {
-            item->setForeground(QBrush(Qt::black));
-            if (c.isRunning) {
-                color = Qt::red;
-            } else {
-                color = Qt::green;
-            }
-
-            item->setIcon(makeCircleIcon(color, 10));
-        }
-        item->setData(QString("C:/backup/%1").arg(c.serialNumber), Qt::UserRole + 1);
         item->setEditable(false);
+        item->setData(QString("C:/backup/%1").arg(c.serialNumber), Qt::UserRole + 1);
+        item->setToolTip(QString("IP: %1\nSFTP: %2\nAPI: %3\nUser: %4\nWorkspace: %5")
+                                 .arg(c.ip)
+                                 .arg(c.sftpPort)
+                                 .arg(c.apiPort)
+                                 .arg(c.username)
+                                 .arg(c.workspacePath));
 
-        // Tooltip에 상세 정보 표시
-        QString tip = QString("IP: %1\nSFTP: %2\nAPI: %3\nUser: %4\nWorkspace: %5")
-                              .arg(c.ip)
-                              .arg(c.sftpPort)
-                              .arg(c.apiPort)
-                              .arg(c.username)
-                              .arg(c.workspacePath);
-        item->setToolTip(tip);
+        QColor iconColor;
+        if (!c.isConnected) {
+            iconColor = Qt::gray;
+            item->setForeground(QBrush(Qt::gray));
+        } else {
+            iconColor = c.isRunning ? Qt::red : Qt::green;
+            item->setForeground(QBrush(Qt::black));
+        }
+        item->setIcon(makeCircleIcon(iconColor, 10));
 
         controllerModel_->appendRow(item);
     }
@@ -414,4 +407,36 @@ void CenterStack::onRemoveController(const QString &serialNumber)
         }
     }
 }
-CenterStack::~CenterStack() = default;
+void CenterStack::startPolling(int intervalMs)
+{
+    if (m_pollingTimer->isActive()) {
+        qWarning() << "[CenterStack] Polling already started";
+        return;
+    }
+
+    qDebug() << "[CenterStack] Starting polling with interval:" << intervalMs << "ms";
+
+    // 즉시 한 번 실행
+    updateControllerList();
+
+    // 주기적으로 실행
+    m_pollingTimer->start(intervalMs);
+}
+
+void CenterStack::stopPolling()
+{
+    if (m_pollingTimer->isActive()) {
+        m_pollingTimer->stop();
+        qDebug() << "[CenterStack] Polling stopped";
+    }
+}
+
+void CenterStack::onPollingTimeout()
+{
+    qDebug() << "timeout";
+    ControllerManager::instance()->updateControllersStates();
+}
+CenterStack::~CenterStack()
+{
+    stopPolling();
+}

@@ -1,12 +1,12 @@
 #pragma once
 
-#include "logging/Logger.h"
-
 #include <filesystem>
 #include <fstream>
 #include <json/json.h>
 #include <string>
 #include <type_traits>
+
+#include "logging/Logger.h"
 
 namespace utils
 {
