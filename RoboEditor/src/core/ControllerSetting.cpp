@@ -14,7 +14,7 @@ ControllerSetting::ControllerSetting(QWidget *parent) :
     connect(ui->CancelBtn, &QPushButton::clicked, this, &ControllerSetting::onRejectBtn);
 
     ui->WPBox->setText("/home/samsung/workspace");
-    ui->apiBox->setText("8080");
+    ui->apiBox->setText("80");
     ui->sftpSpinBox->setValue(22);
 }
 

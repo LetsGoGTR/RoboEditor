@@ -14,7 +14,7 @@
 #include <QVBoxLayout>
 
 #include "ApplyPage.h"
-#include "ui_confirmselection.h"
+#include "ui_ConfirmSelection.h"
 
 ConfirmSelection::ConfirmSelection(QWidget *parent) :
     QDialog(parent),

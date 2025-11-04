@@ -12,10 +12,10 @@ class ShortcutManager : public QObject
         void registerTo(QWidget * widget);
 
       signals:
-        void openRequested();
-        void saveRequested();
-        void saveAsRequested();
-        void closeRequested();
+        void openRequested();    //수정     : backup폴더부터 시작, modifypage_와 연동
+        void saveRequested();    //예외처리  : 안열려있으면  Qmessage
+        void saveAsRequested();  //예외처리  : 안열려있으면  Qmessage
+        void closeRequested();   //modifypage_와 연동
         void quitRequested();
 
       private:
