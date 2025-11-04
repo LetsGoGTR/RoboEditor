@@ -1,2 +1,10 @@
-<h1>Welcome to SvelteKit</h1>
-<p>Visit <a href="https://svelte.dev/docs/kit">svelte.dev/docs/kit</a> to read the documentation</p>
+<script lang="ts">
+	import Header from '../lib/components/Header.svelte';
+	import MenuBar from '../lib/components/MenuBar.svelte';
+</script>
+
+<Header />
+<MenuBar />
+
+<style>
+</style>
