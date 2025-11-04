@@ -45,6 +45,9 @@ class selectcontroller : public QWidget
 
         QVector<cstate>      controllerState;
         QVector<QCheckBox *> checkBoxes;
+
+      signals:
+        void controllerSelectionChanged();
 };
 
 #endif  // SELECTCONTROLLER_H

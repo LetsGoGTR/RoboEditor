@@ -1,5 +1,7 @@
 #include "SelectController.h"
 
+#include <QTableWidget>
+
 #include <QDebug>
 
 selectcontroller::selectcontroller(QWidget *parent) :
@@ -152,8 +154,13 @@ void selectcontroller::updateTable()
 
         table->setIndexWidget(model->index(row, 2), container);
         checkBoxes.append(checkBox);
+
+        connect(checkBox, &QCheckBox::stateChanged, this, [this]() {
+            emit controllerSelectionChanged();
+        });
     }
 }
+
 QVector<QString> selectcontroller::getSelectedControllers() const
 {
     QVector<QString> selected;
@@ -164,4 +171,5 @@ QVector<QString> selectcontroller::getSelectedControllers() const
     }
     return selected;
 }
+
 selectcontroller::~selectcontroller() {}

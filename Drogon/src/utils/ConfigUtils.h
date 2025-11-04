@@ -1,7 +1,10 @@
 #pragma once
 
 #include <drogon/HttpAppFramework.h>
+#include <json/json.h>
 #include <string>
+
+#include "logging/Logger.h"
 
 namespace utils
 {
@@ -41,21 +44,23 @@ namespace utils
 
                 if (!customConfig.isMember("auth") ||
                     !customConfig["auth"].isMember("device_password_hash")) {
-                    LOG_ERROR << "Missing auth.device_password_hash in config.json custom_config";
+                    utils::logging::error(
+                            "Missing auth.device_password_hash in config.json custom_config");
                     return "";
                 }
 
                 std::string hash = customConfig["auth"]["device_password_hash"].asString();
 
                 if (hash.empty()) {
-                    LOG_ERROR << "device_password_hash is empty in config.json";
+                    utils::logging::error("device_password_hash is empty in config.json");
                     return "";
                 }
 
                 return hash;
 
             } catch (const std::exception &e) {
-                LOG_ERROR << "Failed to load password hash from config: " << e.what();
+                utils::logging::error("Failed to load password hash from config: " +
+                                      std::string(e.what()));
                 return "";
             }
         }
