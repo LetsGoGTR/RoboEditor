@@ -1,15 +1,15 @@
 <script lang="ts">
-	import { dummyDeepTree } from '@/testData';
-	import DirectoryTree from '@components/DirectoryTree.svelte';
-	import Header from '@components/Header.svelte';
-	import MenuBar from '@components/MenuBar.svelte';
+	import Header from '@routes/Header.svelte';
+	import MenuBar from '@routes/MenuBar.svelte';
+	import WorkspaceSection from './WorkspaceSection.svelte';
+	import HorizontalSplit from '@layouts/HorizontalSplit.svelte';
 </script>
 
 <Header />
 <MenuBar />
-<main>
-  <DirectoryTree root={dummyDeepTree} />
-</main>
+<HorizontalSplit>
+	<WorkspaceSection slot="left" />
+</HorizontalSplit>
 
 <style>
 </style>
