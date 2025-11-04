@@ -71,7 +71,7 @@ class ControllerManager : public QObject
 
         QString                    configFilePath_;
         QList<ControllerInfo>      controllers_;
-        QMap<QString, ApiClient *> apiClients_;  // serialNumber -> ApiClient
+        QMap<QString, ApiClient *> apiClients_;
         mutable QMutex             mutex_;
 };
 

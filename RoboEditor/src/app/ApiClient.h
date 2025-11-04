@@ -26,10 +26,12 @@ class ApiClient : public QObject
         void get(const QString &endpoint);
         void post(const QString &endpoint, const QJsonObject &data);
 
-        //polling   :   5초, 5초마다 상태 확인
-        void checkRobotRunning();
-        void startPolling(int intervalMs = 5000);
-        void stopPolling();
+        void           checkRobotRunning();
+        static QString normalizeBaseUrl(const QString &baseUrl);
+        QString        getBaseUrl() const
+        {
+            return m_baseUrl;
+        }
 
       signals:
         void robotStateChanged(bool isRunning);  //로봇의 상태가 변화했을 때 신호
@@ -41,7 +43,6 @@ class ApiClient : public QObject
 
       private slots:
         void onFinished(QNetworkReply * reply);
-        void onPollingTimeout();
 
       private:
         QNetworkRequest createRequest(const QString &endpoint);
@@ -49,7 +50,6 @@ class ApiClient : public QObject
 
         QNetworkAccessManager *m_manager;
         QString                m_baseUrl;
-        QTimer                *m_pollingTimer;
         bool                   m_robotRunning;
 
         // 메모리 최적화: 재사용 가능한 객체들

@@ -6,22 +6,60 @@
 ApiClient::ApiClient(const QString &baseUrl, QObject *parent) :
     QObject(parent),
     m_manager(new QNetworkAccessManager(this)),
-    m_baseUrl(baseUrl),
-    m_pollingTimer(new QTimer(this)),
+    m_baseUrl(normalizeBaseUrl(baseUrl)),
     m_robotRunning(false)
 {
     // QNetworkAccessManager finished 시그널 연결
     connect(m_manager, &QNetworkAccessManager::finished, this, &ApiClient::onFinished);
 
-    // 폴링 타이머 연결
-    connect(m_pollingTimer, &QTimer::timeout, this, &ApiClient::onPollingTimeout);
-
     qDebug() << "[ApiClient] Initialized with base URL:" << m_baseUrl;
 }
 
-ApiClient::~ApiClient()
+ApiClient::~ApiClient() {}
+// url 정규화, ip:port또는도메인
+QString ApiClient::normalizeBaseUrl(const QString &baseUrl)
 {
-    stopPolling();
+    QString input = baseUrl.trimmed();
+    QUrl    url;
+
+    // 이미 스킴이 있는 경우
+    if (input.startsWith("http://") || input.startsWith("https://")) {
+        url = QUrl(input);
+    }
+    // 스킴이 없는 경우 http 기본값
+    else {
+        url = QUrl("http://" + input);
+    }
+
+    // URL이 유효하지 않으면 원본 반환
+    if (!url.isValid() || url.host().isEmpty()) {
+        qWarning() << "[normalizeBaseUrl] Invalid URL:" << input;
+        return input;
+    }
+
+    // 포트 처리
+    int     port   = url.port();
+    QString scheme = url.scheme();
+
+    // 포트가 명시되지 않은 경우 스킴 기본 포트 사용
+    if (port == -1) {
+        if (scheme == "https") {
+            port = 443;
+        } else {
+            port = 80;
+        }
+    }
+
+    // 표준 포트는 생략
+    QString result;
+    if ((scheme == "http" && port == 80) || (scheme == "https" && port == 443)) {
+        result = QString("%1://%2").arg(scheme).arg(url.host());
+    } else {
+        result = QString("%1://%2:%3").arg(scheme).arg(url.host()).arg(port);
+    }
+
+    qDebug() << "[normalizeBaseUrl]" << input << "->" << result;
+    return result;
 }
 
 //요청 만들기, 도메인 + 엔드포인트 url 반환
@@ -90,36 +128,6 @@ void ApiClient::post(const QString &endpoint, const QJsonObject &data)
     reply->setProperty("method", "POST");
 
     qDebug() << "[ApiClient] POST request sent to:" << endpoint;
-}
-
-void ApiClient::startPolling(int intervalMs)
-{
-    if (m_pollingTimer->isActive()) {
-        qWarning() << "[ApiClient] Polling already started";
-        return;
-    }
-
-    qDebug() << "[ApiClient] Starting polling with interval:" << intervalMs << "ms";
-
-    // 즉시 한 번 상태 확인
-    checkRobotRunning();
-
-    // 주기적 폴링 시작
-    m_pollingTimer->start(intervalMs);
-}
-
-void ApiClient::stopPolling()
-{
-    if (m_pollingTimer->isActive()) {
-        m_pollingTimer->stop();
-        qDebug() << "[ApiClient] Polling stopped";
-    }
-}
-
-void ApiClient::onPollingTimeout()
-{
-    // 타이머 주기마다 로봇 상태 확인
-    checkRobotRunning();
 }
 
 void ApiClient::onFinished(QNetworkReply *reply)

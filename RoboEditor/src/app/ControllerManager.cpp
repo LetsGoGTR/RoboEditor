@@ -25,7 +25,6 @@ ControllerManager::~ControllerManager()
     // ApiClient들 정리
     for (auto it = apiClients_.begin(); it != apiClients_.end(); ++it) {
         if (it.value()) {
-            it.value()->stopPolling();
             it.value()->deleteLater();
         }
     }
@@ -86,7 +85,6 @@ void ControllerManager::registerController()
 
         saveToFile();
 
-        // ApiClient 설정 (폴링 시작)
         setupApiClient(newConInfo.serialNumber);
 
         emit controllerListChanged();
@@ -170,7 +168,7 @@ void ControllerManager::updateInfo(const ControllerInfo &newInfo)
         saveToFile();
 
         cleanupApiClient(serialNumber);
-        QTimer::singleShot(50, this, [this, serialNumber]() { setupApiClient(serialNumber); });
+        setupApiClient(serialNumber);
 
         emit controllerListChanged();
     }
@@ -194,11 +192,11 @@ void ControllerManager::setupApiClient(const QString &serialNumber)
         return;
     }
 
-    QString    baseUrl = QString("http://%1:%2").arg(info.ip).arg(info.apiPort);
+    QString    baseUrl = QString("%1:%2").arg(info.ip).arg(info.apiPort);
     ApiClient *client  = new ApiClient(baseUrl, this);
 
     // serialNumber를 값으로 캡처
-    //값이 바뀌었을 때
+    //running 값이 바뀌었을 때
     connect(client, &ApiClient::robotStateChanged, this, [this, serialNumber](bool isRunning) {
         updateRunningState(serialNumber, isRunning);
     });
@@ -235,9 +233,6 @@ void ControllerManager::setupApiClient(const QString &serialNumber)
         apiClients_[serialNumber] = client;
     }
 
-    // 폴링 시작 (5초마다 자동으로 GET /api/robot/running 호출)
-    client->startPolling(5000);
-
     qDebug() << "[setupApiClient] ApiClient created and polling started for" << serialNumber;
 }
 
@@ -248,7 +243,6 @@ void ControllerManager::cleanupApiClient(const QString &serialNumber)
     if (apiClients_.contains(serialNumber)) {
         ApiClient *client = apiClients_.take(serialNumber);
         if (client) {
-            client->stopPolling();
             client->deleteLater();
             qDebug() << "[cleanupApiClient] ApiClient removed for" << serialNumber;
         }
@@ -258,21 +252,43 @@ void ControllerManager::cleanupApiClient(const QString &serialNumber)
 // 모든 제어기 상태 업데이트
 void ControllerManager::updateControllersStates()
 {
-    QMutexLocker locker(&mutex_);
+    QList<ControllerInfo>      controllersCopy;
+    QMap<QString, ApiClient *> clientsCopy;
 
-    for (const auto &c : controllers_) {
-        // 이미 ApiClient가 있으면 즉시 체크
-        if (apiClients_.contains(c.serialNumber)) {
-            ApiClient *client = apiClients_[c.serialNumber];
-            locker.unlock();
-            client->checkRobotRunning();
-            locker.relock();
-        } else {
-            // 없으면 새로 생성
-            locker.unlock();
+    {
+        QMutexLocker locker(&mutex_);
+        controllersCopy = controllers_;
+        clientsCopy     = apiClients_;
+    }
+
+    qDebug() << "[ControllerManager] Processing" << controllersCopy.size() << "controllers";
+
+    // mutex 없이 순회
+
+    for (const auto &c : controllersCopy) {
+        ApiClient *client = clientsCopy.value(c.serialNumber, nullptr);
+
+        // URL이 틀리거나, ApiClient가 없으면 재생성
+        if (!client) {
+            updateConnectionState(c.serialNumber, false);  // 즉시 끊김 표시
             setupApiClient(c.serialNumber);
-            locker.relock();
+            continue;
         }
+
+        QString inputUrl    = QString("%1:%2").arg(c.ip).arg(c.apiPort);
+        QString expectedUrl = ApiClient::normalizeBaseUrl(inputUrl);
+        QString currentUrl  = client->getBaseUrl();
+
+        if (currentUrl != expectedUrl) {
+            qDebug() << "[ControllerManager] URL mismatch for" << c.serialNumber;
+            updateConnectionState(c.serialNumber, false);  // 즉시 끊김 표시
+            cleanupApiClient(c.serialNumber);
+            setupApiClient(c.serialNumber);
+            continue;
+        }
+        updateConnectionState(c.serialNumber, false);
+
+        client->checkRobotRunning();
     }
 }
 
@@ -283,14 +299,12 @@ void ControllerManager::updateRunningState(const QString &serialNumber, bool run
 
     for (auto &c : controllers_) {
         if (c.serialNumber == serialNumber) {
-            if (c.isRunning != running) {
-                c.isRunning = running;
-                qDebug() << "[ControllerManager]" << serialNumber << "running state changed to"
-                         << (running ? "RUNNING" : "IDLE");
+            c.isRunning = running;
+            qDebug() << "[ControllerManager]" << serialNumber << "running state changed to"
+                     << (running ? "RUNNING" : "IDLE");
 
-                locker.unlock();
-                emit controllerStateUpdated(serialNumber, c.isConnected, c.isRunning);
-            }
+            locker.unlock();
+            emit controllerStateUpdated(serialNumber, c.isConnected, c.isRunning);
             return;
         }
     }
@@ -302,20 +316,18 @@ void ControllerManager::updateConnectionState(const QString &serialNumber, bool 
 
     for (auto &c : controllers_) {
         if (c.serialNumber == serialNumber) {
-            if (c.isConnected != connected) {
-                c.isConnected = connected;
+            c.isConnected = connected;
 
-                // 연결 끊기면 running도 false로
-                if (!connected) {
-                    c.isRunning = false;
-                }
-
-                qDebug() << "[ControllerManager]" << serialNumber << "connection state changed to"
-                         << (connected ? "CONNECTED" : "DISCONNECTED");
-
-                locker.unlock();
-                emit controllerStateUpdated(serialNumber, c.isConnected, c.isRunning);
+            // 연결 끊기면 running도 false로
+            if (!connected) {
+                c.isRunning = false;
             }
+
+            qDebug() << "[ControllerManager]" << serialNumber << "connection state changed to"
+                     << (connected ? "CONNECTED" : "DISCONNECTED");
+
+            locker.unlock();
+            emit controllerStateUpdated(serialNumber, c.isConnected, c.isRunning);
             return;
         }
     }

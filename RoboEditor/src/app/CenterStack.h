@@ -2,6 +2,7 @@
 #define CENTERSTACK_H
 
 #include <QTabWidget>
+#include <QTimer>
 #include <QTreeView>
 
 #include <QFileSystemModel>
@@ -10,6 +11,8 @@
 #include <QStackedWidget>
 #include <QStandardItemModel>
 #include <QWidget>
+
+#include "ControllerManager.h"
 
 // Forward declarations
 class QMainWindow;
@@ -32,7 +35,8 @@ class CenterStack : public QWidget
         void showModify();
         void showModifyWithCompare();
         void openCompareResult(const QString &left, const QString &right);
-
+        void startPolling(int intervalMs = 5000);
+        void stopPolling();
         // 페이지 접근자
         ModifyPage *modifyPage() const
         {
@@ -57,6 +61,7 @@ class CenterStack : public QWidget
 
       public slots:
         void updateControllerList();
+        void onPollingTimeout();
 
       private slots:
         void onControllerTreeClicked(const QModelIndex &index);
@@ -87,11 +92,15 @@ class CenterStack : public QWidget
         QFileSystemModel   *backupModel_;
         QFileSystemModel   *workspaceModel_;
 
-        ModifyPage *modifyPage_;
+        ModifyPage        *modifyPage_;
+        ControllerManager *controllerManager_;
 
         // 경로
         QString workspacePath_;
         QString backupRootPath_;
+
+        //타이머
+        QTimer *m_pollingTimer;
 };
 
 #endif  // CENTERSTACK_H

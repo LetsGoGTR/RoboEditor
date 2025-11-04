@@ -37,6 +37,7 @@ static QIcon makeCircleIcon(const QColor &color, int size = 12)
 
 CenterStack::CenterStack(QWidget *parent) :
     QWidget(parent),
+    m_pollingTimer(new QTimer(this)),
     splitter_(nullptr),
     treeTabWidget_(nullptr),
     controllerList_(nullptr),
@@ -67,7 +68,15 @@ CenterStack::CenterStack(QWidget *parent) :
     connect(ofp_, &OpenFilePage::uiOpenFileClicked, this, &CenterStack::openFileRequested);
     connect(mfp_, &ModifyPage::uiModifyClicked, this, &CenterStack::modifyRequested);
 
+    connect(m_pollingTimer, &QTimer::timeout, this, &CenterStack::onPollingTimeout);
+
+    connect(ControllerManager::instance(),
+            &ControllerManager::controllerStateUpdated,
+            this,
+            &CenterStack::updateControllerList);
+
     setupUI();
+    startPolling(5000);
 }
 
 void CenterStack::openCompareResult(const QString &left, const QString &right)
@@ -281,6 +290,7 @@ void CenterStack::setupUI()
 
     // [6] refresh버튼 클릭 -> 제어기 리스트 업데이트
     connect(refreshButton, &QToolButton::clicked, this, [=]() {
+        ControllerManager::instance()->updateControllersStates();
         this->updateControllerList();
         qDebug() << "[CenterStack] Controller list refreshed.";
     });
@@ -292,8 +302,6 @@ void CenterStack::updateControllerList()
 {
     controllerModel_->clear();
     controllerModel_->setHorizontalHeaderLabels({"Controller List"});
-
-    //각 제어기마다 get api 요청을 보내, runnig, connected 업데이트, api 도메인 주소는 제어기의 ip
 
     // 1. ControllerManager의 싱글톤 인스턴스 가져오기
     ControllerManager *manager = ControllerManager::instance();
@@ -309,7 +317,7 @@ void CenterStack::updateControllerList()
         return;
     }
 
-    // 4. 제어기별 항목 추가
+    // 4. 제어기 상태 표시
     for (const auto &c : controllers) {
         QStandardItem *item = new QStandardItem(c.serialNumber);
         item->setEditable(false);
@@ -320,34 +328,22 @@ void CenterStack::updateControllerList()
                                  .arg(c.apiPort)
                                  .arg(c.username)
                                  .arg(c.workspacePath));
+
+        QColor iconColor;
+        if (!c.isConnected) {
+            iconColor = Qt::gray;
+            item->setForeground(QBrush(Qt::gray));
+        } else {
+            iconColor = c.isRunning ? Qt::red : Qt::green;
+            item->setForeground(QBrush(Qt::black));
+        }
+        item->setIcon(makeCircleIcon(iconColor, 10));
+
         controllerModel_->appendRow(item);
     }
 
     controllerList_->setModel(controllerModel_);
     controllerList_->update();
-
-    // 5. 제어기 상태 표시
-    connect(manager,
-            &ControllerManager::controllerStateUpdated,
-            this,
-            [=](const QString &serial, bool connected, bool running) {
-                for (int i = 0; i < controllerModel_->rowCount(); ++i) {
-                    QStandardItem *item = controllerModel_->item(i);
-                    if (item->text() == serial) {
-                        QColor color;
-                        if (!connected)
-                            color = Qt::gray;
-                        else if (running)
-                            color = Qt::red;
-                        else
-                            color = Qt::green;
-
-                        item->setIcon(makeCircleIcon(color, 10));
-                        break;
-                    }
-                }
-                controllerList_->update();
-            });
 }
 
 QString CenterStack::getWorkspacePath() const
@@ -420,4 +416,36 @@ void CenterStack::onRemoveController(const QString &serialNumber)
         }
     }
 }
-CenterStack::~CenterStack() = default;
+void CenterStack::startPolling(int intervalMs)
+{
+    if (m_pollingTimer->isActive()) {
+        qWarning() << "[CenterStack] Polling already started";
+        return;
+    }
+
+    qDebug() << "[CenterStack] Starting polling with interval:" << intervalMs << "ms";
+
+    // 즉시 한 번 실행
+    updateControllerList();
+
+    // 주기적으로 실행
+    m_pollingTimer->start(intervalMs);
+}
+
+void CenterStack::stopPolling()
+{
+    if (m_pollingTimer->isActive()) {
+        m_pollingTimer->stop();
+        qDebug() << "[CenterStack] Polling stopped";
+    }
+}
+
+void CenterStack::onPollingTimeout()
+{
+    qDebug() << "timeout";
+    ControllerManager::instance()->updateControllersStates();
+}
+CenterStack::~CenterStack()
+{
+    stopPolling();
+}
