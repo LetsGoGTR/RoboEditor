@@ -60,6 +60,7 @@ aux_source_directory(src/services SERVICE_SRC)
 aux_source_directory(src/utils UTILS_SRC)
 aux_source_directory(src/utils/diff UTILS_DIFF_SRC)
 aux_source_directory(src/utils/logging UTILS_LOGGING_SRC)
+aux_source_directory(src/utils/robot UTILS_ROBOT_SRC)
 
 drogon_create_views(${PROJECT_NAME} ${CMAKE_CURRENT_SOURCE_DIR}/views
                     ${CMAKE_CURRENT_BINARY_DIR})
@@ -89,4 +90,5 @@ target_sources(${PROJECT_NAME}
                ${UTILS_SRC}
                ${UTILS_DIFF_SRC}
                ${UTILS_LOGGING_SRC}
+               ${UTILS_ROBOT_SRC}
 )

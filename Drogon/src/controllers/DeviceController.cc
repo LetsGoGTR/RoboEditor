@@ -8,7 +8,7 @@
 #include "../services/DeviceService.h"
 #include "../services/WorkspaceService.h"
 #include "../utils/ConfigUtils.h"
-#include "../utils/RobotHttpClient.h"
+#include "../utils/robot/RobotHttpClient.h"
 #include "../utils/TimeUtils.h"
 #include "ControllerHelper.h"
 

@@ -1,9 +1,9 @@
 #pragma once
 
-#include "logging/Logger.h"
-
 #include <filesystem>
 #include <string>
+
+#include "logging/Logger.h"
 
 namespace utils
 {
@@ -54,11 +54,6 @@ namespace utils
         }
     }
 
-    /**
-     * @brief Check if path exists and is a directory
-     * @param path Path to check
-     * @return true if path exists and is a directory
-     */
     inline bool isValidDirectory(const std::string &path)
     {
         try {
