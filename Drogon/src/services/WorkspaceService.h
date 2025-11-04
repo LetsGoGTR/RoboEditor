@@ -1,10 +1,10 @@
 #pragma once
 
-#include "ServiceResult.h"
-
 #include <json/json.h>
 #include <string>
 #include <vector>
+
+#include "ServiceResult.h"
 
 namespace services
 {
@@ -28,14 +28,21 @@ namespace services
         // Workspace CRUD operations
         static ServiceResult createWorkspace(const std::string       &baseDir,
                                              const WorkspaceMetadata &metadata);
-        static ServiceResult readWorkspace(const std::string &baseDir, const std::string &workspaceId);
+        static ServiceResult readWorkspace(const std::string &baseDir,
+                                           const std::string &workspaceId);
         static ServiceResult updateWorkspace(const std::string       &baseDir,
                                              const std::string       &workspaceId,
                                              const WorkspaceMetadata &metadata);
-        static ServiceResult deleteWorkspace(const std::string &baseDir, const std::string &workspaceId);
+        static ServiceResult deleteWorkspace(const std::string &baseDir,
+                                             const std::string &workspaceId);
+
+        static ServiceResult moveWorkspace(const std::string &baseDir,
+                                           const std::string &workspaceId,
+                                           const std::string &newWorkspaceId);
 
         // List all workspaces
-        static ServiceResult listWorkspaces(const std::string &baseDir, const std::string &deviceId = "");
+        static ServiceResult listWorkspaces(const std::string &baseDir,
+                                            const std::string &deviceId = "");
 
         // Extract archive to UUID-based directory and create metadata
         static ServiceResult importWorkspace(const std::string       &archivePath,

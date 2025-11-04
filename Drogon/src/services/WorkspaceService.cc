@@ -495,3 +495,63 @@ services::WorkspaceService::deleteWorkspace(const std::string &baseDir,
         return ServiceResult::createError("Delete failed: " + std::string(e.what()));
     }
 }
+
+services::ServiceResult
+services::WorkspaceService::moveWorkspace(const std::string &baseDir,
+                                          const std::string &workspaceId,
+                                          const std::string &newWorkspaceId)
+{
+    std::string oldPath = baseDir + workspaceId;
+    std::string newPath = baseDir + newWorkspaceId;
+
+    // Validate source workspace exists
+    if (!fs::exists(oldPath) || !fs::is_directory(oldPath)) {
+        return ServiceResult::createError("Source workspace not found: " + workspaceId);
+    }
+
+    // Validate destination doesn't exist
+    if (fs::exists(newPath)) {
+        return ServiceResult::createError("Destination workspace already exists: " + newWorkspaceId);
+    }
+
+    // Validate workspace IDs are different
+    if (workspaceId == newWorkspaceId) {
+        return ServiceResult::createError("Source and destination workspace IDs must be different");
+    }
+
+    try {
+        // Load metadata from old location
+        WorkspaceMetadata metadata = loadMetadata(oldPath);
+
+        // Move the workspace directory
+        fs::rename(oldPath, newPath);
+
+        // Update metadata with new ID and timestamp
+        metadata.id        = newWorkspaceId;
+        metadata.updatedAt = utils::getCurrentTimestamp();
+
+        // Save updated metadata to new location
+        std::string metadataPath = newPath + "/" + metadataFilename_;
+        if (!utils::writeJsonToFile(metadataPath, metadata.toJson())) {
+            // Rollback: move directory back
+            fs::rename(newPath, oldPath);
+            return ServiceResult::createError("Failed to update workspace metadata");
+        }
+
+        // Return success with both paths and updated metadata
+        ServiceResult result;
+        result.success         = true;
+        result.data["oldPath"] = oldPath;
+        result.data["newPath"] = newPath;
+        result.data["oldId"]   = workspaceId;
+        result.data["newId"]   = newWorkspaceId;
+        result.data["info"]    = metadata.toJson();
+
+        utils::logging::info("Successfully moved workspace from: " + workspaceId + " to: " +
+                             newWorkspaceId);
+        return result;
+
+    } catch (const std::exception &e) {
+        return ServiceResult::createError("Failed to move workspace: " + std::string(e.what()));
+    }
+}
