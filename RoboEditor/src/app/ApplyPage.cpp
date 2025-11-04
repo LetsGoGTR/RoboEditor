@@ -7,14 +7,9 @@
 #include "ConfirmSelection.h"
 #include "PasswordManager.h"
 #include "ui_ApplyPage.h"
-<<<<<<< HEAD
 #include "ui_ConfirmSelection.h"
-        =======
->>>>>>> origin/develop-qt
 
-        ApplyPage::ApplyPage(QWidget *parent) :
-    QWidget(parent),
-    ui(new Ui::ApplyPage)
+ApplyPage::ApplyPage(QWidget *parent) : QWidget(parent), ui(new Ui::ApplyPage)
 {
     ui->setupUi(this);
     selectbackupWidget     = new selectTableWidget(this);
