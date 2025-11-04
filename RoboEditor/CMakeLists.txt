@@ -12,6 +12,42 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets LinguistTools)
 find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets LinguistTools)
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Network)
+
+include(FetchContent)
+FetchContent_Declare(
+    yaml-cpp
+    GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
+    GIT_TAG    0.8.0
+)
+FetchContent_MakeAvailable(yaml-cpp)
+
+FetchContent_Declare(
+    libarchive
+    GIT_REPOSITORY https://github.com/libarchive/libarchive.git
+    GIT_TAG        v3.7.4 # 안정적인 최신 태그
+)
+# libarchive가 zlib 등 다른 라이브러리를 찾지 못하도록 옵션을 켭니다.
+set(ENABLE_TEST OFF CACHE BOOL "")
+set(ENABLE_ZLIB OFF CACHE BOOL "")
+set(ENABLE_BZIP2 OFF CACHE BOOL "")
+set(ENABLE_LZMA OFF CACHE BOOL "")
+set(ENABLE_ZSTD OFF CACHE BOOL "")
+set(ENABLE_ICONV OFF CACHE BOOL "")
+set(ENABLE_CNG OFF CACHE BOOL "")
+FetchContent_MakeAvailable(libarchive)
+
+# jsoncpp
+set(JSONCPP_WITH_TESTS OFF CACHE BOOL "Disable jsoncpp tests")
+add_subdirectory(external/jsoncpp)
+
+set_target_properties(jsoncpp_static PROPERTIES
+    CXX_STANDARD ${CMAKE_CXX_STANDARD}
+)
+
+# libbcrypt
+add_subdirectory(external/libbcrypt)
+include_directories(external/libbcrypt/include)
+
 set(CMAKE_AUTOUIC_SEARCH_PATHS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ui
 )
@@ -52,6 +88,53 @@ set(PROJECT_SOURCES
         src/app/SelectController.h
         src/app/SelectStorage.h
 
+        # Core Controllers
+        src/core/controllers/ControllerHelper.h
+        src/core/controllers/DeviceController.h
+        src/core/controllers/DeviceController.cc
+        src/core/controllers/FileController.h
+        src/core/controllers/FileController.cc
+        src/core/controllers/FolderController.h
+        src/core/controllers/FolderController.cc
+        src/core/controllers/WorkspaceController.h
+        src/core/controllers/WorkspaceController.cc
+        src/core/controllers/DiffController.h
+        src/core/controllers/DiffController.cc
+
+        # Core Services
+        src/core/services/ServiceResult.h
+        src/core/services/DeviceService.h
+        src/core/services/DeviceService.cc
+        src/core/services/FileService.h
+        src/core/services/FileService.cc
+        src/core/services/FolderService.h
+        src/core/services/FolderService.cc
+        src/core/services/WorkspaceService.h
+        src/core/services/WorkspaceService.cc
+        src/core/services/DiffService.h
+        src/core/services/DiffService.cc
+        src/core/services/AuthService.h
+        src/core/services/AuthService.cc
+
+        # Core Utils
+        src/core/utils/ConfigUtils.h
+        src/core/utils/TimeUtils.h
+        src/core/utils/PathValidator.h
+        src/core/utils/JsonFileUtils.h
+        src/core/utils/RobotHttpClient.h
+        src/core/utils/RobotHttpClient.cc
+        src/core/utils/logging/Logger.h
+        src/core/utils/logging/Logger.cc
+        src/core/utils/diff/DiffText.h
+        src/core/utils/diff/DiffText.cc
+        src/core/utils/diff/DiffPython.h
+        src/core/utils/diff/DiffPython.cc
+        src/core/utils/diff/DiffYaml.h
+        src/core/utils/diff/DiffYaml.cc
+        src/core/utils/diff/treediff.h
+        src/core/utils/diff/treediff.cpp
+        src/core/utils/diff/line-diff-v6+.cpp
+
         src/ui/mainwindow.ui
         src/ui/ApplyPage.ui
         src/ui/confirmselection.ui
@@ -64,7 +147,6 @@ set(PROJECT_SOURCES
 
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
     find_package(Qt6 REQUIRED COMPONENTS Widgets)
-find_package(Qt6 REQUIRED COMPONENTS Widgets)
 
     qt_add_executable(RoboEditor
         MANUAL_FINALIZATION
@@ -73,6 +155,7 @@ find_package(Qt6 REQUIRED COMPONENTS Widgets)
         src/app/CodeEditor.cpp
         src/app/CodeEditor.h
         src/app/ShortcutManager.h src/app/ShortcutManager.cpp
+        src/ui/BackupPage.ui
         src/app/ControllerSetting.h src/app/ControllerSetting.cpp
         src/ui/ControllerSettings.ui
 
@@ -102,8 +185,19 @@ endif()
 
 target_link_libraries(RoboEditor PRIVATE Qt${QT_VERSION_MAJOR}::Widgets)
 target_link_libraries(RoboEditor PRIVATE Qt6::Widgets)
-target_link_libraries(RoboEditor PRIVATE Qt6::Widgets)
 target_link_libraries(RoboEditor PRIVATE Qt6::Network)
+
+# jsoncpp
+target_link_libraries(RoboEditor PRIVATE jsoncpp_static)
+
+# libbcrypt
+target_link_libraries(RoboEditor PRIVATE bcrypt)
+
+# libarchive (for WorkspaceService)
+target_link_libraries(RoboEditor PRIVATE archive_static)
+
+# yaml-cpp (for DiffYaml)
+target_link_libraries(RoboEditor PRIVATE yaml-cpp)
 
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
