@@ -22,12 +22,8 @@ std::string services::DiffService::detectFileType(const std::string &fileName)
     // Convert to lowercase for case-insensitive comparison
     std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
 
-<<<<<<< HEAD
 
     if (ext == ".yaml" || ext == ".yml" || ext == ".pts") {
-=======
-    if (ext == ".yaml" || ext == ".yml") {
->>>>>>> 823347b9c114acd8b9f0ac4eae902aa994da2c4b
         return "yaml";
     } else if (ext == ".srl" || ext == ".py" || ext == ".sbp") {
         return "python";
