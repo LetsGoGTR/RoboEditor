@@ -1,3 +1,13 @@
+// Components Items
+// Tabs
+export type FixedTabId = 'left' | 'right';
+
+export interface FixedTab {
+	id: FixedTabId;
+	label: string;
+	disabled?: boolean;
+}
+
 // File System Types
 type NodeType = 'folder' | 'file';
 
