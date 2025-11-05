@@ -91,14 +91,98 @@ void CodeEditor::lineNumberAreaPaintEvent(QPaintEvent *ev)
 
 void CodeEditor::highlightCurrentLine()
 {
-    if (isReadOnly())
-        return;
+    updateAllHighlights();
+}
+
+void CodeEditor::updateAllHighlights()
+{
     QList<QTextEdit::ExtraSelection> extra;
-    QTextEdit::ExtraSelection        sel;
-    sel.format.setBackground(palette().alternateBase());
-    sel.format.setProperty(QTextFormat::FullWidthSelection, true);
-    sel.cursor = textCursor();
-    sel.cursor.clearSelection();
-    extra.append(sel);
+
+    // 1. Diff 하이라이트 추가 (DiffHighlighter 사용)
+    if (diffHighlighter_) {
+        QMap<int, QString> lineStates = diffHighlighter_->getLineStates();
+        
+        if (!lineStates.isEmpty()) {
+            QTextBlock block = document()->firstBlock();
+            int lineNumber = 1;
+            
+            while (block.isValid()) {
+                if (lineStates.contains(lineNumber)) {
+                    QString state = lineStates[lineNumber];
+                    QColor color = diffHighlighter_->getColorForState(state);
+                    
+                    if (color.isValid()) {
+                        QTextEdit::ExtraSelection sel;
+                        sel.format.setProperty(QTextFormat::FullWidthSelection, true);
+                        sel.format.setBackground(color);
+                        
+                        sel.cursor = QTextCursor(block);
+                        sel.cursor.clearSelection();
+                        extra.append(sel);
+                    }
+                }
+                
+                block = block.next();
+                lineNumber++;
+            }
+        }
+    }
+
+    // 2. 현재 커서 라인 하이라이트 (읽기 전용이 아닐 때만)
+    if (!isReadOnly()) {
+        QTextEdit::ExtraSelection sel;
+        sel.format.setBackground(palette().alternateBase());
+        sel.format.setProperty(QTextFormat::FullWidthSelection, true);
+        sel.cursor = textCursor();
+        sel.cursor.clearSelection();
+        extra.append(sel);
+    }
+
     setExtraSelections(extra);
+}
+
+void CodeEditor::setDiffHighlighter(core::DiffHighlighter *highlighter)
+{
+    // 기존 연결 해제
+    if (diffHighlighter_) {
+        disconnect(diffHighlighter_, &core::DiffHighlighter::highlightChanged,
+                   this, &CodeEditor::updateAllHighlights);
+    }
+    
+    diffHighlighter_ = highlighter;
+    
+    // 새 연결 설정
+    if (diffHighlighter_) {
+        connect(diffHighlighter_, &core::DiffHighlighter::highlightChanged,
+                this, &CodeEditor::updateAllHighlights);
+    }
+    
+    updateAllHighlights();
+}
+
+core::DiffHighlighter *CodeEditor::getDiffHighlighter() const
+{
+    return diffHighlighter_;
+}
+
+void CodeEditor::clearDiffHighlights()
+{
+    if (diffHighlighter_) {
+        diffHighlighter_->clearLineStates();
+    } else {
+        updateAllHighlights();
+    }
+}
+
+void CodeEditor::scrollToLine(int lineNumber)
+{
+    if (lineNumber < 1)
+        return;
+    
+    QTextBlock block = document()->findBlockByLineNumber(lineNumber - 1);
+    if (block.isValid()) {
+        QTextCursor cursor(block);
+        setTextCursor(cursor);
+        centerCursor();
+    }
 }

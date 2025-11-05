@@ -5,6 +5,7 @@
 #include <QWidget>
 
 #include "DropTextEdit.h"
+#include "DiffHighlighter.h"
 
 class CodeEditor;
 
@@ -28,6 +29,12 @@ class CodeEditor : public DropTextEdit
         explicit CodeEditor(QWidget *parent = nullptr);
         int  lineNumberAreaWidth() const;
         void lineNumberAreaPaintEvent(QPaintEvent * event);
+        
+        // Diff 하이라이트 기능 (DiffHighlighter 사용)
+        void setDiffHighlighter(core::DiffHighlighter *highlighter);
+        core::DiffHighlighter *getDiffHighlighter() const;
+        void clearDiffHighlights();
+        void scrollToLine(int lineNumber);
 
       protected:
         void resizeEvent(QResizeEvent * event) override;
@@ -35,9 +42,11 @@ class CodeEditor : public DropTextEdit
         void updateLineNumberAreaWidth(int);
         void updateLineNumberArea(const QRect &rect, int dy);
         void highlightCurrentLine();
+        void updateAllHighlights();
 
       private:
         LineNumberArea *lineNumberArea_{nullptr};
+        core::DiffHighlighter *diffHighlighter_{nullptr};  // DiffHighlighter 객체
 };
 
 #endif  // CODEEDITOR_H

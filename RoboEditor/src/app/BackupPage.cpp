@@ -44,7 +44,7 @@ void BackupPage::importAnySpace()
     QString dirName = QFileDialog::getExistingDirectory(
             this,                // 부모 위젯 포인터 (nullptr 대신 this 권장)
             "Select Workspace",  // 대화상자 제목
-            QDir::homePath(),    // 초기 디렉토리 경로
+            "C:/backup",         // 초기 디렉토리 경로
             QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks  // 폴더만 표시
     );
 

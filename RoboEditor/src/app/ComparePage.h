@@ -9,7 +9,8 @@
 #include <QWidget>
 
 // Core services 포함
-#include "../core/services/DiffService.h"
+#include "./services/DiffService.h"
+#include "DiffHighlighter.h"
 
 class QComboBox;
 class QPushButton;
@@ -29,6 +30,7 @@ class ComparePage : public QWidget
       public:
         explicit ComparePage(QWidget *parent = nullptr);
         void setTargetPath(const QString &path);  // 파일 선택 시 1회 호출
+        void setLeftEditor(CodeEditor *leftEditor);  // 좌측 편집기 설정
 
         QWidget *buildDiffPanel();
         struct DiffRow
@@ -58,10 +60,14 @@ class ComparePage : public QWidget
         QSplitter    *rightSplit_{nullptr};        // (좌) rightText_ | (우) diffPanel_
         QTabWidget   *compareTabWidget_{nullptr};  // 비교 파일들을 탭으로 관리
         CodeEditor   *rightText_{nullptr};  // 읽기 전용 (비교대상) - 현재 활성 탭 (라인 번호 포함)
+        CodeEditor   *leftText_{nullptr};   // 좌측 편집기 (ModifyPage의 현재 탭)
         QWidget      *diffPanel_{nullptr};  // 기존 "테이블+상단 버튼" 위젯
         QTableWidget *diffTable_ = nullptr;
         QLabel       *statLabel_ = nullptr;
         QString       targetPath_;
+        
+        // DiffHighlighter 객체 (양쪽 편집기 공유)
+        core::DiffHighlighter *diffHighlighter_{nullptr};
 
         QWidget *buildDock();
 

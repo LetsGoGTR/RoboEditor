@@ -90,6 +90,8 @@ set(PROJECT_SOURCES
         src/core/ControllerManager.h
         src/core/ControllerSetting.cpp
         src/core/ControllerSetting.h
+        src/core/DiffHighlighter.cpp
+        src/core/DiffHighlighter.h
         src/core/DropTextEdit.cpp
         src/core/DropTextEdit.h
         src/core/PasswordManager.cpp

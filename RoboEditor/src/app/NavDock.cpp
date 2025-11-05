@@ -1,9 +1,9 @@
 #include "NavDock.h"
 
-#include <QAction>  // ✅ 추가 (필요)
+#include <QAction>
 #include <QIcon>
-#include <QPushButton>  // ✅ 추가
-#include <QVBoxLayout>  // ✅ 추가
+#include <QPushButton>
+#include <QVBoxLayout>
 
 #include "ControllerManager.h"
 NavDock::NavDock(QWidget *parent) : QToolBar(parent)

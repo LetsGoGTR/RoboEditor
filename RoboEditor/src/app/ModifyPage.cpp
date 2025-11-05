@@ -183,9 +183,13 @@ void ModifyPage::showCompare()
 
 void ModifyPage::ensureCompare(const QString &targetPath)
 {
+    // 현재 활성 탭의 편집기 가져오기
+    CodeEditor *leftEditor = qobject_cast<CodeEditor *>(tabWidget->currentWidget());
+    
     if (comparePane_) {
-        // 이미 존재하면 경로만 업데이트
+        // 이미 존재하면 경로만 업데이트하고 좌측 편집기도 갱신
         comparePane_->setTargetPath(targetPath);
+        comparePane_->setLeftEditor(leftEditor);
         comparePane_->show();
         return;
     }
@@ -193,6 +197,7 @@ void ModifyPage::ensureCompare(const QString &targetPath)
     // 새로 생성
     comparePane_ = new ComparePage(this);
     comparePane_->setTargetPath(targetPath);
+    comparePane_->setLeftEditor(leftEditor);  // 좌측 편집기 설정
     mainSplit_->addWidget(comparePane_);
     mainSplit_->setStretchFactor(0, 1);
     mainSplit_->setStretchFactor(1, 0);
@@ -200,6 +205,14 @@ void ModifyPage::ensureCompare(const QString &targetPath)
     connect(comparePane_, &ComparePage::closed, this, &ModifyPage::closeCompare);
     connect(comparePane_, &ComparePage::targetPathChanged, this, [this](const QString &path) {
         lastComparedPath_ = path;
+    });
+    
+    // 탭이 변경될 때마다 좌측 편집기 갱신
+    connect(tabWidget, &QTabWidget::currentChanged, this, [this]() {
+        if (comparePane_ && comparePane_->isVisible()) {
+            CodeEditor *currentEditor = qobject_cast<CodeEditor *>(tabWidget->currentWidget());
+            comparePane_->setLeftEditor(currentEditor);
+        }
     });
     
     // Debouncing 타이머 초기화
