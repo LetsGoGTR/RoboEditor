@@ -1,4 +1,4 @@
-import type { TreeNode } from './types';
+import type { Controller, TreeNode } from './types';
 
 // 파일만 있는 Data
 export const dummyFilesOnly: TreeNode = {
@@ -188,3 +188,27 @@ export const dummyDeepTree: TreeNode = {
 		}
 	]
 };
+
+// Controller 정보 Data
+export const dummyController: Controller[] = [
+	{
+		serialNumber: 'SN-A9K3L1X7',
+		state: 'active',
+		ipAddress: '192.168.0.21'
+	},
+	{
+		serialNumber: 'SN-Q4R7C2P8',
+		state: 'idle',
+		ipAddress: '10.0.0.56'
+	},
+	{
+		serialNumber: 'SN-M8T5Z9B3',
+		state: 'error',
+		ipAddress: '172.16.1.102'
+	},
+	{
+		serialNumber: 'SN-V2N6H4W5',
+		state: 'disconnected',
+		ipAddress: '192.168.1.77'
+	}
+];

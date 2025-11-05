@@ -8,6 +8,7 @@ export interface FixedTab {
 	disabled?: boolean;
 }
 
+// Business Items
 // File System Types
 type NodeType = 'folder' | 'file';
 
@@ -32,3 +33,10 @@ export interface FileNode extends BaseNode {
 }
 
 export type TreeNode = FolderNode | FileNode;
+
+// Controller Types
+export interface Controller {
+  serialNumber: string;
+  state: 'idle' | 'active' | 'error' | 'disconnected';
+  ipAddress: string;
+}

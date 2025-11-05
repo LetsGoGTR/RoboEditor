@@ -1,5 +1,6 @@
 <script lang="ts">
-	import type { PageProps } from './$types';
-
-	let { data }: PageProps = $props();
+  import Editor from "@components/Editor.svelte";
+  import { page } from "$app/state";
 </script>
+
+<Editor />
