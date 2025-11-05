@@ -3,6 +3,7 @@
 
 #include <QTabWidget>
 #include <QTextStream>
+#include <QTimer>
 
 #include <QDir>
 #include <QFile>
@@ -93,6 +94,10 @@ class ModifyPage : public QWidget
         QPlainTextEdit *editor_{nullptr};  // 현재 탭의 에디터(CodeEditor)
         ComparePage    *comparePane_{nullptr};
         QString         lastComparedPath_;  // 마지막으로 비교한 파일 경로 저장
+        
+        // Debouncing을 위한 타이머
+        QTimer *diffDebounceTimer_{nullptr};
+        
         // 라인번호
         LineNumberArea *lineArea_{nullptr};
         int             lineNumberAreaWidth() const;

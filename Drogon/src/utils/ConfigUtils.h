@@ -1,10 +1,10 @@
 #pragma once
 
-#include "logging/Logger.h"
-
 #include <drogon/HttpAppFramework.h>
 #include <json/json.h>
 #include <string>
+
+#include "logging/Logger.h"
 
 namespace utils
 {

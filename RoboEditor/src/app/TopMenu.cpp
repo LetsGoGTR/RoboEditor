@@ -48,7 +48,6 @@ void TopMenu::build()
     showLogMenu_->addAction(mk("Log → Left"));
     showLogMenu_->addAction(mk("Log → Top"));
     showLogMenu_->addAction(mk("Log → Float"));
-    showLogMenu_->addAction(mk("Log → Center Bottom"));
     posGroup_->actions().front()->setChecked(true);
 
     actToggle_ = new QAction("Toggle Log", this);

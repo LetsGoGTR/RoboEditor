@@ -1,9 +1,9 @@
 #pragma once
 
-#include "logging/Logger.h"
-
 #include <filesystem>
 #include <string>
+
+#include "logging/Logger.h"
 
 namespace utils
 {

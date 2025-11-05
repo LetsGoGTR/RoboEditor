@@ -1,10 +1,10 @@
 #pragma once
 
-#include "ServiceResult.h"
-
 #include <json/json.h>
 #include <string>
 #include <vector>
+
+#include "ServiceResult.h"
 
 namespace services
 {

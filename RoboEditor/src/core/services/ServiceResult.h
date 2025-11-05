@@ -1,9 +1,9 @@
 #pragma once
 
-#include "../utils/logging/Logger.h"
-
 #include <json/json.h>
 #include <string>
+
+#include "../utils/logging/Logger.h"
 
 namespace services
 {
