@@ -33,9 +33,13 @@
 
 #include <json/json.h>
 #include <sstream>
+#include <yaml-cpp/yaml.h>
 
 ComparePage::ComparePage(QWidget *parent) : QWidget(parent), currentFilter_("All")
 {
+    // DiffHighlighter 객체 생성
+    diffHighlighter_ = new core::DiffHighlighter(this);
+    
     dock_  = buildDock();
     auto v = new QVBoxLayout(this);
     v->setContentsMargins(0, 0, 0, 0);
@@ -338,6 +342,28 @@ QWidget *ComparePage::buildDiffPanel()
     diffTable_->setSelectionMode(QAbstractItemView::SingleSelection);
     diffTable_->setEditTriggers(QAbstractItemView::NoEditTriggers);
     diffTable_->setAlternatingRowColors(true);
+    
+    // 테이블 행 클릭 시 해당 라인으로 스크롤 (양쪽 모두)
+    connect(diffTable_, &QTableWidget::cellClicked, this, [this](int row, int column) {
+        if (row < 0 || row >= diffTable_->rowCount())
+            return;
+        
+        // 첫 번째 컬럼(Line 또는 Key)에서 라인 번호 추출
+        QTableWidgetItem *lineItem = diffTable_->item(row, 0);
+        if (lineItem) {
+            bool ok;
+            int lineNumber = lineItem->text().toInt(&ok);
+            if (ok && lineNumber > 0) {
+                // 양쪽 편집기 모두 스크롤
+                if (rightText_) {
+                    rightText_->scrollToLine(lineNumber);
+                }
+                if (leftText_) {
+                    leftText_->scrollToLine(lineNumber);
+                }
+            }
+        }
+    });
 
     // 테이블 스타일 (스크롤바 포함)
     diffTable_->setStyleSheet("QTableWidget { "
@@ -427,6 +453,16 @@ QWidget *ComparePage::buildDiffPanel()
 void ComparePage::onCloseClicked()
 {
     emit closed();
+}
+
+void ComparePage::setLeftEditor(CodeEditor *leftEditor)
+{
+    leftText_ = leftEditor;
+    
+    // 좌측 편집기에 DiffHighlighter 설정
+    if (leftText_) {
+        leftText_->setDiffHighlighter(diffHighlighter_);
+    }
 }
 
 void ComparePage::setTargetPath(const QString &path)
@@ -544,6 +580,49 @@ void ComparePage::recalcDiff(const QString &leftText)
     
     // 결과 파싱 및 표시
     QList<DiffRow> diffRows = parseDiffResult(result.data, fileType);
+    
+    // YAML 파싱 에러 체크 (빈 결과 + YAML 타입)
+    if (diffRows.isEmpty() && fileType == "yaml") {
+        // 좌측과 우측 파일을 모두 파싱하여 에러 확인
+        bool leftError = false;
+        bool rightError = false;
+        int errorLine = -1;
+        QString errorMsg = "YAML 들여쓰기 또는 형식이 잘못되었습니다.";
+        
+        // 좌측 파일 파싱 시도
+        try {
+            YAML::Load(leftText.toStdString());
+        } catch (const YAML::Exception &e) {
+            leftError = true;
+            errorLine = e.mark.line + 1;  // 0-based -> 1-based
+            errorMsg = QString("라인 %1: %2").arg(errorLine).arg(QString::fromStdString(e.msg));
+        }
+        
+        // 우측 파일 파싱 시도
+        try {
+            YAML::Load(rightText.toStdString());
+        } catch (const YAML::Exception &e) {
+            rightError = true;
+            // 좌측에 에러가 없으면 우측 에러 정보 사용
+            if (!leftError) {
+                errorLine = e.mark.line + 1;
+                errorMsg = QString("비교 파일 라인 %1: %2").arg(errorLine).arg(QString::fromStdString(e.msg));
+            }
+        }
+        
+        // 둘 중 하나라도 에러가 있으면 에러 행 추가
+        if (leftError || rightError) {
+            DiffRow errorRow;
+            errorRow.line = errorLine;
+            errorRow.key = errorLine > 0 ? QString::number(errorLine) : "Parse Error";
+            errorRow.origin = "";
+            errorRow.target = errorMsg + " 파일을 수정해주세요.";
+            errorRow.state = "ERROR";
+            diffRows.append(errorRow);
+        }
+        // 둘 다 정상이면 진짜 동일한 것이므로 에러 추가하지 않음
+    }
+    
     setDiffRows(diffRows);
 }
 
@@ -648,6 +727,36 @@ void ComparePage::refreshDiffTable(const QList<DiffRow> &rows)
 
             itemState->setForeground(QBrush(textColor));
             itemState->setText("= SAME");
+            
+        } else if (r.state == "ERROR") {
+            // 주황색 - 에러 (YAML 형식 오류)
+            QColor bgColor(255, 237, 213);   // 연한 주황색
+            QColor textColor(194, 65, 12);   // 진한 주황색
+
+            if (itemLine) itemLine->setBackground(bgColor);
+            itemKey->setBackground(bgColor);
+            itemLeft->setBackground(bgColor);
+            itemRight->setBackground(bgColor);
+            itemState->setBackground(bgColor);
+
+            itemState->setForeground(QBrush(textColor));
+            QFont boldFont = itemState->font();
+            boldFont.setBold(true);
+            itemState->setFont(boldFont);
+            itemState->setText("⚠ 형식 오류");
+            
+            // Left 컬럼에 "수정 필요" 메시지 표시
+            itemLeft->setText("형식을 수정해주세요");
+            itemLeft->setForeground(QBrush(textColor));
+            QFont italicFont = itemLeft->font();
+            italicFont.setItalic(true);
+            itemLeft->setFont(italicFont);
+            
+            // Right 컬럼에 상세 에러 메시지 표시
+            if (!r.target.isEmpty()) {
+                itemRight->setText("");
+                itemRight->setForeground(QBrush(textColor));
+            }
         }
 
         // 텍스트 정렬
@@ -687,6 +796,23 @@ void ComparePage::refreshDiffTable(const QList<DiffRow> &rows)
 void ComparePage::setDiffRows(const QList<DiffRow> &rows)
 {
     allDiffRows_ = rows;  // 전체 데이터 저장
+    
+    // DiffHighlighter에 하이라이트 정보 설정 (양쪽 편집기 공유)
+    QMap<int, QString> lineStates;
+    for (const DiffRow &row : rows) {
+        if (row.line > 0 && row.state != "SAME") {
+            lineStates[row.line] = row.state;
+        }
+    }
+    
+    if (diffHighlighter_) {
+        diffHighlighter_->setLineStates(lineStates);
+    }
+    
+    // 우측 편집기에 DiffHighlighter 설정 (아직 설정되지 않은 경우)
+    if (rightText_ && rightText_->getDiffHighlighter() != diffHighlighter_) {
+        rightText_->setDiffHighlighter(diffHighlighter_);
+    }
     
     // 현재 필터 적용
     QList<DiffRow> filteredRows = filterRows(rows, currentFilter_);
@@ -790,6 +916,49 @@ void ComparePage::performDiff(const QString &leftPath, const QString &rightPath)
     
     // 결과 파싱 및 표시
     QList<DiffRow> diffRows = parseDiffResult(result.data, fileType);
+    
+    // YAML 파싱 에러 체크 (빈 결과 + YAML 타입)
+    if (diffRows.isEmpty() && fileType == "yaml") {
+        // 좌측과 우측 파일을 모두 파싱하여 에러 확인
+        bool leftError = false;
+        bool rightError = false;
+        int errorLine = -1;
+        QString errorMsg = "YAML 들여쓰기 또는 형식이 잘못되었습니다.";
+        
+        // 좌측 파일 파싱 시도
+        try {
+            YAML::Load(leftContent.toStdString());
+        } catch (const YAML::Exception &e) {
+            leftError = true;
+            errorLine = e.mark.line + 1;  // 0-based -> 1-based
+            errorMsg = QString("라인 %1: %2").arg(errorLine).arg(QString::fromStdString(e.msg));
+        }
+        
+        // 우측 파일 파싱 시도
+        try {
+            YAML::Load(rightContent.toStdString());
+        } catch (const YAML::Exception &e) {
+            rightError = true;
+            // 좌측에 에러가 없으면 우측 에러 정보 사용
+            if (!leftError) {
+                errorLine = e.mark.line + 1;
+                errorMsg = QString("비교 파일 라인 %1: %2").arg(errorLine).arg(QString::fromStdString(e.msg));
+            }
+        }
+        
+        // 둘 중 하나라도 에러가 있으면 에러 행 추가
+        if (leftError || rightError) {
+            DiffRow errorRow;
+            errorRow.line = errorLine;
+            errorRow.key = errorLine > 0 ? QString::number(errorLine) : "Parse Error";
+            errorRow.origin = "";
+            errorRow.target = errorMsg + " 파일을 수정해주세요.";
+            errorRow.state = "ERROR";
+            diffRows.append(errorRow);
+        }
+        // 둘 다 정상이면 진짜 동일한 것이므로 에러 추가하지 않음
+    }
+    
     setDiffRows(diffRows);
     
     // 왼쪽 파일도 표시하고 싶다면 신호를 발생시킴

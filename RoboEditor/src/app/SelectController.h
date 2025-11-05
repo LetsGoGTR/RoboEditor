@@ -22,18 +22,14 @@
 #include <QVBoxLayout>
 #include <QWidget>
 
+#include "../core/ControllerManager.h"
+
 class selectcontroller : public QWidget
 {
     Q_OBJECT
       public:
         selectcontroller(QWidget *parent = nullptr);
         ~selectcontroller();
-
-        struct cstate
-        {
-            QString SN;
-            int     state;
-        };
 
         void             setupUI();
         void             getControllerState();
@@ -43,8 +39,12 @@ class selectcontroller : public QWidget
         QStandardItemModel *model;
         QTableView         *table;
 
-        QVector<cstate>      controllerState;
-        QVector<QCheckBox *> checkBoxes;
+        QVector<ControllerInfo> controllerState;
+        QVector<QCheckBox *>    checkBoxes;
+
+      private slots:
+        void onControllerListChanged();
+        void onControllerStateUpdated(const QString &serialNumber, bool isConnected, bool isRunning);
 
       signals:
         void controllerSelectionChanged();
