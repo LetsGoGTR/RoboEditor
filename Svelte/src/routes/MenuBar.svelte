@@ -1,4 +1,10 @@
 <script lang="ts">
+	import { goto } from "$app/navigation";
+
+	function handleCompare() { goto('/compare'); }
+	function handleBackup() { goto('/backup') };
+	function handleApply() { goto('apply') };
+
 </script>
 
 <div class="full-width" role="menubar">
@@ -12,7 +18,14 @@
 				<li><span>시뮬레이션</span></li>
 			</ul>
 		</li>
-		<li><span>도구</span></li>
+		<li>
+			<span>도구</span>
+			<ul class="dropdown">
+				<li><button onclick={handleCompare}>비교</button></li>
+				<li><button onclick={handleBackup}>제어기로부터 백업</button></li>
+				<li><button onclick={handleApply}>제어기에 적용</button></li>
+			</ul>
+		</li>
 		<li><span>제어기</span></li>
 		<li><span>설정</span></li>
 	</ul>
@@ -36,16 +49,25 @@
 		position: relative;
 	}
 
-	ul > li > span {
+	ul > li > span,
+	ul > li > button {
+		font-size: 16px;
+		cursor: pointer;
 		display: block;
 		padding: 10px 20px;
 		color: #fff;
 		text-decoration: none;
+		background: none;
+		border: none;
 	}
 
-	ul > li:hover > span {
-		color: #000;
+	ul > li:hover {
 		background: #fff;
+	}
+
+	ul > li:hover > span,
+	ul > li:hover > button {
+		color: #000;
 	}
 
 	ul > li > hr {

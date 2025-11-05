@@ -50,13 +50,14 @@
     <pre><code>{code || '\n'}</code></pre>
   </div>
 
+  <!-- 작고 숨겨진 입력 textarea -->
   <textarea
     bind:this={textarea}
     bind:value={code}
     oninput={handleInput}
     onscroll={syncScroll}
     spellcheck="false"
-    class="code-input"
+    class="hidden-input"
   ></textarea>
 </div>
 
@@ -87,11 +88,11 @@
   overflow: hidden;
 }
 
-/* 코드 영역 */
+/* 코드 표시 영역 */
 .code-display {
   flex: 1;
   padding: 0.5rem;
-  overflow: hidden; /* 직접 스크롤하지 않음 */
+  overflow: auto;
   white-space: pre;
   font-family: inherit;
   font-size: inherit;
@@ -101,14 +102,14 @@
   margin: 0;
 }
 
-/* 입력 textarea (투명 오버레이) */
-.code-input {
+/* 숨겨진 입력 필드 */
+.hidden-input {
   position: absolute;
+  width: 1px;
+  height: 1px;
+  left: -9999px;
   top: 0;
-  left: 3rem;
-  right: 0;
-  bottom: 0;
-  padding: 0.5rem;
+  opacity: 0;
   border: none;
   outline: none;
   resize: none;
@@ -117,11 +118,5 @@
   caret-color: black;
   font: inherit;
   line-height: inherit;
-  overflow: auto;
-  white-space: pre;
-}
-
-.code-input::selection {
-  background: rgba(80, 140, 255, 0.35);
 }
 </style>

@@ -1,12 +1,13 @@
 <script lang="ts">
-  import type { TreeNode } from "@/types";
   import DirectoryItem from "./DirectoryItem.svelte";
+  import type { TreeNode } from "@/types";
 
   export let root: TreeNode;
+  export let onselect: (node: TreeNode) => void;
 </script>
 
 <ul class="tree-root">
-  <DirectoryItem node={root} depth={0} />
+  <DirectoryItem node={root} depth={0} onselect={onselect} />
 </ul>
 
 <style>

@@ -55,8 +55,4 @@
     display: flex;
     border-bottom: 1px solid #e5e7eb;
   }
-
-  .tab-panels {
-    padding-top: 0.5rem;
-  }
 </style>
