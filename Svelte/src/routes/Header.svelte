@@ -1,10 +1,10 @@
 <script lang="ts">
 </script>
 
-<header class="header">
+<div class="header">
 	<span class="title">RoboEditor</span>
 	<span class="file-name">파일 이름</span>
-</header>
+</div>
 
 <style>
 	.header {

@@ -26,7 +26,7 @@ export interface FolderNode extends BaseNode {
 
 export interface FileNode extends BaseNode {
 	type: 'file';
-	content?: string;
+	contentRef?: string;
 	size?: number;
 	lastModified?: string; // ISO timestamp
 }

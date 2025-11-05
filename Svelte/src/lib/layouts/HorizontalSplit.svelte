@@ -1,7 +1,7 @@
 <script lang="ts">
   let container: HTMLDivElement | null = null;
 
-  export let initialLeftRatio: number = 25;
+  export let initialLeftRatio: number = 20;
   export let minLeftRatio: number = 10;
   export let maxLeftRatio: number = 50;
 
@@ -56,16 +56,10 @@
 </div>
 
 <style>
-  :global(html, body) {
-    margin: 0;
-    height: 100%;
-    overflow: hidden; /* 스크롤 완전 제거 */
-  }
-
   .split-container {
     display: flex;
-    width: 100vw;
-    height: 100vh; /* 뷰포트 높이에 완전히 맞춤 */
+    height: 100%;
+    width: 100%;
     overflow: hidden;
   }
 
