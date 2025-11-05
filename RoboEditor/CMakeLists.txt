@@ -60,6 +60,7 @@ set(PROJECT_SOURCES
         src/app/BackupPage.cpp
         src/app/CenterStack.cpp
         src/app/ComparePage.cpp
+        src/app/FlowLayout.cpp
         src/app/LogManager.cpp
         src/app/mainwindow.cpp
         src/app/NavDock.cpp
@@ -74,6 +75,7 @@ set(PROJECT_SOURCES
         src/app/BackupPage.h
         src/app/CenterStack.h
         src/app/ComparePage.h
+        src/app/FlowLayout.h
         src/app/LogManager.h
         src/app/mainwindow.h
         src/app/NavDock.h
