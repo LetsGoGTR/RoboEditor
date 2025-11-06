@@ -44,6 +44,7 @@ ModifyPage::ModifyPage(QWidget *parent) : QWidget(parent), currentDoc(nullptr)
                 // ComparePage가 여전히 유효한지 재확인 후 호출
                 if (comparePane_ == pane) {
                     pane->setLeftEditor(currentEditor);
+                    pane->recalcDiff(currentLeftText(), currentLeftPath());
                 }
             }
         }
@@ -88,7 +89,7 @@ Document *ModifyPage::openDocument(const QString &path)
     }
 
     auto *neweditor_ = new CodeEditor();
-    neweditor_->setPlainText(doc->gcontent());
+    neweditor_->setLoadedText(doc->gcontent(), path);
 
     int index = tabWidget->addTab(neweditor_, doc->gfileName());
     tabWidget->setCurrentIndex(index);
@@ -117,6 +118,14 @@ Document *ModifyPage::openDocument(const QString &path)
     documents.append(doc);
     setCurrentDocument(documents.size() - 1);
 
+    if (comparePane_) {
+        ComparePage *pane = comparePane_;
+        if (pane == comparePane_) {
+            pane->setLeftEditor(qobject_cast<CodeEditor *>(neweditor_));
+            pane->recalcDiff(currentLeftText(), currentLeftPath());
+        }
+    }
+
     return doc;
 }
 
@@ -128,6 +137,13 @@ QString ModifyPage::currentLeftText() const
     // (혹은 탭 위젯에서 직접 읽어도 됨)
     auto *ed = qobject_cast<QPlainTextEdit *>(tabWidget->currentWidget());
     return ed ? ed->toPlainText() : QString();
+}
+
+QString ModifyPage::currentLeftPath() const
+{
+    if (currentDoc)
+        return currentDoc->gfilePath();
+    return QString();
 }
 
 void ModifyPage::buildUi()
@@ -154,7 +170,7 @@ void ModifyPage::showCompare()
     // 케이스 1: 이미 ComparePage가 열려있으면 -> 즉시 재비교
     ComparePage *pane = comparePane_;
     if (pane && pane == comparePane_) {
-        pane->recalcDiff(currentLeftText());
+        pane->recalcDiff(currentLeftText(), currentLeftPath());
         return;
     }
 
@@ -198,7 +214,7 @@ void ModifyPage::showCompare()
     // ComparePage 생성 및 비교 실행
     lastComparedPath_ = targetPath;
     ensureCompare(targetPath);
-    comparePane_->recalcDiff(currentLeftText());
+    comparePane_->recalcDiff(currentLeftText(), currentLeftPath());
     
     // ComparePage가 완전히 생성된 후 설정 복원
     restoreCompareSettings();
@@ -294,7 +310,7 @@ void ModifyPage::ensureCompare(const QString &targetPath)
         connect(diffDebounceTimer_, &QTimer::timeout, this, [this] {
             ComparePage *pane = comparePane_;
             if (pane && pane == comparePane_) {
-                pane->recalcDiff(currentLeftText());
+                pane->recalcDiff(currentLeftText(), currentLeftPath());
             }
         });
         
@@ -506,14 +522,23 @@ void ModifyPage::openFromTree(const QString &path)
         const QString text = in.readAll();
         f.close();
 
-        auto *ed = qobject_cast<QPlainTextEdit *>(tabWidget->currentWidget());
+        auto *ed = qobject_cast<CodeEditor *>(tabWidget->currentWidget());
         if (ed) {
-            ed->setPlainText(text);
+            ed->setLoadedText(text, path);
             if (currentDoc) {
                 currentDoc->setContent(text);
-                currentDoc->setModified(true);
+                currentDoc->setFilePath(path);
+                currentDoc->setModified(false);
                 updateTitle();
             }
+        }
+    }
+
+    if (comparePane_) {
+        ComparePage *pane = comparePane_;
+        if (pane == comparePane_) {
+            pane->setLeftEditor(qobject_cast<CodeEditor *>(tabWidget->currentWidget()));
+            pane->recalcDiff(currentLeftText(), currentLeftPath());
         }
     }
 }
@@ -522,7 +547,7 @@ void ModifyPage::compareWithFromTree(const QString &path)
 {
     lastComparedPath_ = path;
     ensureCompare(path);
-    comparePane_->recalcDiff(currentLeftText());
+    comparePane_->recalcDiff(currentLeftText(), currentLeftPath());
 }
 
 int ModifyPage::lineNumberAreaWidth() const
@@ -633,6 +658,13 @@ void ModifyPage::saveFile()
     doc->setModified(false);
     updateTitle();
     file.close();
+
+    if (comparePane_) {
+        ComparePage *pane = comparePane_;
+        if (pane == comparePane_) {
+            pane->recalcDiff(currentLeftText(), currentLeftPath());
+        }
+    }
 }
 void ModifyPage::saveAsFile()
 {
@@ -671,6 +703,13 @@ void ModifyPage::saveAsFile()
     file.close();
 
     qDebug() << "File saved as:" << newFilePath;
+
+    if (comparePane_) {
+        ComparePage *pane = comparePane_;
+        if (pane == comparePane_) {
+            pane->recalcDiff(currentLeftText(), currentLeftPath());
+        }
+    }
 }
 
 bool ModifyPage::hasUnsavedChanges(Document *doc)

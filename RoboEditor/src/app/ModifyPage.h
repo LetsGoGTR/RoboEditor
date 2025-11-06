@@ -89,6 +89,7 @@ class ModifyPage : public QWidget
         void            buildUi();
         void            ensureCompare(const QString &targetPath);
         QString         currentLeftText() const;
+        QString         currentLeftPath() const;
         QSplitter      *mainSplit_{nullptr};  // [0] editorHost, [1] comparePane(옵션)
         QWidget        *editorHost_{nullptr};
         QPlainTextEdit *editor_{nullptr};  // 현재 탭의 에디터(CodeEditor)
