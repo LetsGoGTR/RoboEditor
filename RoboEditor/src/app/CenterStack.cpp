@@ -317,8 +317,7 @@ void CenterStack::updateControllerList()
                                  .arg(c.ip)
                                  .arg(c.sftpPort)
                                  .arg(c.apiPort)
-                                 .arg(c.username)
-                                 .arg(c.workspacePath));
+                                 .arg(c.username));
 
         QColor iconColor;
         if (!c.isConnected) {

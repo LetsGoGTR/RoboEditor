@@ -16,11 +16,11 @@ struct ControllerInfo
     int     sftpPort;
     int     apiPort;
     QString username;
-    QString workspacePath;
+    QString pswd;
     bool    isConnected;
     bool    isRunning;
 
-    ControllerInfo() : sftpPort(22), apiPort(8080), isConnected(false), isRunning(false) {}
+    ControllerInfo() : sftpPort(22), apiPort(80), isConnected(false), isRunning(false) {}
 };
 
 class ControllerManager : public QObject
@@ -68,6 +68,12 @@ class ControllerManager : public QObject
         // 상태 업데이트 (thread-safe)
         void updateRunningState(const QString &serialNumber, bool running);
         void updateConnectionState(const QString &serialNumber, bool connected);
+
+        //그냥 호출해도 괜찮
+        void backupRequest(const QString &serialNumber);
+
+        //여러개 한번에 보내면 안돼서 보낼 제어기 리스트를 큐로 관리해서 하나씩 보내고 완료되면 다음꺼 보내야함
+        void applyRequest(const QString &serialNumber, const QString &filePath);
 
         QString                    configFilePath_;
         QList<ControllerInfo>      controllers_;
