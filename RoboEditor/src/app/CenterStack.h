@@ -38,16 +38,20 @@ class CenterStack : public QWidget
         // 페이지 접근자
         ModifyPage *modifyPage() const
         {
-            return mfp_;
+            return modifyPage_;
         }
         ModifyPage *getModifyPage() const
         {
-            return mfp_;
+            return modifyPage_;
         }
 
         // 경로 관련
         QString getWorkspacePath() const;
         void    setBackupPath(const QString &path);
+
+        // 설정 저장/복원
+        QByteArray saveSplitterState() const;
+        void       restoreSplitterState(const QByteArray &state);
 
       signals:
         // 메인윈도우가 받을 시그널
@@ -70,9 +74,8 @@ class CenterStack : public QWidget
 
         // 첫 번째 구조 (Compare/OpenFile/Modify 페이지용)
         QStackedWidget *stack_;
-        int             idxC_, idxM_;
+        int             idxC_;
         ComparePage    *cmp_;
-        ModifyPage     *mfp_;
 
         // 두 번째 구조 (Controller/Workspace 트리용)
         QStackedWidget *internalStack_;

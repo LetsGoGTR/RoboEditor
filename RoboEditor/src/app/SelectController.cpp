@@ -1,8 +1,8 @@
 #include "SelectController.h"
 
 #include <QTableWidget>
-
 #include <QDebug>
+#include <QPainter>
 
 selectcontroller::selectcontroller(QWidget *parent) :
     QWidget(parent),
@@ -11,77 +11,34 @@ selectcontroller::selectcontroller(QWidget *parent) :
 {
     setupUI();
     getControllerState();
+
+    // ControllerManager 시그널 연결
+    ControllerManager *manager = ControllerManager::instance();
+    connect(manager, &ControllerManager::controllerListChanged, 
+            this, &selectcontroller::onControllerListChanged);
+    connect(manager, &ControllerManager::controllerStateUpdated,
+            this, &selectcontroller::onControllerStateUpdated);
 }
 
-//로컬 PC drogon 서버로부터 제어기의 SN, State를 받아오는 함수
+//ControllerManager로부터 제어기의 정보를 받아오는 함수
 void selectcontroller::getControllerState()
 {
     qDebug() << "refreshed";
     controllerState.clear();
 
-    // 테스트용 더미 데이터
-    QByteArray dummyResponse = R"(
-    {
-        "status": "ok",
-        "data": [
-            { "serial_number": "LSI-CTRL-001", "state": 1 },
-            { "serial_number": "LSI-CTRL-002", "state": 0 },
-            { "serial_number": "LSI-CTRL-003", "state": 1 },
-            { "serial_number": "LSI-CTRL-004", "state": 2 }
-        ]
+    // ControllerManager에서 실제 제어기 목록 가져오기
+    ControllerManager *manager = ControllerManager::instance();
+    QList<ControllerInfo> controllers = manager->getControllers();
+
+    // QList를 QVector로 변환
+    for (const auto &info : controllers) {
+        controllerState.push_back(info);
     }
-    )";
 
-    QNetworkAccessManager *manager = new QNetworkAccessManager(this);
-    QNetworkRequest        request(QUrl("http://192.xxx.x.xx/api/v1/controllers"));
-
-    connect(manager,
-            &QNetworkAccessManager::finished,
-            this,
-            [this, manager, dummyResponse](QNetworkReply *reply) {  // dummyResponse 캡처
-                QByteArray response;
-
-                // 네트워크 에러 시 더미 데이터 사용
-                if (reply->error() != QNetworkReply::NoError) {
-                    qWarning() << "Network error, using dummy data:" << reply->errorString();
-                    response = dummyResponse;  // 더미 데이터 사용
-                } else {
-                    response = reply->readAll();  // 실제 응답 사용
-                }
-
-                // JSON 파싱 (더미든 실제든 동일하게 처리)
-                QJsonDocument jsonDoc = QJsonDocument::fromJson(response);
-
-                if (!jsonDoc.isNull() && jsonDoc.isObject()) {
-                    QJsonObject jsonObj = jsonDoc.object();
-
-                    if (jsonObj.contains("data") && jsonObj["data"].isArray()) {
-                        QJsonArray controllers = jsonObj["data"].toArray();
-
-                        // 각 제어기 정보 추출
-                        for (const QJsonValue &value : controllers) {
-                            if (!value.isObject())
-                                continue;
-
-                            QJsonObject ctrl = value.toObject();
-                            cstate      cs;
-                            cs.SN    = ctrl["serial_number"].toString();
-                            cs.state = ctrl["state"].toInt();
-
-                            if (!cs.SN.isEmpty()) {
-                                controllerState.push_back(cs);
-                            }
-                        }
-
-                        updateTable();  // 데이터 수신 후 테이블 업데이트
-                    }
-                }
-
-                reply->deleteLater();
-                manager->deleteLater();
-            });
-
-    manager->get(request);
+    // 상태 업데이트 요청
+    manager->updateControllersStates();
+    
+    updateTable();  // 테이블 업데이트
 }
 
 void selectcontroller::setupUI()
@@ -108,32 +65,63 @@ void selectcontroller::updateTable()
     model->removeRows(0, model->rowCount());  // 기존 행 제거
     checkBoxes.clear();
 
-    for (const cstate &cs : controllerState) {
+    for (const ControllerInfo &info : controllerState) {
         QList<QStandardItem *> rowItems;
 
         // Serial Number
-        QStandardItem *snItem = new QStandardItem(cs.SN);
+        QStandardItem *snItem = new QStandardItem(info.serialNumber);
         snItem->setEditable(false);
         rowItems.append(snItem);
 
-        // State
+        // State 결정
+        // 0: Offline (연결 안됨)
+        // 1: Running (연결 + 실행 중, data: true)
+        // 2: Online (연결 + 실행 안함, data: false)
+        int state;
+        if (!info.isConnected) {
+            state = 0;  // Offline
+        } else if (info.isRunning) {
+            state = 1;  // Running (data: true)
+        } else {
+            state = 2;  // Online (data: false)
+        }
+
+        // State 표시 (switch case 사용)
         QString stateStr;
-        switch (cs.state) {
+        QColor  statusColor;
+        
+        switch (state) {
         case 0:
-            stateStr = "Offline";
+            stateStr    = "Offline";
+            statusColor = QColor(128, 128, 128);  // 회색
             break;
         case 1:
-            stateStr = "Online";
+            stateStr    = "Running";
+            statusColor = QColor(255, 0, 0);  // 빨강
             break;
         case 2:
-            stateStr = "Error";
+            stateStr    = "Online";
+            statusColor = QColor(0, 255, 0);  // 초록
             break;
         default:
-            stateStr = "Unknown";
+            stateStr    = "Unknown";
+            statusColor = QColor(128, 128, 128);  // 회색
             break;
         }
+
         QStandardItem *stateItem = new QStandardItem(stateStr);
         stateItem->setEditable(false);
+
+        // 원형 아이콘 생성
+        QPixmap  pixmap(16, 16);
+        pixmap.fill(Qt::transparent);
+        QPainter painter(&pixmap);
+        painter.setRenderHint(QPainter::Antialiasing);
+        painter.setBrush(statusColor);
+        painter.setPen(Qt::NoPen);
+        painter.drawEllipse(2, 2, 12, 12);
+
+        stateItem->setIcon(QIcon(pixmap));
         rowItems.append(stateItem);
 
         // Select (placeholder)
@@ -166,10 +154,36 @@ QVector<QString> selectcontroller::getSelectedControllers() const
     QVector<QString> selected;
     for (int i = 0; i < checkBoxes.size() && i < controllerState.size(); ++i) {
         if (checkBoxes[i]->isChecked()) {
-            selected.append(controllerState[i].SN);
+            selected.append(controllerState[i].serialNumber);
         }
     }
     return selected;
+}
+
+void selectcontroller::onControllerListChanged()
+{
+    qDebug() << "[SelectController] Controller list changed, refreshing...";
+    getControllerState();
+}
+
+void selectcontroller::onControllerStateUpdated(const QString &serialNumber, 
+                                                bool isConnected, 
+                                                bool isRunning)
+{
+    qDebug() << "[SelectController] State updated:" << serialNumber 
+             << "Connected:" << isConnected << "Running:" << isRunning;
+    
+    // controllerState에서 해당 제어기 찾아서 업데이트
+    for (auto &info : controllerState) {
+        if (info.serialNumber == serialNumber) {
+            info.isConnected = isConnected;
+            info.isRunning = isRunning;
+            break;
+        }
+    }
+    
+    // 테이블 업데이트
+    updateTable();
 }
 
 selectcontroller::~selectcontroller() {}

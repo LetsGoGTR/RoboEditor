@@ -49,10 +49,8 @@ CenterStack::CenterStack(QWidget *parent) :
 {
     stack_ = new QStackedWidget;
     cmp_   = new ComparePage;
-    mfp_   = new ModifyPage;
 
     idxC_ = stack_->addWidget(cmp_);
-    idxM_ = stack_->addWidget(mfp_);
 
     // auto *layout = new QVBoxLayout(this);
     // layout->addWidget(stack_);
@@ -62,7 +60,6 @@ CenterStack::CenterStack(QWidget *parent) :
         emit compareRequested(L, R);
         openCompareResult(L, R);
     });
-    connect(mfp_, &ModifyPage::uiModifyClicked, this, &CenterStack::modifyRequested);
 
     connect(m_pollingTimer, &QTimer::timeout, this, &CenterStack::onPollingTimeout);
 
@@ -92,14 +89,12 @@ void CenterStack::showCompare()
 
 void CenterStack::showModify()
 {
-    stack_->setCurrentIndex(idxM_);
+    // modifyPage_는 항상 splitter에 표시되므로 별도 전환 불필요
+    // 필요 시 modifyPage_를 포커스하거나 다른 작업 수행 가능
 }
 
 void CenterStack::showModifyWithCompare()
 {
-    // ModifyPage로 전환
-    stack_->setCurrentIndex(idxM_);
-
     // ModifyPage의 Compare 기능 활성화
     if (modifyPage_) {
         modifyPage_->showCompare();
@@ -273,6 +268,10 @@ void CenterStack::setupUI()
             qDebug() << "Opened file in ModifyPage:" << path;
         }
     });
+    
+    // [4-1] ModifyPage 시그널 연결
+    connect(modifyPage_, &ModifyPage::uiModifyClicked, this, &CenterStack::modifyRequested);
+    
     // [5] 제어기 등록 -> 제어기 리스트 업데이트
     connect(ControllerManager::instance(),
             &ControllerManager::controllerListChanged,
@@ -435,6 +434,22 @@ void CenterStack::onPollingTimeout()
     qDebug() << "timeout";
     ControllerManager::instance()->updateControllersStates();
 }
+
+QByteArray CenterStack::saveSplitterState() const
+{
+    if (splitter_) {
+        return splitter_->saveState();
+    }
+    return QByteArray();
+}
+
+void CenterStack::restoreSplitterState(const QByteArray &state)
+{
+    if (splitter_ && !state.isEmpty()) {
+        splitter_->restoreState(state);
+    }
+}
+
 CenterStack::~CenterStack()
 {
     stopPolling();
