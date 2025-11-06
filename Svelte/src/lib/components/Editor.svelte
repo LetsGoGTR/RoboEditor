@@ -1,6 +1,8 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
 
+  let { readonly = false } = $props<{ readonly?: boolean }>();
+
   let code = $state(`console.log("Hello, RoboEditor!");`);
   let lines: string[] = $state([]);
   let textarea: HTMLTextAreaElement;
@@ -8,6 +10,7 @@
   let lineNumbers: HTMLDivElement;
 
   async function handleInput(event: Event) {
+    if (readonly) return;
     const target = event.target as HTMLTextAreaElement;
     code = target.value;
     await tick();
@@ -21,7 +24,7 @@
   }
 
   function focusTextarea() {
-    textarea?.focus();
+    if (!readonly) textarea?.focus();
   }
 
   onMount(() => {
@@ -47,10 +50,14 @@
       if (e.key === 'Enter' || e.key === ' ') focusTextarea();
     }}
   >
-    <pre><code>{code || '\n'}</code></pre>
+    <!-- ✅ 변경된 부분: 한 줄씩 pre 요소로 출력 -->
+    {#each lines as line, i}
+      <pre class="code-line" data-line={i + 1}>
+        {line || '\u200B'}
+      </pre>
+    {/each}
   </div>
 
-  <!-- 작고 숨겨진 입력 textarea -->
   <textarea
     bind:this={textarea}
     bind:value={code}
@@ -58,6 +65,8 @@
     onscroll={syncScroll}
     spellcheck="false"
     class="hidden-input"
+    readonly={readonly}
+    tabindex={readonly ? -1 : 0}
   ></textarea>
 </div>
 
@@ -79,7 +88,7 @@
 .line-numbers {
   width: 3rem;
   text-align: right;
-  padding: 0.5rem 0.5rem 0.5rem 0;
+  padding: 0.4rem 0.4rem 0.4rem 0;
   border-right: 1px solid #ccc;
   color: #888;
   user-select: none;
@@ -88,18 +97,32 @@
   overflow: hidden;
 }
 
+.line-numbers > div {
+  height: 1.4em;            /* ✅ 코드 라인과 동일한 높이 */
+  line-height: 1.4em;
+  padding-right: 0.4rem;    /* 약간의 간격 */
+}
+
 /* 코드 표시 영역 */
 .code-display {
   flex: 1;
-  padding: 0.5rem;
+  padding: 0.4rem;
   overflow: auto;
   white-space: pre;
   font-family: inherit;
   font-size: inherit;
   cursor: text;
 }
-.code-display pre {
+
+/* ✅ 한 줄씩 렌더링된 코드 */
+.code-line {
   margin: 0;
+  padding: 0 0.6rem;
+  height: 1.4em;
+  line-height: 1.4em;
+}
+.code-line:hover {
+  background: rgba(0, 0, 0, 0.04);
 }
 
 /* 숨겨진 입력 필드 */

@@ -2,8 +2,12 @@
   import ControllerList from '../apply/ControllerList.svelte';
   import { dummyController } from '@/testData';
   import type { PageProps } from './$types';
+	import FileExplorer from './FileExplorer.svelte';
+	import { fileTree } from '@/stores/fileTree';
+	import type { TreeNode } from '@/types';
 
   let { data }: PageProps = $props();
+  let tree: TreeNode = $derived($fileTree);
 
   let selected = $state<string[]>([]);
   let showBackupOnly = $state(false);
@@ -51,6 +55,8 @@
     적용하기
   </button>
 </main>
+
+<FileExplorer />
 
 <style>
 main {

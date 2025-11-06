@@ -16,6 +16,7 @@ interface BaseNode {
 	id: string;
 	name: string;
 	type: NodeType;
+	checked?: boolean;
 	parentId?: string | null; // root of the file/folder
 	path?: string; // "src/routes/main.svelte"
 }
@@ -36,7 +37,19 @@ export type TreeNode = FolderNode | FileNode;
 
 // Controller Types
 export interface Controller {
-  serialNumber: string;
-  state: 'idle' | 'active' | 'error' | 'disconnected';
-  ipAddress: string;
+	serialNumber: string;
+	state: 'idle' | 'active' | 'error' | 'disconnected';
+	ipAddress: string;
+}
+
+// Differences Checks Types
+export type DiffState = 'ADDED' | 'REMOVED' | 'CHANGED';
+export type DiffFilter = 'ALL' | DiffState;
+
+export interface DiffItem {
+	line: number;
+	path: string;
+	leftValue: string;
+	rightValue: string;
+	state: DiffState;
 }

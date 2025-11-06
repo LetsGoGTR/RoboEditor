@@ -1,4 +1,4 @@
-import type { Controller, TreeNode } from './types';
+import type { Controller, DiffItem, TreeNode } from './types';
 
 // 파일만 있는 Data
 export const dummyFilesOnly: TreeNode = {
@@ -211,4 +211,12 @@ export const dummyController: Controller[] = [
 		state: 'disconnected',
 		ipAddress: '192.168.1.77'
 	}
+];
+
+// 비교 결과 Data
+export const dummyDiffs: DiffItem[] = [
+	{ line: 1, path: 'action', leftValue: '{"action":0}', rightValue: '', state: 'REMOVED' },
+	{ line: 2, path: 'cd_jog', leftValue: '{"cd_jog":0}', rightValue: '', state: 'REMOVED' },
+	{ line: 4, path: 'min_req_version', leftValue: '2400', rightValue: '1500', state: 'CHANGED' },
+	{ line: 7, path: 'path_info', leftValue: '', rightValue: '{}', state: 'ADDED' }
 ];
