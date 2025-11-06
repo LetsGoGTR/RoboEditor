@@ -54,12 +54,11 @@ ControllerInfo ControllerSetting::getControllerInfo()
         return ControllerInfo();  // 빈 구조체
     }
 
-    info.serialNumber  = ui->SNBox->text().trimmed();
-    info.ip            = ui->ipBox->text().trimmed();
-    info.username      = ui->usernameBox->text().trimmed();
-    info.sftpPort      = ui->sftpSpinBox->value();
-    info.apiPort       = ui->apiBox->text().toInt();
-    info.workspacePath = ui->WPBox->text().trimmed();
+    info.serialNumber = ui->SNBox->text().trimmed();
+    info.ip           = ui->ipBox->text().trimmed();
+    info.username     = ui->usernameBox->text().trimmed();
+    info.sftpPort     = ui->sftpSpinBox->value();
+    info.apiPort      = ui->apiBox->text().toInt();
 
     info.isConnected = m_info.isConnected;
     info.isRunning   = m_info.isRunning;
@@ -76,5 +75,4 @@ void ControllerSetting::setControllerInfo(const ControllerInfo &info)
     ui->usernameBox->setText(info.username);
     ui->sftpSpinBox->setValue(info.sftpPort);
     ui->apiBox->setText(QString::number(info.apiPort));
-    ui->WPBox->setText(info.workspacePath);
 }

@@ -1,3 +1,4 @@
+#libssh 없는 순정
 cmake_minimum_required(VERSION 3.16)
 
 project(RoboEditor VERSION 0.1 LANGUAGES CXX)
@@ -23,18 +24,29 @@ set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 FetchContent_MakeAvailable(yaml-cpp)
 
 FetchContent_Declare(
+    zlib
+    GIT_REPOSITORY https://github.com/madler/zlib.git
+    GIT_TAG        v1.3.1
+)
+FetchContent_MakeAvailable(zlib)
+
+FetchContent_Declare(
     libarchive
     GIT_REPOSITORY https://github.com/libarchive/libarchive.git
     GIT_TAG        v3.7.4 # 안정적인 최신 태그
 )
 # libarchive가 zlib 등 다른 라이브러리를 찾지 못하도록 옵션을 켭니다.
 set(ENABLE_TEST OFF CACHE BOOL "")
-set(ENABLE_ZLIB OFF CACHE BOOL "")
+set(ENABLE_ZLIB ON CACHE BOOL "")
 set(ENABLE_BZIP2 OFF CACHE BOOL "")
 set(ENABLE_LZMA OFF CACHE BOOL "")
 set(ENABLE_ZSTD OFF CACHE BOOL "")
 set(ENABLE_ICONV OFF CACHE BOOL "")
 set(ENABLE_CNG OFF CACHE BOOL "")
+
+set(ZLIB_INCLUDE_DIR ${zlib_SOURCE_DIR} ${zlib_BINARY_DIR} CACHE PATH "")
+set(ZLIB_LIBRARY zlibstatic CACHE STRING "")
+
 FetchContent_MakeAvailable(libarchive)
 
 # jsoncpp
@@ -170,6 +182,7 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         src/ui/BackupPage.ui
 
         src/ui/ControllerSettings.ui
+        src/core/FileCompressor.h src/core/FileCompressor.cpp
 
     )
 # Define target properties for Android with Qt 6 as:
@@ -214,6 +227,7 @@ target_link_libraries(RoboEditor PRIVATE archive_static)
 # yaml-cpp (for DiffYaml)
 target_link_libraries(RoboEditor PRIVATE yaml-cpp)
 
+target_link_libraries(RoboEditor PRIVATE zlibstatic)
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
 # If you are developing for iOS or macOS you should consider setting an

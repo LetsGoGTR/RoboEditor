@@ -8,6 +8,7 @@
 #include <QMessageBox>
 
 #include "ControllerSetting.h"
+#include "FileCompressor.h"
 
 static ControllerManager *getinstance = nullptr;
 
@@ -81,7 +82,6 @@ void ControllerManager::registerController()
         qDebug() << "SFTP:" << newConInfo.sftpPort;
         qDebug() << "API:" << newConInfo.apiPort;
         qDebug() << "Username:" << newConInfo.username;
-        qDebug() << "Workspace:" << newConInfo.workspacePath;
 
         saveToFile();
 
@@ -146,11 +146,10 @@ void ControllerManager::updateInfo(const ControllerInfo &newInfo)
                 if (c.serialNumber == newInfo.serialNumber) {
                     serialNumber = c.serialNumber;
 
-                    c.ip            = updated.ip;
-                    c.username      = updated.username;
-                    c.sftpPort      = updated.sftpPort;
-                    c.apiPort       = updated.apiPort;
-                    c.workspacePath = updated.workspacePath;
+                    c.ip       = updated.ip;
+                    c.username = updated.username;
+                    c.sftpPort = updated.sftpPort;
+                    c.apiPort  = updated.apiPort;
 
                     qDebug() << "[updateInfo] Controller updated:";
                     qDebug() << "SN:" << c.serialNumber;
@@ -158,7 +157,6 @@ void ControllerManager::updateInfo(const ControllerInfo &newInfo)
                     qDebug() << "Username:" << c.username;
                     qDebug() << "SFTP:" << c.sftpPort;
                     qDebug() << "API:" << c.apiPort;
-                    qDebug() << "Workspace:" << c.workspacePath;
 
                     break;
                 }
@@ -288,7 +286,7 @@ void ControllerManager::updateControllersStates()
         }
         updateConnectionState(c.serialNumber, false);
 
-        client->checkRobotRunning();
+        client->get("/api/robot/running");
     }
 }
 
@@ -379,14 +377,13 @@ void ControllerManager::saveToFile(const QString &filePath)
     QJsonArray controllersArray;
     for (const auto &c : controllers_) {
         QJsonObject obj;
-        obj["serialNumber"]  = c.serialNumber;
-        obj["ip"]            = c.ip;
-        obj["sftpPort"]      = c.sftpPort;
-        obj["apiPort"]       = c.apiPort;
-        obj["username"]      = c.username;
-        obj["workspacePath"] = c.workspacePath;
-        obj["isConnected"]   = c.isConnected;
-        obj["isRunning"]     = c.isRunning;
+        obj["serialNumber"] = c.serialNumber;
+        obj["ip"]           = c.ip;
+        obj["sftpPort"]     = c.sftpPort;
+        obj["apiPort"]      = c.apiPort;
+        obj["username"]     = c.username;
+        obj["isConnected"]  = c.isConnected;
+        obj["isRunning"]    = c.isRunning;
 
         controllersArray.append(obj);
     }
@@ -441,14 +438,13 @@ void ControllerManager::loadFromFile(const QString &filePath)
         QJsonObject obj = val.toObject();
 
         ControllerInfo c;
-        c.serialNumber  = obj["serialNumber"].toString();
-        c.ip            = obj["ip"].toString();
-        c.sftpPort      = obj["sftpPort"].toInt();
-        c.apiPort       = obj["apiPort"].toInt();
-        c.username      = obj["username"].toString();
-        c.workspacePath = obj["workspacePath"].toString();
-        c.isConnected   = obj["isConnected"].toBool(false);
-        c.isRunning     = obj["isRunning"].toBool(false);
+        c.serialNumber = obj["serialNumber"].toString();
+        c.ip           = obj["ip"].toString();
+        c.sftpPort     = obj["sftpPort"].toInt();
+        c.apiPort      = obj["apiPort"].toInt();
+        c.username     = obj["username"].toString();
+        c.isConnected  = obj["isConnected"].toBool(false);
+        c.isRunning    = obj["isRunning"].toBool(false);
 
         controllers_.append(c);
     }
@@ -457,10 +453,30 @@ void ControllerManager::loadFromFile(const QString &filePath)
 
     locker.unlock();
 
-    // ✅ 로드된 제어기들에 대해 ApiClient 자동 생성 및 폴링 시작
     for (const auto &c : controllers_) {
         setupApiClient(c.serialNumber);
     }
 
     emit controllerListChanged();
+}
+void ControllerManager::backupRequest(const QString &serialNumber)
+{
+    ApiClient *client = getApiClient(serialNumber);
+    if (!client) {
+        qWarning() << "[ControllerManager] No client for" << serialNumber;
+        return;
+    }
+
+    // 백업 저장 경로 설정
+    QString backupDir = QString("C:/backup/%1").arg(serialNumber);
+    client->download("/api/robot/export", backupDir, serialNumber);
+}
+void ControllerManager::applyRequest(const QString &serialNumber, const QString &filePath)
+{
+    ApiClient *client = getApiClient(serialNumber);
+    if (!client) {
+        qWarning() << "[ControllerManager] No client for" << serialNumber;
+        return;
+    }
+    client->upload("/api/robot/import", filePath);
 }
