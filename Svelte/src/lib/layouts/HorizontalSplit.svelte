@@ -1,9 +1,9 @@
 <script lang="ts">
   let container: HTMLDivElement | null = null;
 
-  export let initialLeftRatio: number = 20;
+  export let initialLeftRatio: number = 50;
   export let minLeftRatio: number = 10;
-  export let maxLeftRatio: number = 50;
+  export let maxLeftRatio: number = 90;
 
   let leftRatio = initialLeftRatio;
   let isResizing = false;

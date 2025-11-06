@@ -1,35 +1,26 @@
 <script lang="ts">
+	import { fileTree } from "@/stores/fileTree";
   import DirectoryTree from "@components/DirectoryTree.svelte";
-  import type { TreeNode } from "@/types";
 
-  export let workspace: TreeNode; // 루트 노드 데이터
-
-  let selected: TreeNode | null = null;
-
-  function handleSelect(node: TreeNode) {
-    selected = node;
-  }
+  let rootSelect = $derived($fileTree);
 </script>
 
 <div class="explorer">
-  <DirectoryTree root={workspace} onselect={handleSelect} />
-  {#if selected}
-    <div class="info">
-      <p><strong>{selected.name}</strong></p>
-      <p>Type: {selected.type}</p>
-    </div>
-  {/if}
+  <div class="panel">
+    <h4>Select Workspace</h4>
+    <DirectoryTree root={rootSelect} mode="select" />
+  </div>
 </div>
 
 <style>
 .explorer {
   display: flex;
-  flex-direction: column;
+  gap: 1rem;
   height: 100%;
 }
-.info {
-  margin-top: 0.5rem;
-  font-size: 0.9rem;
-  color: #444;
+.panel {
+  flex: 1;
+  border: 1px solid #ddd;
+  padding: 0.5rem;
 }
 </style>

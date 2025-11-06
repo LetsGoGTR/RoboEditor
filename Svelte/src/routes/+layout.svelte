@@ -16,7 +16,7 @@
   </header>
 
   <main class="app-main">
-    <HorizontalSplit>
+    <HorizontalSplit initialLeftRatio={20}>
       <WorkspaceSection slot="left" />
       <slot slot="right" />
     </HorizontalSplit>

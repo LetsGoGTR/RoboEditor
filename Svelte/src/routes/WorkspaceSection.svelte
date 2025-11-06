@@ -14,14 +14,14 @@
 </script>
 
 <TabLayout
-	leftTab={{ id: 'left', label: 'Workspace' }}
-	rightTab={{ id: 'right', label: 'Controller' }}
+	leftTab={{ id: 'left', label: 'Controller' }}
+	rightTab={{ id: 'right', label: 'Workspace' }}
 >
 	<div slot="left">
-		<DirectoryTree root={tree} onselect={handleSelect} />
+		<p>고급 설정 탭의 내용입니다.</p>
 	</div>
 
 	<div slot="right">
-		<p>고급 설정 탭의 내용입니다.</p>
+		<DirectoryTree root={tree} mode="view" onselect={handleSelect}/>
 	</div>
 </TabLayout>

@@ -58,6 +58,7 @@ main {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  min-width: 500px;
 }
 
 /* 상단 제목과 토글 버튼 정렬 */

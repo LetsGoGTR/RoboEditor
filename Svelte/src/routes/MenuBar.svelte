@@ -1,12 +1,33 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
+	import { page } from "$app/state";
 
-	function handleCompare() { goto('/compare'); }
+	let dialog: HTMLDialogElement;
+
+  function handleCompare() {
+		const path = page.url.pathname;
+		const id = page.params.id && page.params.id !== 'register'
+			? page.params.id
+			: null;
+
+		if (!id) {
+			dialog.showModal();
+			return;
+		}
+
+		goto(`/${id}/compare`);
+	}
+
 	function handleBackup() { goto('/backup'); }
 	function handleApply() { goto('/apply'); }
 	function handleRegister() { goto('/register'); }
-
 </script>
+
+<dialog bind:this={dialog}>
+  <h3>경고</h3>
+  <p>비교할 대상이 선택되지 않았습니다. 먼저 항목을 선택하세요.</p>
+  <button class="confirm-btn" onclick={() => {dialog.close();}}>확인</button>
+</dialog>
 
 <div class="full-width" role="menubar">
 	<ul class="menu">
@@ -37,6 +58,47 @@
 </div>
 
 <style>
+	/* dialog styles */
+	dialog {
+		border: #4e83db solid 2px;
+		border-radius: 8px;
+		padding: 1.2rem 1.5rem;
+		text-align: center;
+	}
+
+	dialog::backdrop {
+		background: rgba(0, 0, 0, 0.3);
+	}
+
+	dialog > h3 {
+		margin-top: 0;
+		color: #3f51b5; /* 상단 메뉴와 동일한 블루톤 */
+		font-size: 1.1rem;
+	}
+
+	dialog > p {
+		margin: 1rem 0;
+		font-size: 0.95rem;
+		line-height: 1.4;
+		color: #444;
+	}
+
+	.confirm-btn {
+		background: #4e83db;
+		color: white;
+		border: none;
+		border-radius: 6px;
+		padding: 0.5rem 1.2rem;
+		font-size: 0.9rem;
+		cursor: pointer;
+		transition: background 0.2s ease;
+	}
+
+	.confirm-btn:hover {
+		background: #32419c;
+	}
+
+	/* nav styles */
 	.full-width {
 		display: block; /* 인라인 요소라면 block으로 변경 */
 		width: 100%; /* 부모 너비의 100% 차지 */
