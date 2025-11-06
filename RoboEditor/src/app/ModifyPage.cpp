@@ -183,9 +183,13 @@ void ModifyPage::showCompare()
 
 void ModifyPage::ensureCompare(const QString &targetPath)
 {
+    // 현재 활성 탭의 편집기 가져오기
+    CodeEditor *leftEditor = qobject_cast<CodeEditor *>(tabWidget->currentWidget());
+    
     if (comparePane_) {
-        // 이미 존재하면 경로만 업데이트
+        // 이미 존재하면 경로만 업데이트하고 좌측 편집기도 갱신
         comparePane_->setTargetPath(targetPath);
+        comparePane_->setLeftEditor(leftEditor);
         comparePane_->show();
         return;
     }
@@ -193,6 +197,7 @@ void ModifyPage::ensureCompare(const QString &targetPath)
     // 새로 생성
     comparePane_ = new ComparePage(this);
     comparePane_->setTargetPath(targetPath);
+    comparePane_->setLeftEditor(leftEditor);  // 좌측 편집기 설정
     mainSplit_->addWidget(comparePane_);
     mainSplit_->setStretchFactor(0, 1);
     mainSplit_->setStretchFactor(1, 0);
@@ -200,6 +205,14 @@ void ModifyPage::ensureCompare(const QString &targetPath)
     connect(comparePane_, &ComparePage::closed, this, &ModifyPage::closeCompare);
     connect(comparePane_, &ComparePage::targetPathChanged, this, [this](const QString &path) {
         lastComparedPath_ = path;
+    });
+    
+    // 탭이 변경될 때마다 좌측 편집기 갱신
+    connect(tabWidget, &QTabWidget::currentChanged, this, [this]() {
+        if (comparePane_ && comparePane_->isVisible()) {
+            CodeEditor *currentEditor = qobject_cast<CodeEditor *>(tabWidget->currentWidget());
+            comparePane_->setLeftEditor(currentEditor);
+        }
     });
     
     // Debouncing 타이머 초기화
@@ -240,6 +253,112 @@ void ModifyPage::closeCompare()
     comparePane_->setParent(nullptr);  // 스플리터에서 분리
     comparePane_->deleteLater();
     comparePane_ = nullptr;
+}
+
+void ModifyPage::showCompareFolders()
+{
+    // 현재 열린 파일이 있는지 확인
+    bool hasOpenFile = (currentDoc != nullptr && !currentDoc->gfilePath().isEmpty());
+    
+    QString leftPath;
+    QString rightPath;
+    
+    if (hasOpenFile) {
+        // 파일이 열려있는 경우: 해당 파일의 폴더 vs 다른 폴더/압축 파일
+        QFileInfo currentFileInfo(currentDoc->gfilePath());
+        leftPath = currentFileInfo.absolutePath();  // 현재 파일의 폴더
+        
+        QMessageBox msgBox(this);
+        msgBox.setWindowTitle(tr("폴더 비교"));
+        msgBox.setText(tr("현재 파일의 폴더와 비교할 폴더/압축 파일을 선택하세요:\n현재: %1")
+                       .arg(leftPath));
+        msgBox.setIcon(QMessageBox::Information);
+        msgBox.setStandardButtons(QMessageBox::Ok | QMessageBox::Cancel);
+        
+        if (msgBox.exec() != QMessageBox::Ok) {
+            return;
+        }
+        
+        // 비교할 폴더/압축 파일 선택
+        QFileDialog dialog(this, tr("Select folder or archive to compare"), "C:/backup");
+        dialog.setFileMode(QFileDialog::Directory);
+        dialog.setOption(QFileDialog::ShowDirsOnly, false);
+        dialog.setOption(QFileDialog::DontUseNativeDialog, true);
+        dialog.setNameFilter(tr("Folders and Archives (*.zip *.tar *.tar.gz *.tgz)"));
+        
+        if (dialog.exec() == QDialog::Accepted) {
+            QStringList paths = dialog.selectedFiles();
+            if (!paths.isEmpty()) {
+                rightPath = paths.first();
+            }
+        }
+        
+        if (rightPath.isEmpty()) {
+            return;
+        }
+        
+    } else {
+        // 파일이 열려있지 않은 경우: 두 폴더/압축 파일 선택
+        QMessageBox msgBox(this);
+        msgBox.setWindowTitle(tr("폴더 비교"));
+        msgBox.setText(tr("열린 파일이 없습니다.\n비교할 두 폴더/압축 파일을 선택해주세요."));
+        msgBox.setIcon(QMessageBox::Information);
+        msgBox.setStandardButtons(QMessageBox::Ok | QMessageBox::Cancel);
+        
+        if (msgBox.exec() != QMessageBox::Ok) {
+            return;
+        }
+        
+        // 첫 번째 폴더/압축 파일 선택
+        QFileDialog dialog1(this, tr("Select first folder or archive (compare)"), "C:/backup");
+        dialog1.setFileMode(QFileDialog::Directory);
+        dialog1.setOption(QFileDialog::ShowDirsOnly, false);
+        dialog1.setOption(QFileDialog::DontUseNativeDialog, true);
+        dialog1.setNameFilter(tr("Folders and Archives (*.zip *.tar *.tar.gz *.tgz)"));
+        
+        if (dialog1.exec() == QDialog::Accepted) {
+            QStringList paths = dialog1.selectedFiles();
+            if (!paths.isEmpty()) {
+                leftPath = paths.first();
+            }
+        }
+        
+        if (leftPath.isEmpty()) {
+            return;
+        }
+        
+        // 두 번째 폴더/압축 파일 선택
+        QFileDialog dialog2(this, tr("Select second folder or archive (base)"), "C:/backup");
+        dialog2.setFileMode(QFileDialog::Directory);
+        dialog2.setOption(QFileDialog::ShowDirsOnly, false);
+        dialog2.setOption(QFileDialog::DontUseNativeDialog, true);
+        dialog2.setNameFilter(tr("Folders and Archives (*.zip *.tar *.tar.gz *.tgz)"));
+        
+        if (dialog2.exec() == QDialog::Accepted) {
+            QStringList paths = dialog2.selectedFiles();
+            if (!paths.isEmpty()) {
+                rightPath = paths.first();
+            }
+        }
+        
+        if (rightPath.isEmpty()) {
+            return;
+        }
+    }
+    
+    // ComparePage가 없으면 생성
+    if (!comparePane_) {
+        comparePane_ = new ComparePage(this);
+        mainSplit_->addWidget(comparePane_);
+        mainSplit_->setStretchFactor(0, 1);
+        mainSplit_->setStretchFactor(1, 0);
+        
+        connect(comparePane_, &ComparePage::closed, this, &ModifyPage::closeCompare);
+    }
+    
+    // 폴더 비교 수행
+    comparePane_->show();
+    comparePane_->performFolderDiff(leftPath, rightPath);
 }
 
 void ModifyPage::openFromTree(const QString &path)
