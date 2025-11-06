@@ -2,8 +2,9 @@
 	import { goto } from "$app/navigation";
 
 	function handleCompare() { goto('/compare'); }
-	function handleBackup() { goto('/backup') };
-	function handleApply() { goto('apply') };
+	function handleBackup() { goto('/backup'); }
+	function handleApply() { goto('/apply'); }
+	function handleRegister() { goto('/register'); }
 
 </script>
 
@@ -22,11 +23,15 @@
 			<span>도구</span>
 			<ul class="dropdown">
 				<li><button onclick={handleCompare}>비교</button></li>
+			</ul>
+		</li>
+		<li><span>제어기</span>
+			<ul class="dropdown">
+				<li><button onclick={handleRegister}>제어기 등록</button></li>
 				<li><button onclick={handleBackup}>제어기로부터 백업</button></li>
 				<li><button onclick={handleApply}>제어기에 적용</button></li>
 			</ul>
-		</li>
-		<li><span>제어기</span></li>
+			</li>
 		<li><span>설정</span></li>
 	</ul>
 </div>

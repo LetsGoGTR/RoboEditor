@@ -3,7 +3,6 @@
 
 <div class="header">
 	<span class="title">RoboEditor</span>
-	<span class="file-name">파일 이름</span>
 </div>
 
 <style>
@@ -19,10 +18,5 @@
 
 		font-size: 24px;
 		font-weight: 700;
-	}
-
-	.file-name {
-		font-size: 20px;
-		font-weight: 400;
 	}
 </style>
