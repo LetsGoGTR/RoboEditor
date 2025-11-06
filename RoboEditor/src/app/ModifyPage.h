@@ -97,6 +97,7 @@ class ModifyPage : public QWidget
         
         // Debouncing을 위한 타이머
         QTimer *diffDebounceTimer_{nullptr};
+        QMetaObject::Connection editorTextChangedConnection_;  // editorTextChangedForDiff 연결 추적
         
         // 라인번호
         LineNumberArea *lineArea_{nullptr};
@@ -141,6 +142,13 @@ class ModifyPage : public QWidget
         void showCompare();  // Compare 버튼 진입: "닫힘→파일선택", "열림→재비교"
         void showCompareFolders();  // 폴더 비교 버튼: 파일 유무에 따라 동작 분기
         void closeCompare();  // ComparePane의 [X] 클릭 시 호출
+
+      public:
+        // 설정 저장/복원
+        QByteArray saveSplitterState() const;
+        void       restoreSplitterState(const QByteArray &state);
+        void       saveComparePageState();  // ComparePage의 상태 저장
+        void       restoreCompareSettings(); // ComparePage 설정 복원
 
       protected:
         void dragEnterEvent(QDragEnterEvent * event) override;

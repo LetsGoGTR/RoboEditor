@@ -61,6 +61,21 @@ ComparePage::~ComparePage()
     cleanupTempFolders();
 }
 
+QByteArray ComparePage::saveSplitterState() const
+{
+    if (rightSplit_) {
+        return rightSplit_->saveState();
+    }
+    return QByteArray();
+}
+
+void ComparePage::restoreSplitterState(const QByteArray &state)
+{
+    if (rightSplit_ && !state.isEmpty()) {
+        rightSplit_->restoreState(state);
+    }
+}
+
 QWidget *ComparePage::buildDock()
 {
     auto w = new QWidget(this);
@@ -530,6 +545,37 @@ void ComparePage::setLeftEditor(CodeEditor *leftEditor)
     if (leftText_) {
         leftText_->setDiffHighlighter(leftDiffHighlighter_);
     }
+}
+
+void ComparePage::clearHighlights()
+{
+    // 좌측 편집기의 하이라이트 제거 및 DiffHighlighter 연결 해제
+    // leftText_는 ModifyPage의 CodeEditor이므로 DiffHighlighter 연결을 완전히 제거해야 함
+    if (leftText_) {
+        leftText_->clearDiffHighlights();
+        
+        // CodeEditor에서 DiffHighlighter 연결 완전히 제거 (삭제된 객체 참조 방지)
+        leftText_->setDiffHighlighter(nullptr);
+    }
+    
+    // 우측 편집기의 하이라이트 제거
+    if (rightText_) {
+        rightText_->clearDiffHighlights();
+        
+        // 우측 편집기에서도 DiffHighlighter 연결 제거
+        rightText_->setDiffHighlighter(nullptr);
+    }
+    
+    // DiffHighlighter의 상태도 초기화
+    if (leftDiffHighlighter_) {
+        leftDiffHighlighter_->clearLineStates();
+    }
+    if (rightDiffHighlighter_) {
+        rightDiffHighlighter_->clearLineStates();
+    }
+    
+    // leftText_ 포인터는 ComparePage가 삭제될 때 자동으로 무효화되므로
+    // 여기서는 nullptr로 설정하지 않음
 }
 
 void ComparePage::setTargetPath(const QString &path)

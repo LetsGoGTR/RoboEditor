@@ -35,6 +35,7 @@ class ComparePage : public QWidget
         
         void setTargetPath(const QString &path);  // 파일 선택 시 1회 호출
         void setLeftEditor(CodeEditor *leftEditor);  // 좌측 편집기 설정
+        void clearHighlights();  // 하이라이트 제거
 
         QWidget *buildDiffPanel();
         struct DiffRow
@@ -52,6 +53,10 @@ class ComparePage : public QWidget
 
         // 폴더 비교 관련
         void performFolderDiff(const QString &leftPath, const QString &rightPath);
+
+        // 설정 저장/복원
+        QByteArray saveSplitterState() const;
+        void       restoreSplitterState(const QByteArray &state);
 
       public slots:
         void recalcDiff(const QString &leftText);  // 좌 텍스트 받아 재계산
