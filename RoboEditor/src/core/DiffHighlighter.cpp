@@ -60,5 +60,5 @@ DiffHighlighter::HighlightColors DiffHighlighter::getColors() const
     return colors_;
 }
 
-}  // namespace core
+}
 
