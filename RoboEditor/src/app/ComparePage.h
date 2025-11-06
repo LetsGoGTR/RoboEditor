@@ -3,6 +3,7 @@
 #pragma once
 
 #include <QList>
+#include <QPair>
 #include <QSplitter>
 #include <QString>
 #include <QStringList>
@@ -35,6 +36,7 @@ class ComparePage : public QWidget
         
         void setTargetPath(const QString &path);  // 파일 선택 시 1회 호출
         void setLeftEditor(CodeEditor *leftEditor);  // 좌측 편집기 설정
+        void clearHighlights();  // 하이라이트 제거
 
         QWidget *buildDiffPanel();
         struct DiffRow
@@ -53,8 +55,12 @@ class ComparePage : public QWidget
         // 폴더 비교 관련
         void performFolderDiff(const QString &leftPath, const QString &rightPath);
 
+        // 설정 저장/복원
+        QByteArray saveSplitterState() const;
+        void       restoreSplitterState(const QByteArray &state);
+
       public slots:
-        void recalcDiff(const QString &leftText);  // 좌 텍스트 받아 재계산
+        void recalcDiff(const QString &leftText, const QString &leftPath = QString());  // 좌 텍스트 받아 재계산
 
       signals:
         // 메인/센터스택 쪽으로 전달할 로그용 이벤트
@@ -76,6 +82,8 @@ class ComparePage : public QWidget
         QTreeWidget  *folderDiffTree_ = nullptr;  // 폴더 비교 결과 트리
         QLabel       *statLabel_ = nullptr;
         QString       targetPath_;
+        QString       cachedLeftPath_;
+        QString       cachedLeftText_;
         
         // DiffHighlighter 객체 (양쪽 편집기 공유)
         core::DiffHighlighter *leftDiffHighlighter_{nullptr};   // 좌측 편집기용
@@ -102,7 +110,9 @@ class ComparePage : public QWidget
         QList<DiffRow> parseDiffResult(const Json::Value &result, const QString &fileType);
         
         // 테이블 컬럼 조정
-        void updateTableColumns(const QString &fileType);
+        void updateTableColumns(const QString &fileType,
+                                const QString &leftHeaderOverride = QString(),
+                                const QString &rightHeaderOverride = QString());
 
         // 필터 관련
         void applyFilter(const QString &filterType);
@@ -112,6 +122,19 @@ class ComparePage : public QWidget
         QString extractArchiveToTemp(const QString &archivePath);
         void cleanupTempFolders();
         QColor getColorForDiffState(const QString &state) const;
+
+        QString detectFileType(const QString &path) const;
+        bool areFileTypesCompatible(const QString &leftType, const QString &rightType) const;
+
+        struct ControllerPathInfo
+        {
+            QString serial;
+            QString detail;
+        };
+
+        ControllerPathInfo extractControllerInfo(const QString &path) const;
+        QPair<QString, QString> determineColumnHeaders(const QString &leftPath,
+                                                       const QString &rightPath) const;
 };
 
 #endif  // COMPAREPAGE_H

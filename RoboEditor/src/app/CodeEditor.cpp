@@ -1,5 +1,6 @@
 #include "CodeEditor.h"
 
+#include <QDebug>
 #include <QTextBlock>
 
 #include <QPaintEvent>

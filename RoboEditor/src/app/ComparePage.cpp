@@ -31,6 +31,7 @@
 #include <QUuid>
 #include <QListView>
 #include <QList>
+#include <QSet>
 
 #include "DropTextEdit.h"
 #include "CodeEditor.h"
@@ -59,6 +60,21 @@ ComparePage::~ComparePage()
 {
     // 임시 폴더 정리
     cleanupTempFolders();
+}
+
+QByteArray ComparePage::saveSplitterState() const
+{
+    if (rightSplit_) {
+        return rightSplit_->saveState();
+    }
+    return QByteArray();
+}
+
+void ComparePage::restoreSplitterState(const QByteArray &state)
+{
+    if (rightSplit_ && !state.isEmpty()) {
+        rightSplit_->restoreState(state);
+    }
 }
 
 QWidget *ComparePage::buildDock()
@@ -529,7 +545,44 @@ void ComparePage::setLeftEditor(CodeEditor *leftEditor)
     // 좌측 편집기에 좌측 DiffHighlighter 설정
     if (leftText_) {
         leftText_->setDiffHighlighter(leftDiffHighlighter_);
+        cachedLeftPath_ = leftText_->lastLoadedPath();
+        cachedLeftText_ = leftText_->toPlainText();
+
+        if (!targetPath_.isEmpty()) {
+            recalcDiff(cachedLeftText_, cachedLeftPath_);
+        }
     }
+}
+
+void ComparePage::clearHighlights()
+{
+    // 좌측 편집기의 하이라이트 제거 및 DiffHighlighter 연결 해제
+    // leftText_는 ModifyPage의 CodeEditor이므로 DiffHighlighter 연결을 완전히 제거해야 함
+    if (leftText_) {
+        leftText_->clearDiffHighlights();
+        
+        // CodeEditor에서 DiffHighlighter 연결 완전히 제거 (삭제된 객체 참조 방지)
+        leftText_->setDiffHighlighter(nullptr);
+    }
+    
+    // 우측 편집기의 하이라이트 제거
+    if (rightText_) {
+        rightText_->clearDiffHighlights();
+        
+        // 우측 편집기에서도 DiffHighlighter 연결 제거
+        rightText_->setDiffHighlighter(nullptr);
+    }
+    
+    // DiffHighlighter의 상태도 초기화
+    if (leftDiffHighlighter_) {
+        leftDiffHighlighter_->clearLineStates();
+    }
+    if (rightDiffHighlighter_) {
+        rightDiffHighlighter_->clearLineStates();
+    }
+    
+    // leftText_ 포인터는 ComparePage가 삭제될 때 자동으로 무효화되므로
+    // 여기서는 nullptr로 설정하지 않음
 }
 
 void ComparePage::setTargetPath(const QString &path)
@@ -579,9 +632,14 @@ void ComparePage::setTargetPath(const QString &path)
     rightText_ = newTextEdit;
 
     emit targetPathChanged(path);
+
+    QString leftContent = leftText_ ? leftText_->toPlainText() : cachedLeftText_;
+    if (!cachedLeftPath_.isEmpty()) {
+        recalcDiff(leftContent, cachedLeftPath_);
+    }
 }
 
-void ComparePage::recalcDiff(const QString &leftText)
+void ComparePage::recalcDiff(const QString &leftText, const QString &leftPath)
 {
     // compareTabWidget_이 null이거나 탭이 없으면 리턴
     if (!compareTabWidget_ || compareTabWidget_->count() == 0) {
@@ -589,6 +647,14 @@ void ComparePage::recalcDiff(const QString &leftText)
     }
 
     const QString rightText = rightText_ ? rightText_->toPlainText() : QString();
+
+    QString effectiveLeftPath = leftPath;
+    if (effectiveLeftPath.isEmpty() && leftText_) {
+        effectiveLeftPath = leftText_->lastLoadedPath();
+    }
+
+    cachedLeftText_ = leftText;
+    cachedLeftPath_ = effectiveLeftPath;
 
     // (임시) 빈 diff라도 테이블이 null이 아니도록 보장
     if (!diffTable_)
@@ -622,16 +688,41 @@ void ComparePage::recalcDiff(const QString &leftText)
     std::string leftNameStr     = "ModifyPage"; // 임시 이름
     
     // 파일 타입 감지 (확장자 기반)
-    QFileInfo fileInfo(targetPath_);
-    QString ext = fileInfo.suffix().toLower();
-    QString fileType;
-    
-    if (ext == "yaml" || ext == "yml" || ext == "pts") {
-        fileType = "yaml";
-    } else if (ext == "py" || ext == "srl" || ext == "sbp") {
-        fileType = "python";
-    } else {
-        fileType = "text";
+    QString fileType = detectFileType(targetPath_);
+    QPair<QString, QString> columnHeaders = determineColumnHeaders(effectiveLeftPath, targetPath_);
+
+    if (!effectiveLeftPath.isEmpty()) {
+        QString leftFileType = detectFileType(effectiveLeftPath);
+        QString leftSuffix   = QFileInfo(effectiveLeftPath).suffix();
+        QString rightSuffix  = QFileInfo(targetPath_).suffix();
+
+        bool suffixMismatch = !leftSuffix.isEmpty() && !rightSuffix.isEmpty() &&
+                              leftSuffix.compare(rightSuffix, Qt::CaseInsensitive) != 0;
+
+        if (suffixMismatch || !areFileTypesCompatible(leftFileType, fileType)) {
+            updateTableColumns(fileType, columnHeaders.first, columnHeaders.second);
+
+            QString normalizedLeftSuffix = leftSuffix.toUpper();
+            if (normalizedLeftSuffix.isEmpty()) {
+                normalizedLeftSuffix = leftFileType.isEmpty() ? tr("없음") : leftFileType.toUpper();
+            }
+
+            QString normalizedRightSuffix = rightSuffix.toUpper();
+            if (normalizedRightSuffix.isEmpty()) {
+                normalizedRightSuffix = fileType.isEmpty() ? tr("없음") : fileType.toUpper();
+            }
+
+            DiffRow errorRow;
+            errorRow.key   = tr("확장자 불일치");
+            errorRow.origin = tr("%1").arg(normalizedRightSuffix);
+            errorRow.target = tr("%1").arg(normalizedLeftSuffix);
+            errorRow.state  = "MISMATCH";
+
+    QList<DiffRow> mismatchRows;
+            mismatchRows.append(errorRow);
+            setDiffRows(mismatchRows);
+            return;
+        }
     }
     
     services::ServiceResult result = services::DiffService::diff(rightContentStr, 
@@ -701,7 +792,7 @@ void ComparePage::recalcDiff(const QString &leftText)
     }
     
     // 테이블 컬럼 업데이트
-    updateTableColumns(fileType);
+            updateTableColumns(fileType, columnHeaders.first, columnHeaders.second);
     
     // 결과 파싱 및 표시 (core의 DiffService가 이미 모든 비교와 에러 처리를 수행함)
     QList<DiffRow> diffRows = parseDiffResult(result.data, fileType);
@@ -885,6 +976,22 @@ void ComparePage::refreshDiffTable(const QList<DiffRow> &rows)
                 itemRight->setText("");
                 itemRight->setForeground(QBrush(textColor));
             }
+        } else if (r.state == "MISMATCH") {
+            // 주황색 - 확장자 불일치(형식 오류와 구분)
+            QColor bgColor(255, 237, 213);
+            QColor textColor(194, 65, 12);
+
+            if (itemLine) itemLine->setBackground(bgColor);
+            itemKey->setBackground(bgColor);
+            itemLeft->setBackground(bgColor);
+            itemRight->setBackground(bgColor);
+            itemState->setBackground(bgColor);
+
+            itemState->setForeground(QBrush(textColor));
+            QFont boldFont = itemState->font();
+            boldFont.setBold(true);
+            itemState->setFont(boldFont);
+            itemState->setText("⚠ 확장자 불일치");
         }
 
         // 텍스트 정렬
@@ -993,17 +1100,35 @@ void ComparePage::performDiff(const QString &leftPath, const QString &rightPath)
     rightFile.close();
     
     // 파일 타입 감지
-    QFileInfo fileInfo(rightPath);
-    QString ext = fileInfo.suffix().toLower();
-    QString fileType;
-    
-    if (ext == "yaml" || ext == "yml" || ext == "pts") {
-        fileType = "yaml";
-    } else if (ext == "py" || ext == "srl" || ext == "sbp") {
-        fileType = "python";
-    } else {
-        fileType = "text";
+    QString leftFileType = detectFileType(leftPath);
+    QString rightFileType = detectFileType(rightPath);
+
+    if (!areFileTypesCompatible(leftFileType, rightFileType)) {
+        QString leftSuffix = QFileInfo(leftPath).suffix();
+        QString rightSuffix = QFileInfo(rightPath).suffix();
+
+        if (leftSuffix.isEmpty()) {
+            leftSuffix = leftFileType.toUpper();
+        } else {
+            leftSuffix = leftSuffix.toUpper();
+        }
+
+        if (rightSuffix.isEmpty()) {
+            rightSuffix = rightFileType.toUpper();
+        } else {
+            rightSuffix = rightSuffix.toUpper();
+        }
+
+        QMessageBox::warning(this,
+                             tr("파일 형식 불일치"),
+                             tr("서로 다른 형식의 파일은 비교할 수 없습니다.\n왼쪽: %1\n오른쪽: %2")
+                                 .arg(leftSuffix)
+                                 .arg(rightSuffix));
+        return;
     }
+
+    QString fileType = rightFileType;
+    QPair<QString, QString> columnHeaders = determineColumnHeaders(leftPath, rightPath);
     
     // DiffService를 사용하여 diff 수행
     // 주의: right가 기준(base), left가 비교 대상(compare)
@@ -1081,7 +1206,7 @@ void ComparePage::performDiff(const QString &leftPath, const QString &rightPath)
     }
     
     // 테이블 컬럼 업데이트
-    updateTableColumns(fileType);
+    updateTableColumns(fileType, columnHeaders.first, columnHeaders.second);
     
     // 결과 파싱 및 표시 (core의 DiffService가 이미 모든 비교와 에러 처리를 수행함)
     QList<DiffRow> diffRows = parseDiffResult(result.data, fileType);
@@ -1137,14 +1262,22 @@ void ComparePage::performDiff(const QString &leftPath, const QString &rightPath)
     emit uiCompareClicked(leftPath, rightPath);
 }
 
-void ComparePage::updateTableColumns(const QString &fileType)
+void ComparePage::updateTableColumns(const QString &fileType,
+                                     const QString &leftHeaderOverride,
+                                     const QString &rightHeaderOverride)
 {
     if (!diffTable_) return;
     
+    auto resolveHeader = [](const QString &overrideText, const QString &fallback) {
+        return overrideText.isEmpty() ? fallback : overrideText;
+    };
+
     if (fileType == "yaml") {
         // YAML: Line, Path, Left Value, Right Value, State
         diffTable_->setColumnCount(5);
-        diffTable_->setHorizontalHeaderLabels({"Line", "Path", "Left Value (Compare)", "Right Value (Base)", "State"});
+        QString leftHeader  = resolveHeader(leftHeaderOverride, tr("Left Value (Compare)"));
+        QString rightHeader = resolveHeader(rightHeaderOverride, tr("Right Value (Base)"));
+        diffTable_->setHorizontalHeaderLabels({"Line", "Path", leftHeader, rightHeader, "State"});
         diffTable_->setColumnWidth(0, 50);   // Line
         diffTable_->setColumnWidth(1, 120);  // Path
         diffTable_->setColumnWidth(2, 150);  // Left Value
@@ -1153,7 +1286,9 @@ void ComparePage::updateTableColumns(const QString &fileType)
     } else if (fileType == "python" || fileType == "text") {
         // Python/Text: Line, Left Content, Right Content, State (순서 변경)
         diffTable_->setColumnCount(4);
-        diffTable_->setHorizontalHeaderLabels({"Line", "Left Content (Compare)", "Right Content (Base)", "State"});
+        QString leftHeader  = resolveHeader(leftHeaderOverride, tr("Left Content (Compare)"));
+        QString rightHeader = resolveHeader(rightHeaderOverride, tr("Right Content (Base)"));
+        diffTable_->setHorizontalHeaderLabels({"Line", leftHeader, rightHeader, "State"});
         diffTable_->setColumnWidth(0, 50);   // Line (줄임)
         diffTable_->setColumnWidth(1, 150);  // Left Content (줄임)
         diffTable_->setColumnWidth(2, 150);  // Right Content (줄임)
@@ -1161,7 +1296,9 @@ void ComparePage::updateTableColumns(const QString &fileType)
     } else {
         // 기본값
         diffTable_->setColumnCount(4);
-        diffTable_->setHorizontalHeaderLabels({"Key", "Left", "Right", "State"});
+        QString leftHeader  = resolveHeader(leftHeaderOverride, tr("Left"));
+        QString rightHeader = resolveHeader(rightHeaderOverride, tr("Right"));
+        diffTable_->setHorizontalHeaderLabels({"Key", leftHeader, rightHeader, "State"});
         diffTable_->setColumnWidth(0, 50);
         diffTable_->setColumnWidth(1, 150);
         diffTable_->setColumnWidth(2, 150);
@@ -1537,6 +1674,123 @@ QColor ComparePage::getColorForDiffState(const QString &state) const
         return QColor(255, 250, 205);  // 연한 노란색
     }
     return QColor(255, 255, 255);  // 흰색 (기본)
+}
+
+QString ComparePage::detectFileType(const QString &path) const
+{
+    QString ext = QFileInfo(path).suffix().toLower();
+
+    static const QSet<QString> yamlExts   = {"yaml", "yml", "pts"};
+    static const QSet<QString> pythonExts = {"py", "srl", "sbp"};
+
+    if (yamlExts.contains(ext)) {
+        return "yaml";
+    }
+
+    if (pythonExts.contains(ext)) {
+        return "python";
+    }
+
+    return "text";
+}
+
+bool ComparePage::areFileTypesCompatible(const QString &leftType, const QString &rightType) const
+{
+    if (leftType == rightType) {
+        return true;
+    }
+
+    if (leftType == "text" && rightType == "text") {
+        return true;
+    }
+
+    return false;
+}
+
+ComparePage::ControllerPathInfo ComparePage::extractControllerInfo(const QString &path) const
+{
+    ControllerPathInfo info;
+    if (path.isEmpty())
+        return info;
+
+    QString normalized = QDir::fromNativeSeparators(QDir::cleanPath(path));
+    QStringList parts = normalized.split('/', Qt::SkipEmptyParts);
+    if (parts.isEmpty())
+        return info;
+
+    int backupIndex = -1;
+    for (int i = 0; i < parts.size(); ++i) {
+        if (parts[i].compare("backup", Qt::CaseInsensitive) == 0) {
+            backupIndex = i;
+            break;
+        }
+    }
+
+    if (backupIndex < 0)
+        return info;
+
+    int serialIndex = backupIndex + 1;
+    if (serialIndex >= parts.size())
+        return info;
+
+    QString serialCandidate = parts[serialIndex];
+    if (serialCandidate.compare("temp", Qt::CaseInsensitive) == 0) {
+        serialIndex++;
+        if (serialIndex >= parts.size())
+            return info;
+        serialCandidate = parts[serialIndex];
+    }
+
+    info.serial = serialCandidate;
+
+    int detailIndex = serialIndex + 1;
+    if (detailIndex >= 0 && detailIndex < parts.size() - 1) {
+        info.detail = parts[detailIndex];
+    }
+
+    return info;
+}
+
+QPair<QString, QString> ComparePage::determineColumnHeaders(const QString &leftPath,
+                                                           const QString &rightPath) const
+{
+    ControllerPathInfo leftInfo  = extractControllerInfo(leftPath);
+    ControllerPathInfo rightInfo = extractControllerInfo(rightPath);
+
+    QString leftHeader;
+    QString rightHeader;
+
+    bool leftHasSerial  = !leftInfo.serial.isEmpty();
+    bool rightHasSerial = !rightInfo.serial.isEmpty();
+    bool sameController = leftHasSerial && rightHasSerial &&
+                          leftInfo.serial.compare(rightInfo.serial, Qt::CaseInsensitive) == 0;
+
+    if (sameController) {
+        if (!leftInfo.detail.isEmpty())
+            leftHeader = leftInfo.detail;
+        else if (leftHasSerial)
+            leftHeader = leftInfo.serial;
+
+        if (!rightInfo.detail.isEmpty())
+            rightHeader = rightInfo.detail;
+        else if (rightHasSerial)
+            rightHeader = rightInfo.serial;
+    } else {
+        if (leftHasSerial)
+            leftHeader = leftInfo.serial;
+        if (rightHasSerial)
+            rightHeader = rightInfo.serial;
+    }
+
+    if (leftHeader.isEmpty() && !leftPath.isEmpty()) {
+        leftHeader = QFileInfo(leftPath).fileName();
+    }
+
+    if (rightHeader.isEmpty() && !rightPath.isEmpty()) {
+        rightHeader = QFileInfo(rightPath).fileName();
+    }
+
+    return {leftHeader, rightHeader};
 }
 
 void ComparePage::displayFolderDiffResult(const Json::Value &result)
