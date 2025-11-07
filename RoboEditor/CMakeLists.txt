@@ -183,6 +183,7 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
 
         src/ui/ControllerSettings.ui
         src/core/FileCompressor.h src/core/FileCompressor.cpp
+        RoboEditor.qrc
 
     )
 # Define target properties for Android with Qt 6 as:

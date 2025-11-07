@@ -147,6 +147,7 @@ void CenterStack::setupUI()
 
     backupTree_ = new QTreeView;
     backupTree_->setModel(backupModel_);
+    backupTree_->header()->hide();
     backupTree_->setColumnHidden(1, true);
     backupTree_->setColumnHidden(2, true);
     backupTree_->setColumnHidden(3, true);
@@ -172,6 +173,7 @@ void CenterStack::setupUI()
 
     workspaceTree_ = new QTreeView;
     workspaceTree_->setModel(workspaceModel_);
+    workspaceTree_->header()->hide();
     workspaceTree_->setColumnHidden(1, true);
     workspaceTree_->setColumnHidden(2, true);
     workspaceTree_->setColumnHidden(3, true);
