@@ -34,7 +34,7 @@ ModifyPage::ModifyPage(QWidget *parent) : QWidget(parent), currentDoc(nullptr)
         editor_              = qobject_cast<QPlainTextEdit *>(tabWidget->widget(index));
 
         updateTitle();
-        
+
         // ComparePage가 열려있으면 현재 편집기 업데이트
         // comparePane_가 유효하고 삭제되지 않았는지 확인
         ComparePage *pane = comparePane_;
@@ -74,6 +74,7 @@ Document *ModifyPage::openDocument(const QString &path)
         return nullptr;
     }
 
+    // 기존의 있는 파일인지 확인
     for (int i = 0; i < documents.size(); i++) {
         if (documents[i]->gfilePath() == path) {
             tabWidget->setCurrentIndex(i);
@@ -88,7 +89,7 @@ Document *ModifyPage::openDocument(const QString &path)
         return nullptr;
     }
 
-    auto *neweditor_ = new CodeEditor();
+    auto *neweditor_ = new CodeEditor(tabWidget);
     neweditor_->setLoadedText(doc->gcontent(), path);
 
     int index = tabWidget->addTab(neweditor_, doc->gfileName());
@@ -105,11 +106,8 @@ Document *ModifyPage::openDocument(const QString &path)
         }
     });
 
-    connect(neweditor_, &DropTextEdit::fileDroppedToLeft, this, [this](const QString &p) {
-        emit editorFileDropped(p);
-    });
-    connect(neweditor_, &DropTextEdit::fileDroppedToRight, this, [this](const QString &p) {
-        emit editorFileDropped(p);
+    connect(neweditor_, &DropTextEdit::fileDropped, this, [this](const QString &path) {
+        openDocument(path);
     });
 
     currentDoc = doc;
@@ -120,10 +118,8 @@ Document *ModifyPage::openDocument(const QString &path)
 
     if (comparePane_) {
         ComparePage *pane = comparePane_;
-        if (pane == comparePane_) {
-            pane->setLeftEditor(qobject_cast<CodeEditor *>(neweditor_));
-            pane->recalcDiff(currentLeftText(), currentLeftPath());
-        }
+        pane->setLeftEditor(qobject_cast<CodeEditor *>(neweditor_));
+        pane->recalcDiff(currentLeftText(), currentLeftPath());
     }
 
     return doc;
@@ -198,7 +194,8 @@ void ModifyPage::showCompare()
             targetPath = lastComparedPath_;
         } else if (result == QMessageBox::No) {
             // 새 파일 선택 - C:/backup에서 시작
-            targetPath = QFileDialog::getOpenFileName(this, tr("Select file to compare"), "C:/backup");
+            targetPath =
+                    QFileDialog::getOpenFileName(this, tr("Select file to compare"), "C:/backup");
         } else {
             // 취소
             return;
@@ -215,7 +212,7 @@ void ModifyPage::showCompare()
     lastComparedPath_ = targetPath;
     ensureCompare(targetPath);
     comparePane_->recalcDiff(currentLeftText(), currentLeftPath());
-    
+
     // ComparePage가 완전히 생성된 후 설정 복원
     restoreCompareSettings();
 }
@@ -224,22 +221,22 @@ void ModifyPage::restoreCompareSettings()
 {
     if (!comparePane_ || !mainSplit_)
         return;
-        
+
     QString configFile = "C:/backup/config/settings.ini";
     if (!QFile::exists(configFile))
         return;
-    
+
     // ComparePage 포인터를 로컬에 저장하여 삭제 후 접근 방지
     ComparePage *pane = comparePane_;
-    
+
     // ComparePage가 완전히 렌더링될 때까지 대기
     QTimer::singleShot(100, this, [this, configFile, pane]() {
         // comparePane_가 변경되었거나 삭제되었는지 확인
         if (!pane || pane != comparePane_ || !mainSplit_)
             return;
-            
+
         QSettings settings(configFile, QSettings::IniFormat);
-        
+
         // ModifyPage의 Splitter 상태 복원 (에디터 ↔ Compare 패널)
         if (settings.contains("ModifyPage/splitterState")) {
             QByteArray modifyState = settings.value("ModifyPage/splitterState").toByteArray();
@@ -250,14 +247,14 @@ void ModifyPage::restoreCompareSettings()
                 }
             }
         }
-        
+
         // ComparePage 내부의 Splitter 상태 복원 (좌측 파일 ↔ 우측 Diff 패널)
         // ModifyPage splitter 복원 후에 실행
         QTimer::singleShot(50, this, [this, configFile, pane]() {
             // comparePane_가 변경되었거나 삭제되었는지 확인
             if (!pane || pane != comparePane_)
                 return;
-                
+
             QSettings settings(configFile, QSettings::IniFormat);
             if (settings.contains("ComparePage/splitterState")) {
                 QByteArray compareState = settings.value("ComparePage/splitterState").toByteArray();
@@ -273,7 +270,7 @@ void ModifyPage::ensureCompare(const QString &targetPath)
 {
     // 현재 활성 탭의 편집기 가져오기
     CodeEditor *leftEditor = qobject_cast<CodeEditor *>(tabWidget->currentWidget());
-    
+
     if (comparePane_) {
         // 이미 존재하면 경로만 업데이트하고 좌측 편집기도 갱신
         comparePane_->setTargetPath(targetPath);
@@ -297,15 +294,15 @@ void ModifyPage::ensureCompare(const QString &targetPath)
     connect(comparePane_, &ComparePage::targetPathChanged, this, [this](const QString &path) {
         lastComparedPath_ = path;
     });
-    
+
     // 탭 변경 시 ComparePage 업데이트는 생성자에서 이미 연결되어 있음
-    
+
     // Debouncing 타이머 초기화 (한 번만)
     if (!diffDebounceTimer_) {
         diffDebounceTimer_ = new QTimer(this);
         diffDebounceTimer_->setSingleShot(true);  // 한 번만 실행
         diffDebounceTimer_->setInterval(500);     // 500ms 대기
-        
+
         // 타이머 timeout 시 실제 diff 실행
         connect(diffDebounceTimer_, &QTimer::timeout, this, [this] {
             ComparePage *pane = comparePane_;
@@ -313,18 +310,19 @@ void ModifyPage::ensureCompare(const QString &targetPath)
                 pane->recalcDiff(currentLeftText(), currentLeftPath());
             }
         });
-        
+
         // 텍스트 변경 시 타이머 재시작 (Debouncing) - 한 번만 연결
         // 연결을 저장하여 나중에 해제할 수 있도록 함
-        editorTextChangedConnection_ = connect(this, &ModifyPage::editorTextChangedForDiff, this, [this] {
-            ComparePage *pane = comparePane_;
-            if (pane && pane == comparePane_ && diffDebounceTimer_) {
-                diffDebounceTimer_->stop();   // 기존 타이머 중지
-                diffDebounceTimer_->start();  // 새로 시작 (500ms 후 실행)
-            }
-        });
+        editorTextChangedConnection_ =
+                connect(this, &ModifyPage::editorTextChangedForDiff, this, [this] {
+                    ComparePage *pane = comparePane_;
+                    if (pane && pane == comparePane_ && diffDebounceTimer_) {
+                        diffDebounceTimer_->stop();   // 기존 타이머 중지
+                        diffDebounceTimer_->start();  // 새로 시작 (500ms 후 실행)
+                    }
+                });
     }
-    
+
     // 저장된 설정 복원은 showCompare 호출 후에 별도로 처리
     // 여기서는 복원하지 않고, showCompare에서 처리하도록 함
 }
@@ -333,13 +331,13 @@ void ModifyPage::closeCompare()
 {
     if (!comparePane_)
         return;
-    
+
     // ComparePage 포인터를 로컬에 저장
     ComparePage *paneToDelete = comparePane_;
-    
+
     // 먼저 포인터를 nullptr로 설정하여 다른 곳에서 접근하는 것을 방지
     comparePane_ = nullptr;
-    
+
     // ComparePage를 닫기 전에 상태 저장
     saveComparePageState();
 
@@ -352,17 +350,17 @@ void ModifyPage::closeCompare()
     // paneToDelete가 유효한지 확인 후 호출
     if (paneToDelete) {
         paneToDelete->clearHighlights();
-        
+
         // ComparePage 시그널 연결 해제 (크래시 방지)
         disconnect(paneToDelete, &ComparePage::closed, this, &ModifyPage::closeCompare);
         disconnect(paneToDelete, &ComparePage::targetPathChanged, this, nullptr);
-        
+
         // 경로는 보존 (lastComparedPath_에 이미 저장되어 있음)
         paneToDelete->hide();
         paneToDelete->setParent(nullptr);  // 스플리터에서 분리
         paneToDelete->deleteLater();
     }
-    
+
     // editorTextChangedForDiff 연결은 해제하지 않음 (다음 ComparePage 생성 시 재사용)
     // 하지만 comparePane_가 nullptr이므로 람다에서 자동으로 무시됨
 }
@@ -386,25 +384,25 @@ void ModifyPage::saveComparePageState()
 {
     if (!comparePane_)
         return;
-    
+
     QString configDir = "C:/backup/config";
-    QDir dir;
+    QDir    dir;
     if (!dir.exists(configDir)) {
         dir.mkpath(configDir);
     }
-    
-    QString configFile = configDir + "/settings.ini";
+
+    QString   configFile = configDir + "/settings.ini";
     QSettings settings(configFile, QSettings::IniFormat);
-    
+
     // ComparePage 내부의 Splitter 상태 저장 (좌측 파일 ↔ 우측 Diff 패널)
     QByteArray compareSplitterState = comparePane_->saveSplitterState();
     settings.setValue("ComparePage/splitterState", compareSplitterState);
-    
+
     // ModifyPage의 Splitter 상태 저장 (에디터 ↔ Compare 패널)
     // ComparePage가 열려있을 때만 저장
     QByteArray modifySplitterState = saveSplitterState();
     settings.setValue("ModifyPage/splitterState", modifySplitterState);
-    
+
     settings.sync();
 }
 
@@ -412,44 +410,44 @@ void ModifyPage::showCompareFolders()
 {
     // 현재 열린 파일이 있는지 확인
     bool hasOpenFile = (currentDoc != nullptr && !currentDoc->gfilePath().isEmpty());
-    
+
     QString leftPath;
     QString rightPath;
-    
+
     if (hasOpenFile) {
         // 파일이 열려있는 경우: 해당 파일의 폴더 vs 다른 폴더/압축 파일
         QFileInfo currentFileInfo(currentDoc->gfilePath());
         leftPath = currentFileInfo.absolutePath();  // 현재 파일의 폴더
-        
+
         QMessageBox msgBox(this);
         msgBox.setWindowTitle(tr("폴더 비교"));
         msgBox.setText(tr("현재 파일의 폴더와 비교할 폴더/압축 파일을 선택하세요:\n현재: %1")
-                       .arg(leftPath));
+                               .arg(leftPath));
         msgBox.setIcon(QMessageBox::Information);
         msgBox.setStandardButtons(QMessageBox::Ok | QMessageBox::Cancel);
-        
+
         if (msgBox.exec() != QMessageBox::Ok) {
             return;
         }
-        
+
         // 비교할 폴더/압축 파일 선택
         QFileDialog dialog(this, tr("Select folder or archive to compare"), "C:/backup");
         dialog.setFileMode(QFileDialog::Directory);
         dialog.setOption(QFileDialog::ShowDirsOnly, false);
         dialog.setOption(QFileDialog::DontUseNativeDialog, true);
         dialog.setNameFilter(tr("Folders and Archives (*.zip *.tar *.tar.gz *.tgz)"));
-        
+
         if (dialog.exec() == QDialog::Accepted) {
             QStringList paths = dialog.selectedFiles();
             if (!paths.isEmpty()) {
                 rightPath = paths.first();
             }
         }
-        
+
         if (rightPath.isEmpty()) {
             return;
         }
-        
+
     } else {
         // 파일이 열려있지 않은 경우: 두 폴더/압축 파일 선택
         QMessageBox msgBox(this);
@@ -457,58 +455,58 @@ void ModifyPage::showCompareFolders()
         msgBox.setText(tr("열린 파일이 없습니다.\n비교할 두 폴더/압축 파일을 선택해주세요."));
         msgBox.setIcon(QMessageBox::Information);
         msgBox.setStandardButtons(QMessageBox::Ok | QMessageBox::Cancel);
-        
+
         if (msgBox.exec() != QMessageBox::Ok) {
             return;
         }
-        
+
         // 첫 번째 폴더/압축 파일 선택
         QFileDialog dialog1(this, tr("Select first folder or archive (compare)"), "C:/backup");
         dialog1.setFileMode(QFileDialog::Directory);
         dialog1.setOption(QFileDialog::ShowDirsOnly, false);
         dialog1.setOption(QFileDialog::DontUseNativeDialog, true);
         dialog1.setNameFilter(tr("Folders and Archives (*.zip *.tar *.tar.gz *.tgz)"));
-        
+
         if (dialog1.exec() == QDialog::Accepted) {
             QStringList paths = dialog1.selectedFiles();
             if (!paths.isEmpty()) {
                 leftPath = paths.first();
             }
         }
-        
+
         if (leftPath.isEmpty()) {
             return;
         }
-        
+
         // 두 번째 폴더/압축 파일 선택
         QFileDialog dialog2(this, tr("Select second folder or archive (base)"), "C:/backup");
         dialog2.setFileMode(QFileDialog::Directory);
         dialog2.setOption(QFileDialog::ShowDirsOnly, false);
         dialog2.setOption(QFileDialog::DontUseNativeDialog, true);
         dialog2.setNameFilter(tr("Folders and Archives (*.zip *.tar *.tar.gz *.tgz)"));
-        
+
         if (dialog2.exec() == QDialog::Accepted) {
             QStringList paths = dialog2.selectedFiles();
             if (!paths.isEmpty()) {
                 rightPath = paths.first();
             }
         }
-        
+
         if (rightPath.isEmpty()) {
             return;
         }
     }
-    
+
     // ComparePage가 없으면 생성
     if (!comparePane_) {
         comparePane_ = new ComparePage(this);
         mainSplit_->addWidget(comparePane_);
         mainSplit_->setStretchFactor(0, 1);
         mainSplit_->setStretchFactor(1, 0);
-        
+
         connect(comparePane_, &ComparePage::closed, this, &ModifyPage::closeCompare);
     }
-    
+
     // 폴더 비교 수행
     comparePane_->show();
     comparePane_->performFolderDiff(leftPath, rightPath);
