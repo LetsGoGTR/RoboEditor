@@ -18,7 +18,19 @@ int main(int argc, char *argv[])
             break;
         }
     }
+
+    QString stylePath = QApplication::applicationDirPath() + "/../../src/styles/style.qss";
+    QFile   styleFile(stylePath);
+    if (styleFile.open(QFile::ReadOnly)) {
+        QString style = QLatin1String(styleFile.readAll());
+        a.setStyleSheet(style);
+        qDebug() << "✅ Loaded QSS from:" << stylePath;
+    } else {
+        qWarning() << "⚠️ Failed to load QSS:" << stylePath;
+    }
+
     MainWindow w;
-    w.show();
+    w.setWindowFlags(Qt::Window);
+    w.showMaximized();
     return a.exec();
 }
