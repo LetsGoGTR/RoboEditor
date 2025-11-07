@@ -1,6 +1,6 @@
 #ifndef CENTERSTACK_H
 #define CENTERSTACK_H
-
+#pragma once
 #include <QTabWidget>
 #include <QTimer>
 #include <QTreeView>
