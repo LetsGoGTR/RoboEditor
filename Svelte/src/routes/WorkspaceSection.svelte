@@ -1,43 +1,55 @@
 <script lang="ts">
 	import TabLayout from '@layouts/TabLayout.svelte';
 	import DirectoryTree from '@components/DirectoryTree.svelte';
-	import { browser } from '$app/environment';
 	import type { TreeNode } from '@/types';
 	import { goto } from '$app/navigation';
-	import { fileTree, openDirectory } from '@/stores/fileTree';
+	import { fileTree } from '@/stores/fileTree';
+	import ControllerDir from './ControllerDir.svelte';
+	import { onDestroy } from 'svelte';
 
 	let tree: TreeNode | null = $derived($fileTree);
+	let activeId: 'left' | 'right' = $state('left'); // 현재 활성 탭 상태
 
-  function handleSelect(node: TreeNode) {
-    // console.log("clicked:", node.name);
-    if (node.type === "file") goto(`/${encodeURIComponent(node.id)}`);
-  }
+	function handleSelect(node: TreeNode) {
+		if (node.type === 'file') goto(`/${encodeURIComponent(node.id)}`);
+	}
 
-	async function handleClick() {
-		if (!browser) return;
-		await openDirectory();
+	// ✅ fileTree 변경 감지 → Workspace 탭으로 자동 전환
+	const unsubscribe = fileTree.subscribe((value) => {
+		if (value) activeId = 'right';
+	});
+	onDestroy(unsubscribe);
+
+	// ✅ 수동 탭 클릭 대응
+	function handleTabChange(id: 'left' | 'right') {
+		activeId = id;
 	}
 </script>
 
 <TabLayout
 	leftTab={{ id: 'left', label: 'Controller' }}
 	rightTab={{ id: 'right', label: 'Workspace' }}
+	activeId={activeId}
+	onTabChange={handleTabChange}
 >
 	<div slot="left">
-		<p>고급 설정 탭의 내용입니다.</p>
+		<ControllerDir />
 	</div>
 
 	<div slot="right">
-		<!-- 디렉토리 표시 영역 -->
 		{#if tree}
 			<DirectoryTree root={tree} mode="view" onselect={handleSelect} />
 		{:else}
-			<p>📂 아직 열려 있는 디렉토리가 없습니다.</p>
+			<p class="notice">아직 열려 있는 디렉토리가 없습니다.</p>
 		{/if}
-
-		<!-- 디렉토리 열기 버튼 -->
-		<button onclick={handleClick} class="open-dir-btn">
-			📁 Open Directory
-		</button>
 	</div>
 </TabLayout>
+
+<style>
+.notice {
+	font-size: 0.95rem;
+	color: #333;
+	text-align: center;
+	padding: 0.8rem 0;
+}
+</style>
