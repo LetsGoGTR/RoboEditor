@@ -287,6 +287,9 @@ void ControllerManager::updateControllersStates()
         updateConnectionState(c.serialNumber, false);
 
         client->get("/api/robot/running");
+        if (c.serialNumber == "SN1") {
+            //applyRequest(c.serialNumber, "C:\\backup\\SN1\\SN1_2025-11-06_151306\\workspace");
+        }
     }
 }
 

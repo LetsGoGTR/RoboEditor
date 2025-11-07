@@ -161,7 +161,7 @@ QWidget *ComparePage::buildDock()
 
     rightSplit_->addWidget(compareTabWidget_);
     rightSplit_->addWidget(diffPanel_);
-    rightSplit_->setStretchFactor(0, 4);  // compareTabWidget_ (파일 내용) - 2배 공간
+    rightSplit_->setStretchFactor(0, 1);  // compareTabWidget_ (파일 내용) - 2배 공간
     rightSplit_->setStretchFactor(1, 1);  // diffPanel_ (비교 테이블) - 1배 공간
 
     v->addWidget(rightSplit_);
@@ -580,18 +580,41 @@ void ComparePage::clearHighlights()
     // leftText_ 포인터는 ComparePage가 삭제될 때 자동으로 무효화되므로
     // 여기서는 nullptr로 설정하지 않음
 }
+QString ComparePage::formatPathForCompare(const QString &fullPath) const
+{
+    if (fullPath.isEmpty()) {
+        return "No file opened";
+    }
 
+    QString displayPath = fullPath;
+
+    // "C:/backup" 제거
+    if (displayPath.startsWith("C:/backup", Qt::CaseInsensitive)) {
+        displayPath.remove(0, 9);
+    } else if (displayPath.startsWith("C:\\backup", Qt::CaseInsensitive)) {
+        displayPath.remove(0, 9);
+    }
+
+    // 맨 앞 / 제거
+    if (displayPath.startsWith('/') || displayPath.startsWith('\\')) {
+        displayPath.remove(0, 1);
+    }
+
+    // / 또는 \를 " > "로 변경
+    displayPath.replace('/', " > ");
+    displayPath.replace('\\', " > ");
+
+    return displayPath;
+}
 void ComparePage::setTargetPath(const QString &path)
 {
     if (path.isEmpty())
         return;
-
     // compareTabWidget_이 null인지 체크
     if (!compareTabWidget_) {
         qWarning() << "[ComparePage] compareTabWidget_ is null";
         return;
     }
-
     targetPath_ = path;
     QFileInfo fileInfo(path);
     QString   fileName     = fileInfo.fileName();
@@ -605,11 +628,35 @@ void ComparePage::setTargetPath(const QString &path)
             widget->deleteLater();
     }
 
-    // 새 탭 추가 (CodeEditor 사용 - 라인 번호 포함)
-    auto *newTextEdit = new CodeEditor(compareTabWidget_);
+    // 컨테이너 위젯 생성 (QLabel + CodeEditor)
+    QWidget     *tabPage    = new QWidget(compareTabWidget_);
+    QVBoxLayout *pageLayout = new QVBoxLayout(tabPage);
+    pageLayout->setContentsMargins(0, 0, 0, 0);
+    pageLayout->setSpacing(0);
+
+    // 파일 경로 레이블 생성
+    QLabel *pathLabel = new QLabel(tabPage);
+    pathLabel->setObjectName("pathLabel");
+    pathLabel->setStyleSheet("QLabel {"
+                             "  padding: 4px 8px;"
+                             "  background-color: #f0f0f0;"
+                             "  border-bottom: 1px solid #d0d0d0;"
+                             "  font-size: 9pt;"
+                             "  color: #666;"
+                             "}");
+    pathLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+
+    // 경로 포맷팅
+    QString displayPath = formatPathForCompare(absolutePath);
+    pathLabel->setText(displayPath);
+    pageLayout->addWidget(pathLabel);
+
+    // CodeEditor 생성
+    auto *newTextEdit = new CodeEditor(tabPage);
     newTextEdit->setReadOnly(true);
     newTextEdit->setAccept(true);
     newTextEdit->setStyleSheet("QPlainTextEdit { background-color: white; border: none; }");
+    pageLayout->addWidget(newTextEdit);
 
     // 파일 내용 로드
     QFile f(path);
@@ -621,16 +668,18 @@ void ComparePage::setTargetPath(const QString &path)
     } else {
         newTextEdit->setPlainText(tr("Failed to open: %1").arg(path));
     }
+
     connect(newTextEdit, &DropTextEdit::fileDropped, this, [this](const QString &droppedPath) {
         qDebug() << "[ComparePage] File dropped:" << droppedPath;
         setTargetPath(droppedPath);  // 재귀 호출로 파일 교체
     });
-    // 탭 추가 및 활성화 (툴팁에 전체 경로 저장)
-    int index = compareTabWidget_->addTab(newTextEdit, fileName);
+
+    // 컨테이너를 탭에 추가
+    int index = compareTabWidget_->addTab(tabPage, fileName);
     compareTabWidget_->setTabToolTip(index, absolutePath);
     compareTabWidget_->setCurrentIndex(index);
-    rightText_ = newTextEdit;
 
+    rightText_ = newTextEdit;
     emit targetPathChanged(path);
 
     QString leftContent = leftText_ ? leftText_->toPlainText() : cachedLeftText_;

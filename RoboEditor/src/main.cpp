@@ -19,6 +19,7 @@ int main(int argc, char *argv[])
         }
     }
     MainWindow w;
-    w.show();
+    w.setWindowFlags(Qt::Window);  // ✅ 타이틀바, 닫기/최대화 버튼 유지
+    w.showMaximized();
     return a.exec();
 }
