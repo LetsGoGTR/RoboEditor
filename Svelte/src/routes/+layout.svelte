@@ -3,6 +3,8 @@
   import MenuBar from '@routes/MenuBar.svelte';
   import WorkspaceSection from './WorkspaceSection.svelte';
   import HorizontalSplit from '@layouts/HorizontalSplit.svelte';
+
+  export const ssr = false;
 </script>
 
 <svelte:head>
