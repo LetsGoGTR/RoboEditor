@@ -1,16 +1,22 @@
 <script lang="ts">
-	import { fileTree } from '@/stores/fileTree';
 	import TabLayout from '@layouts/TabLayout.svelte';
 	import DirectoryTree from '@components/DirectoryTree.svelte';
+	import { browser } from '$app/environment';
 	import type { TreeNode } from '@/types';
 	import { goto } from '$app/navigation';
+	import { fileTree, openDirectory } from '@/stores/fileTree';
 
-	let tree: TreeNode = $derived($fileTree);
+	let tree: TreeNode | null = $derived($fileTree);
 
   function handleSelect(node: TreeNode) {
     // console.log("clicked:", node.name);
     if (node.type === "file") goto(`/${encodeURIComponent(node.id)}`);
   }
+
+	async function handleClick() {
+		if (!browser) return;
+		await openDirectory();
+	}
 </script>
 
 <TabLayout
@@ -22,6 +28,16 @@
 	</div>
 
 	<div slot="right">
-		<DirectoryTree root={tree} mode="view" onselect={handleSelect}/>
+		<!-- 디렉토리 표시 영역 -->
+		{#if tree}
+			<DirectoryTree root={tree} mode="view" onselect={handleSelect} />
+		{:else}
+			<p>📂 아직 열려 있는 디렉토리가 없습니다.</p>
+		{/if}
+
+		<!-- 디렉토리 열기 버튼 -->
+		<button onclick={handleClick} class="open-dir-btn">
+			📁 Open Directory
+		</button>
 	</div>
 </TabLayout>
