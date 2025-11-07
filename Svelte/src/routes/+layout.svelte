@@ -9,6 +9,7 @@
 
 <svelte:head>
 	<title>RoboEditor</title>
+  <link rel="icon" type="image/svg+xml" href="/roboeditor-icon.svg" />
 </svelte:head>
 
 <div class="app-container">

@@ -1,19 +1,41 @@
 <script lang="ts">
-  import Editor from "@components/Editor.svelte";
   import DiffResult from "./DiffResult.svelte";
 	import HorizontalSplit from "@layouts/HorizontalSplit.svelte";
 	import { dummyDiffs } from "@/testData";
-</script>
+  import { onMount } from 'svelte';
+  import * as monaco from 'monaco-editor';
 
+  let leftContainer: HTMLDivElement;
+  let rightContainer: HTMLDivElement;
+
+  onMount(() => {
+    const leftEditor = monaco.editor.create(leftContainer, {
+      value: 'console.log("Hello, Monaco!");',
+      language: 'javascript',
+      theme: 'vs',
+      automaticLayout: true
+    });
+
+    const rightEditor = monaco.editor.create(rightContainer, {
+      value: 'console.log("Hello, Monaco!");',
+      language: 'javascript',
+      theme: 'vs',
+      automaticLayout: true
+    });
+
+    // 메모리 누수 방지를 위한 cleanup
+    return () => {leftEditor.dispose();rightEditor.dispose();}
+  });
+</script>
 
 <HorizontalSplit initialLeftRatio={70}>
   <main slot="left" class="code-main">
     <HorizontalSplit initialLeftRatio={50}>
       <section slot="left">
-        <Editor />
+        <div bind:this={leftContainer} style="width:auto; height: 100%;"></div>
       </section>
       <section slot="right">
-        <Editor />
+        <div bind:this={rightContainer} style="width:auto; height: 100%;"></div>
       </section>
     </HorizontalSplit>
   </main>
