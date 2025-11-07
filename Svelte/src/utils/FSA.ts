@@ -136,3 +136,30 @@ async function insertFileNode(root: TreeNode, pathParts: string[], file: File) {
 		await insertFileNode(folder, rest, file);
 	}
 }
+
+// Read text from a file
+export async function readTextFile(handle: FileSystemFileHandle): Promise<string | null> {
+	try {
+		const file = await handle.getFile();
+		return await file.text(); // YAML, XML, SRL 등 모두 텍스트 처리 가능
+	} catch (err) {
+		console.error('❌ 파일 읽기 실패:', err);
+		return null;
+	}
+}
+
+// Write text from a file
+export async function writeTextFile(
+	handle: FileSystemFileHandle,
+	content: string
+): Promise<boolean> {
+	try {
+		const writable = await handle.createWritable();
+		await writable.write(content);
+		await writable.close();
+		return true;
+	} catch (err) {
+		console.error('❌ 파일 쓰기 실패:', err);
+		return false;
+	}
+}

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  width="256"
+  height="256"
+  viewBox="0 0 256 256">
+
+  <defs>
+    <style>
+      .main-fill { fill: #6783D4; }
+      .main-stroke { stroke: #6783D4; stroke-width: 8; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+    </style>
+  </defs>
+
+  <path class="main-stroke" d="M132 32h60l30 30v96H132z" />
+  <path class="main-stroke" d="M192 32v30h30" />
+
+  <rect x="24" y="108" width="160" height="108" rx="28" ry="28" fill="white" stroke="#6783D4" stroke-width="12" />
+
+  <line x1="104" y1="108" x2="104" y2="72" stroke="#6783D4" stroke-width="11" stroke-linecap="round" />
+  <circle cx="104" cy="72" r="12" fill="#6783D4" />
+
+  <circle cx="88" cy="156" r="12" fill="#6783D4" />
+  <circle cx="152" cy="156" r="12" fill="#6783D4" />
+</svg>
