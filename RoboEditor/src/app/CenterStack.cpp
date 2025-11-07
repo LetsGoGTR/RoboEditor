@@ -178,6 +178,7 @@ void CenterStack::setupUI()
     workspaceTree_->setDragEnabled(true);
     workspaceTree_->setAcceptDrops(true);
     workspaceTree_->setDropIndicatorShown(true);
+    backupTree_->setExpandsOnDoubleClick(false);
     workspaceTree_->setDragDropMode(QAbstractItemView::DragDrop);
     workspaceTree_->setDefaultDropAction(Qt::MoveAction);
     workspaceTree_->setSelectionMode(QAbstractItemView::SingleSelection);
@@ -259,19 +260,22 @@ void CenterStack::setupUI()
     });
 
     // [4] WorkspaceTree 더블클릭 → ModifyPage 열기
-    connect(workspaceTree_, &QTreeView::doubleClicked, this, [=](const QModelIndex &index) {
+    connect(workspaceTree_, &QTreeView::clicked, this, [=](const QModelIndex &index) {
         QString   path = workspaceModel_->filePath(index);
         QFileInfo info(path);
 
-        if (info.isFile()) {
+        if (info.isDir()) {
+            bool expanded = workspaceTree_->isExpanded(index);
+            workspaceTree_->setExpanded(index, !expanded);  // 한 번 클릭으로 토글
+        } else if (info.isFile()) {
             modifyPage_->openDocument(path);
             qDebug() << "Opened file in ModifyPage:" << path;
         }
     });
-    
+
     // [4-1] ModifyPage 시그널 연결
     connect(modifyPage_, &ModifyPage::uiModifyClicked, this, &CenterStack::modifyRequested);
-    
+
     // [5] 제어기 등록 -> 제어기 리스트 업데이트
     connect(ControllerManager::instance(),
             &ControllerManager::controllerListChanged,
