@@ -1,5 +1,6 @@
 #ifndef SELECTCONTROLLER_H
 #define SELECTCONTROLLER_H
+#pragma once
 #include <QTableView>
 
 #include <QAbstractItemModel>
@@ -12,6 +13,7 @@
 #include <QJsonObject>
 #include <QJsonValue>
 #include <QList>
+#include <QMap>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QNetworkRequest>
@@ -41,6 +43,9 @@ class selectcontroller : public QWidget
 
         QVector<ControllerInfo> controllerState;
         QVector<QCheckBox *>    checkBoxes;
+
+      private:
+        QMap<QString, bool> checkBoxStates_;
 
       private slots:
         void onControllerListChanged();
