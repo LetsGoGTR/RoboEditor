@@ -56,7 +56,7 @@
   </button>
 </main>
 
-<FileExplorer />
+<!-- <FileExplorer /> -->
 
 <style>
 main {

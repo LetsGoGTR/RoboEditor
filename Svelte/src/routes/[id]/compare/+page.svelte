@@ -48,7 +48,7 @@ section {
 
 .compare-section {
   flex: 1 1 auto;
-  overflow: hidden;
+  overflow: scroll;
   display: flex;
   height: 100%;
   min-height: 0;

@@ -80,6 +80,7 @@
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-width: 500px;
   background: #fafafa;
   border-left: 1px solid #ddd;
   font-family: "Consolas", monospace;

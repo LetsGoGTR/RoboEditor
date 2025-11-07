@@ -9,37 +9,48 @@ export interface FixedTab {
 }
 
 // Business Items
-// File System Types
-type NodeType = 'folder' | 'file';
+// File System Types for FSA API + Fallback
+export type NodeType = 'folder' | 'file';
 
 interface BaseNode {
 	id: string;
 	name: string;
 	type: NodeType;
-	checked?: boolean;
-	parentId?: string | null; // root of the file/folder
-	path?: string; // "src/routes/main.svelte"
+	path: string; // 예: "src/routes/main.svelte"
+	parentId?: string | null; // 상위 폴더 참조
+	checked?: boolean; // 선택용 (UI 상태)
 }
 
 export interface FolderNode extends BaseNode {
 	type: 'folder';
 	children: TreeNode[];
+	handle?: FileSystemDirectoryHandle; // ✅ FSA 전용 핸들 (디렉토리)
+	kind?: 'directory'; // FSA 호환 속성 (선택)
 }
 
 export interface FileNode extends BaseNode {
 	type: 'file';
-	contentRef?: string;
 	size?: number;
-	lastModified?: string; // ISO timestamp
+	lastModified?: number; // epoch ms (File.lastModified)
+	contentRef?: string; // IndexedDB나 Blob URL 참조 시 사용
+	handle?: FileSystemFileHandle; // ✅ FSA 전용 핸들 (파일)
+	file?: File; // fallback 모드에서 직접 참조
+	kind?: 'file'; // FSA 호환 속성 (선택)
 }
 
 export type TreeNode = FolderNode | FileNode;
 
 // Controller Types
-export interface Controller {
+export interface Controller extends FolderNode {
 	serialNumber: string;
+	name: string;
 	state: 'idle' | 'active' | 'error' | 'disconnected';
 	ipAddress: string;
+	workspaces: FolderNode[]; // 1-depth 폴더 목록
+}
+
+export interface BackupRoot extends FolderNode {
+	controllers: Controller[];
 }
 
 // Differences Checks Types
