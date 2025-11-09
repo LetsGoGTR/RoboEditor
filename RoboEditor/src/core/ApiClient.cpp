@@ -33,7 +33,7 @@ QString ApiClient::normalizeBaseUrl(const QString &baseUrl)
     QUrl    url;
 
     // 이미 스킴이 있는 경우
-    if (input.startsWith("http://") || input.startsWith("https://")) {
+    if (input.startsWith("https://") || input.startsWith("https://")) {
         url = QUrl(input);
     }
     // 스킴이 없는 경우 http 기본값
@@ -41,7 +41,7 @@ QString ApiClient::normalizeBaseUrl(const QString &baseUrl)
         if (input.contains(":443")) {
             url = QUrl("https://" + input);
         } else {
-            url = QUrl("http://" + input);
+            url = QUrl("https://" + input);
         }
     }
 
