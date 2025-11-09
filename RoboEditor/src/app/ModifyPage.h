@@ -14,6 +14,7 @@
 #include <QPlainTextEdit>
 #include <QSplitter>
 #include <QVBoxLayout>
+#include <QWheelEvent>
 #include <QWidget>
 
 //Document : 개별 파일 관리
