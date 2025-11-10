@@ -14,13 +14,13 @@ struct ControllerInfo
     QString serialNumber;
     QString ip;
     int     sftpPort;
-    int     apiPort;
     QString username;
     QString pswd;
+    QString wsPath;
     bool    isConnected;
     bool    isRunning;
 
-    ControllerInfo() : sftpPort(22), apiPort(80), isConnected(false), isRunning(false) {}
+    ControllerInfo() : sftpPort(22), isConnected(false), isRunning(false) {}
 };
 
 class ControllerManager : public QObject
@@ -48,11 +48,15 @@ class ControllerManager : public QObject
         void saveToFile(const QString &filePath = "");
         void loadFromFile(const QString &filePath = "");
 
-        //그냥 호출해도 괜찮
         void backupRequest(const QString &serialNumber);
-
-        //여러개 한번에 보내면 안돼서 보낼 제어기 리스트를 큐로 관리해서 하나씩 보내고 완료되면 다음꺼 보내야함
         void applyRequest(const QString &serialNumber, const QString &filePath);
+
+        bool receive(const QString &serialNumber,
+                     const QString &remoteTarGz,
+                     const QString &localDestDir);
+        bool send(const QString     &serialNumber,
+                  const QStringList &localPaths,
+                  const QString     &remoteDir);
 
       signals:
         void controllerListChanged();

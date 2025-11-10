@@ -1,34 +1,40 @@
-// #ifndef SFTPCLIENT_H
-// #define SFTPCLIENT_H
+#ifndef SFTPCLIENT_H
+#define SFTPCLIENT_H
 
-// #include <QObject>
-// #include <QTcpSocket>
-// #include <QFile>
+#include <QTcpSocket>
 
-// #include <libssh2.h>
-// #include <libssh2_sftp.h>
+#include <QFile>
+#include <QObject>
 
-// class SFTPClient : public QObject {
-//     Q_OBJECT
-//   public:
-//     SFTPClient(const QString &host, int port, const QString &user, const QString &pass, QObject *parent = nullptr);
-//     ~SFTPClient();
+#include <libssh2.h>
+#include <libssh2_sftp.h>
 
-//     bool connectToServer();
-//     void disconnect();
+class SFTPClient : public QObject
+{
+    Q_OBJECT
+      public:
+        SFTPClient(const QString &host,
+                   int            port,
+                   const QString &user,
+                   const QString &pass,
+                   QObject       *parent = nullptr);
+        ~SFTPClient();
 
-//     bool uploadFile(const QString &localPath, const QString &remotePath);
-//     bool downloadFile(const QString &remotePath, const QString &localPath);
+        bool connectToServer();
+        void disconnect();
 
-//   private:
-//     QString host_;
-//     int port_;
-//     QString user_;
-//     QString pass_;
+        bool uploadFile(const QString &localPath, const QString &remotePath);
+        bool downloadFile(const QString &remotePath, const QString &localPath);
 
-//     QTcpSocket socket_;
-//     LIBSSH2_SESSION *session_ = nullptr;
-//     LIBSSH2_SFTP *sftp_ = nullptr;
-// };
+      private:
+        QString host_;
+        int     port_;
+        QString user_;
+        QString pass_;
 
-// #endif // SFTPCLIENT_H
+        QTcpSocket       socket_;
+        LIBSSH2_SESSION *session_     = nullptr;
+        LIBSSH2_SFTP    *sftpSession_ = nullptr;
+};
+
+#endif  // SFTPCLIENT_H
