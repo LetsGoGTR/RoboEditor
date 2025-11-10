@@ -1,7 +1,7 @@
 <script lang="ts">
-  import ControllerList from '../apply/ControllerList.svelte';
+  import ControllerList from '@features/ApplyControllerList.svelte';
   import { dummyController } from '@/testData';
-  import type { PageProps } from './$types';
+  import type { PageProps } from './backup/$types';
 
   let { data }: PageProps = $props();
 

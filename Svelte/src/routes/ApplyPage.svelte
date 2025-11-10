@@ -1,11 +1,11 @@
 <script lang="ts">
-  import ControllerList from '../apply/ControllerList.svelte';
+  import ControllerList from '@features/ApplyControllerList.svelte';
   import { dummyController } from '@/testData';
-  import { openDirectory } from '@/utils/FSA';
+  import { openDirectory } from '@utils/FSA';
   import type { PageProps } from './$types';
 	import type { TreeNode } from '@/types';
-  import FileExplorer from './FileExplorer.svelte';
-  import ApplyDialog from './dialogs.svelte';
+  import FileExplorer from '@features/FileExplorer.svelte';
+  import ApplyDialog from '@features/dialogs.svelte';
   
 
   let { data }: PageProps = $props();

@@ -4,10 +4,39 @@
   import { fileTree } from '@/stores/fileTree';
 
 	let backupTree: FolderNode | null = null;
+	let errorMsg = '';
+
+	/** config/controllers.json 파일 존재 여부 확인 */
+	function hasConfigControllers(folder: FolderNode): boolean {
+		const configFolder = folder.children?.find(
+			(child) => child.type === 'folder' && child.name === 'config'
+		);
+
+		if (!configFolder) return false;
+
+		const controllersFile = configFolder.children?.find(
+			(file) => file.type === 'file' && file.name === 'controllers.json'
+		);
+
+		return !!controllersFile;
+	}
 
 	async function handleOpenBackup() {
+		errorMsg = '';
 		const tree = await openDirectory();
-		if (tree && tree.type === 'folder') backupTree = tree;
+
+		if (!tree || tree.type !== 'folder') {
+			alert('폴더를 열 수 없습니다.');
+			return;
+		}
+
+		if (hasConfigControllers(tree)) {
+			backupTree = tree;
+			console.log('Valid backup folder loaded:', tree.name);
+		} else {
+			alert('유효한 백업 폴더가 아닙니다.');
+			backupTree = null;
+		}
 	}
 
 	function handleWorkspaceSelect(ws: FolderNode) {
