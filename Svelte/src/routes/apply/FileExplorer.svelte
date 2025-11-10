@@ -1,26 +1,27 @@
 <script lang="ts">
-	import { fileTree } from "@/stores/fileTree";
   import DirectoryTree from "@components/DirectoryTree.svelte";
+  import type { TreeNode } from "@/types";
 
-  let rootSelect = $derived($fileTree);
+  let { root }: { root?: TreeNode | null } = $props();
+  const rootSelect = $derived(root ?? null);
 </script>
 
 <div class="explorer">
-  <div class="panel">
+  <div>
     <h4>Select Workspace</h4>
-    <DirectoryTree root={rootSelect} mode="select" />
+    {#if rootSelect}
+      <DirectoryTree root={rootSelect} mode="view" />
+    {:else}
+      <p>표시할 트리가 없습니다.</p>
+    {/if}
   </div>
 </div>
+
 
 <style>
 .explorer {
   display: flex;
   gap: 1rem;
   height: 100%;
-}
-.panel {
-  flex: 1;
-  border: 1px solid #ddd;
-  padding: 0.5rem;
 }
 </style>
