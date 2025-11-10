@@ -16,7 +16,7 @@ interface BaseNode {
 	id: string;
 	name: string;
 	type: NodeType;
-	path: string; // 예: "src/routes/main.svelte"
+	path: string | null; // "src/routes/main.svelte", 새 파일인 경우 null
 	parentId?: string | null; // 상위 폴더 참조
 	checked?: boolean; // 선택용 (UI 상태)
 }

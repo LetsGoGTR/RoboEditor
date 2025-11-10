@@ -1,6 +1,7 @@
 #include "SelectController.h"
 
 #include <QTableWidget>
+
 #include <QDebug>
 #include <QPainter>
 
@@ -14,10 +15,14 @@ selectcontroller::selectcontroller(QWidget *parent) :
 
     // ControllerManager 시그널 연결
     ControllerManager *manager = ControllerManager::instance();
-    connect(manager, &ControllerManager::controllerListChanged, 
-            this, &selectcontroller::onControllerListChanged);
-    connect(manager, &ControllerManager::controllerStateUpdated,
-            this, &selectcontroller::onControllerStateUpdated);
+    connect(manager,
+            &ControllerManager::controllerListChanged,
+            this,
+            &selectcontroller::onControllerListChanged);
+    connect(manager,
+            &ControllerManager::controllerStateUpdated,
+            this,
+            &selectcontroller::onControllerStateUpdated);
 }
 
 //ControllerManager로부터 제어기의 정보를 받아오는 함수
@@ -27,7 +32,7 @@ void selectcontroller::getControllerState()
     controllerState.clear();
 
     // ControllerManager에서 실제 제어기 목록 가져오기
-    ControllerManager *manager = ControllerManager::instance();
+    ControllerManager    *manager     = ControllerManager::instance();
     QList<ControllerInfo> controllers = manager->getControllers();
 
     // QList를 QVector로 변환
@@ -37,7 +42,7 @@ void selectcontroller::getControllerState()
 
     // 상태 업데이트 요청
     manager->updateControllersStates();
-    
+
     updateTable();  // 테이블 업데이트
 }
 
@@ -62,6 +67,11 @@ void selectcontroller::setupUI()
 }
 void selectcontroller::updateTable()
 {
+    // 현재 체크박스 상태 저장
+    for (int i = 0; i < checkBoxes.size() && i < controllerState.size(); ++i) {
+        checkBoxStates_[controllerState[i].serialNumber] = checkBoxes[i]->isChecked();
+    }
+
     model->removeRows(0, model->rowCount());  // 기존 행 제거
     checkBoxes.clear();
 
@@ -89,7 +99,7 @@ void selectcontroller::updateTable()
         // State 표시 (switch case 사용)
         QString stateStr;
         QColor  statusColor;
-        
+
         switch (state) {
         case 0:
             stateStr    = "Offline";
@@ -113,7 +123,7 @@ void selectcontroller::updateTable()
         stateItem->setEditable(false);
 
         // 원형 아이콘 생성
-        QPixmap  pixmap(16, 16);
+        QPixmap pixmap(16, 16);
         pixmap.fill(Qt::transparent);
         QPainter painter(&pixmap);
         painter.setRenderHint(QPainter::Antialiasing);
@@ -132,8 +142,14 @@ void selectcontroller::updateTable()
         model->appendRow(rowItems);
 
         // CheckBox 추가
-        int          row       = model->rowCount() - 1;
-        QCheckBox   *checkBox  = new QCheckBox();
+        int        row      = model->rowCount() - 1;
+        QCheckBox *checkBox = new QCheckBox();
+
+        // 이전 체크 상태 복원
+        if (checkBoxStates_.contains(info.serialNumber)) {
+            checkBox->setChecked(checkBoxStates_[info.serialNumber]);
+        }
+
         QWidget     *container = new QWidget();
         QHBoxLayout *layout    = new QHBoxLayout(container);
         layout->addWidget(checkBox);
@@ -166,22 +182,22 @@ void selectcontroller::onControllerListChanged()
     getControllerState();
 }
 
-void selectcontroller::onControllerStateUpdated(const QString &serialNumber, 
-                                                bool isConnected, 
-                                                bool isRunning)
+void selectcontroller::onControllerStateUpdated(const QString &serialNumber,
+                                                bool           isConnected,
+                                                bool           isRunning)
 {
-    qDebug() << "[SelectController] State updated:" << serialNumber 
-             << "Connected:" << isConnected << "Running:" << isRunning;
-    
+    qDebug() << "[SelectController] State updated:" << serialNumber << "Connected:" << isConnected
+             << "Running:" << isRunning;
+
     // controllerState에서 해당 제어기 찾아서 업데이트
     for (auto &info : controllerState) {
         if (info.serialNumber == serialNumber) {
             info.isConnected = isConnected;
-            info.isRunning = isRunning;
+            info.isRunning   = isRunning;
             break;
         }
     }
-    
+
     // 테이블 업데이트
     updateTable();
 }

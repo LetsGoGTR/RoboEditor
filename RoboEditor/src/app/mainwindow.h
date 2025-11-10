@@ -26,6 +26,9 @@ class MainWindow : public QMainWindow
         explicit MainWindow(QWidget *parent = nullptr);
         ~MainWindow();
 
+      protected:
+        void closeEvent(QCloseEvent * event) override;
+
       private:
         // lazy objects
 
@@ -41,6 +44,9 @@ class MainWindow : public QMainWindow
         void ensureNav();
         void ensureLog();
         void wire();
+
+        void saveSettings();
+        void loadSettings();
 
         std::unique_ptr<TopMenu>     menu_;
         std::unique_ptr<CenterStack> center_;  // CenterStack → Center

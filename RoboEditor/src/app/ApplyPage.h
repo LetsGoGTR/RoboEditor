@@ -1,5 +1,8 @@
+#ifndef APPLYPAGE_H
+#define APPLYPAGE_H
 #pragma once
 #include <QList>
+#include <QQueue>
 #include <QWidget>
 
 #include "SelectController.h"
@@ -31,6 +34,21 @@ class ApplyPage : public QWidget
         void confirmSelection();
         void importAnyspace();
 
+        QQueue<QString> applyQueue_;
+        int             totalApplyRequests_;
+        int             completedApplyRequests_;
+        int             failedApplyRequests_;
+
       signals:
         void uiApplyClicked(const QString &target);
+
+      private slots:
+        void onAllAppliesCompleted();
+        // 큐 처리용 슬롯
+        void startApplyQueue();
+        void processNextApply();
+        void onApplyCompleted(const QString &serialNumber);
+        void onApplyFailed(const QString &serialNumber, const QString &error);
 };
+
+#endif  // APPLYPAGE_H

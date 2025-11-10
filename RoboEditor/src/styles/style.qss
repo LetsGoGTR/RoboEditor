@@ -1,0 +1,148 @@
+/* === 기본 === */
+* {
+    font-family: 'Segoe UI', 'Noto Sans KR';
+    font-size: 13px;
+    color: #222;
+}
+
+/* === 메인 윈도우 === */
+QMainWindow {
+    background-color: #f6f8fa;
+}
+
+/* === 메뉴바 === */
+QMenuBar {
+    background-color: #4969e9;
+    color: white;
+    /* padding: 4px 8px; */
+}
+QMenuBar::item {
+    background: transparent;
+    padding: 4px 12px;
+}
+QMenuBar::item:selected {
+    background-color: #6c82e8;
+    border-radius: 4px;
+}
+QMenu {
+    background-color: white;
+    border: 1px solid #ccc;
+}
+QMenu::item:selected {
+    background-color: #e8ecff;
+}
+
+/* === 탭 === */
+QTabBar::tab {
+    background: #e9ebf2;
+    border: 1px solid #ccc;
+    border-bottom: none;
+    padding: 6px 12px;
+    min-width: 80px;
+}
+QTabBar::tab:selected {
+    background: white;
+    border-top: 2px solid #4a67d6;
+}
+QTabWidget::pane {
+    border: 1px solid #ccc;
+    top: -1px;
+}
+
+/* === 버튼 === */
+QPushButton {
+    background-color: #4a67d6;
+    color: white;
+    border-radius: 3px;
+    padding: 5px 12px;
+}
+QPushButton:hover {
+    background-color: #5e7aed;
+}
+QPushButton:pressed {
+    background-color: #3a54b0;
+}
+
+/* === 트리뷰 / 리스트 === */
+QTreeView, QListView {
+    background: #ffffff;
+    border: 1px solid #ddd;
+    selection-background-color: #e8ecff;
+    selection-color: #222;
+}
+QTreeView::item:hover {
+    background: #f3f6ff;
+}
+QTreeView::item:selected {
+    background: #dce3ff;
+    border-left: 3px solid #4a67d6;
+}
+
+/* === 스플리터 === */
+QSplitter::handle {
+    background: #e0e0e0;
+}
+QSplitter::handle:hover {
+    background: #bfc8ff;
+}
+
+/* === 스크롤바 === */
+QScrollBar:vertical {
+    background: transparent;
+    width: 10px;
+    margin: 2px;
+}
+QScrollBar::handle:vertical {
+    background: #cfd4e3;
+    border-radius: 5px;
+    min-height: 20px;
+}
+QScrollBar::handle:vertical:hover {
+    background: #aeb8dd;
+}
+QScrollBar::add-line:vertical,
+QScrollBar::sub-line:vertical {
+    height: 0;
+}
+
+/* === 라벨 / 텍스트 === */
+QLabel {
+    color: #333;
+}
+
+/* === 텍스트에디터 === */
+QPlainTextEdit, QTextEdit {
+    background-color: #ffffff;
+    border-radius: 2px;
+    padding: 6px;
+    selection-background-color: #dce3ff;
+    selection-color: #000;
+}
+
+/* === 테이블뷰 === */
+QTableView {
+    background: white;
+    gridline-color: #eee;
+    selection-background-color: #e8ecff;
+}
+QHeaderView::section {
+    background: #f4f6fb;
+    border: 1px solid #ddd;
+    padding: 4px;
+}
+
+/* === 로그창 === */
+QTextBrowser, QTextEdit#logView {
+    background-color: #fafafa;
+    border: 1px solid #ddd;
+    font-family: Consolas, monospace;
+    font-size: 12px;
+}
+
+/* === 상태 표시 등 === */
+QLabel#status_connected {
+    color: #00b300;
+}
+QLabel#status_disconnected {
+    color: #ff4c4c;
+}
