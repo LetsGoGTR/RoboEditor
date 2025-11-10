@@ -2,7 +2,7 @@
 	import { page } from '$app/state';
 	import { currentFile } from '@/stores/currentFile';
 	import { fileTree } from '@/stores/fileTree';
-	import type { FolderNode } from '@/types';
+	import { gotoPage } from '@/stores/workspaces';
 	import { createNewFileNode } from '@/utils/fileAction';
 	import { createFolderWithDialog, openDirectory, readDirectory } from '@/utils/FSA';
 

@@ -1,93 +1,96 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import * as monaco from 'monaco-editor';
+  import { onMount, tick } from 'svelte';
   import { currentFile } from '@/stores/currentFile';
-  import { readTextFile, writeTextFile } from '@utils/FSA';
+  import { readTextFile } from '@utils/FSA';
+  import { detectLanguage, saveFileAndRefresh } from '@utils/fileAction';
   import type { FileNode } from '@/types';
-	import { detectLanguage, saveFileAndRefresh } from '@utils/fileAction';
 
-  let container: HTMLDivElement;
-  let editor: monaco.editor.IStandaloneCodeEditor | null = null;
+  let container: HTMLDivElement | null = null;
+  let editor: any = null;
+  let monaco: any = null;
 
-  // 현재 store 상태 구독
   let state = $derived($currentFile);
 
   /** 파일 읽기 및 에디터 초기화 */
   async function loadEditor() {
     const file = state.file as FileNode | null;
-    if (!file) {
-      console.warn("⚠️ 선택된 파일이 없습니다.");
-      return;
-    }
+    if (!file || !container || !monaco) return;
 
-    let text: string | null = null;
+    // 파일 읽기
+    let text = '';
+    if (file.handle) text = (await readTextFile(file.handle)) ?? '';
+    else if (file.file) text = await file.file.text();
 
-    if (file.handle) {
-      text = await readTextFile(file.handle);
-    } else if (file.file) {
-      text = await file.file.text();
-    } else {
-      // 새로 만든 파일의 경우 handle/file 없음 → 빈 내용으로 초기화
-      text = "";
-    }
+    const language = detectLanguage(file.name);
 
-    // --- 에디터 생성 또는 갱신
-    if (!container) return;
+    // 🔹 새 model 생성
+    const model = monaco.editor.createModel(text, language);
 
     if (editor) {
-      editor.setValue(text ?? "");
-      monaco.editor.setModelLanguage(editor.getModel()!, detectLanguage(file.name));
+      // 기존 model dispose
+      const oldModel = editor.getModel();
+      if (oldModel) oldModel.dispose();
+
+      // 새 model 교체
+      editor.setModel(model);
     } else {
+      // 새 editor 생성
       editor = monaco.editor.create(container, {
-        value: text ?? "",
-        language: detectLanguage(file.name),
-        theme: "vs-white",
+        model,
+        theme: 'vs-white',
         automaticLayout: true,
         minimap: { enabled: false },
       });
 
-      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, async () => {
-        await save();
-      });
+      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, save);
     }
   }
+
 
   /** 파일 저장 */
   async function save() {
     const file = state.file;
     if (!editor || !file) return;
-
     const content = editor.getValue();
     const updated = await saveFileAndRefresh(file, content);
-
-    // 변경된 handle, path를 store에 반영
     currentFile.open(updated);
   }
 
-  /** 반응형: store 상태 변경 시 파일 다시 로드 */
-  $effect(() => {
-    loadEditor();
+  /** onMount 후 모듈 로드 */
+  onMount(async () => {
+    await tick();
+    console.log("🚀 onMount called, importing monaco...");
+    monaco = await import('monaco-editor');
+    console.log("✅ Monaco imported:", monaco);
+    await loadEditor(); // import 완료 후에만 호출
   });
 
-  /** 마운트 후 정리 */
-  onMount(() => {
-    return () => editor?.dispose();
+  /** 파일 변경 시 다시 로드 */
+  $effect(() => {
+    const file = $currentFile.file;
+    if (monaco && file) {
+      console.log('📂 File changed -> reload editor', file.name);
+      loadEditor();
+    }
   });
 </script>
 
-<!-- ✅ 에디터 레이아웃 -->
-<div bind:this={container} style="width:100%; height:100%;"></div>
-<button onclick={save} class="save-button">
-  저장
-</button>
+<div bind:this={container} class="editor-container"></div>
+<button onclick={save} class="save-button">저장</button>
 
 <style>
+.editor-container {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
 .save-button {
   position: absolute;
   bottom: 1rem;
   right: 2rem;
-
-  background: #4e83db;              /* 상단 메뉴와 동일한 메인 블루 */
+  background: #4e83db;
   color: white;
   border: none;
   border-radius: 6px;
@@ -97,12 +100,5 @@
   cursor: pointer;
   transition: background 0.2s ease, transform 0.1s ease;
 }
-
-.save-button:hover {
-  background: #3f6ac0;              /* hover 시 조금 더 짙은 블루 */
-}
-
-.save-button:active {
-  background: #365ca7;              /* 클릭 시 더 어두운 블루 */
-}
+.save-button:hover { background: #3f6ac0; }
 </style>

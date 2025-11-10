@@ -2,14 +2,10 @@
   import ControllerList from '@features/ApplyControllerList.svelte';
   import { dummyController } from '@/testData';
   import { openDirectory } from '@utils/FSA';
-  import type { PageProps } from './$types';
 	import type { TreeNode } from '@/types';
   import FileExplorer from '@features/FileExplorer.svelte';
   import ApplyDialog from '@features/dialogs.svelte';
   
-
-  let { data }: PageProps = $props();
-
   let selected = $state<string[]>([]);
   let showBackupOnly = $state(false);
   let selectTree = $state<TreeNode | null>(null);

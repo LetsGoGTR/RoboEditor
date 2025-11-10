@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, onDestroy } from "svelte";
+  import { onMount } from "svelte";
   import * as monaco from "monaco-editor";
   import { currentFile } from "@/stores/currentFile";
   import { readTextFile } from "@utils/FSA";
