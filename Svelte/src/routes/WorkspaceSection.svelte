@@ -1,26 +1,31 @@
 <script lang="ts">
 	import TabLayout from '@layouts/TabLayout.svelte';
 	import DirectoryTree from '@components/DirectoryTree.svelte';
-	import type { TreeNode } from '@/types';
+	import type { FileNode, TreeNode } from '@/types';
 	import { goto } from '$app/navigation';
 	import { fileTree } from '@/stores/fileTree';
 	import ControllerDir from './ControllerDir.svelte';
 	import { onDestroy } from 'svelte';
+	import { currentFile } from '@/stores/currentFile';
 
 	let tree: TreeNode | null = $derived($fileTree);
-	let activeId: 'left' | 'right' = $state('left'); // 현재 활성 탭 상태
+	let activeId: 'left' | 'right' = $state('left');
 
+	// 파일 클릭 시 store 저장 및 routing
 	function handleSelect(node: TreeNode) {
-		if (node.type === 'file') goto(`/${encodeURIComponent(node.id)}`);
+		if (node.type === 'file') {
+			currentFile.open(node as FileNode);
+			goto(`/${encodeURIComponent(node.id)}`);
+		}
 	}
 
-	// ✅ fileTree 변경 감지 → Workspace 탭으로 자동 전환
+	// workspace 감지
 	const unsubscribe = fileTree.subscribe((value) => {
 		if (value) activeId = 'right';
 	});
 	onDestroy(unsubscribe);
 
-	// ✅ 수동 탭 클릭 대응
+	// 수동 클릭 대응
 	function handleTabChange(id: 'left' | 'right') {
 		activeId = id;
 	}
