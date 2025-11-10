@@ -2,9 +2,9 @@
   import { onMount } from 'svelte';
   import * as monaco from 'monaco-editor';
   import { currentFile } from '@/stores/currentFile';
-  import { readTextFile, writeTextFile } from '@/utils/FSA';
+  import { readTextFile, writeTextFile } from '@utils/FSA';
   import type { FileNode } from '@/types';
-	import { detectLanguage, saveFileAndRefresh } from '@/utils/fileAction';
+	import { detectLanguage, saveFileAndRefresh } from '@utils/fileAction';
 
   let container: HTMLDivElement;
   let editor: monaco.editor.IStandaloneCodeEditor | null = null;

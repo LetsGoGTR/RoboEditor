@@ -1,4 +1,4 @@
-import type { FileNode } from '@/types';
+import type { FileNode, TreeNode } from '@/types';
 import { readDirectory, writeTextFile } from './FSA';
 import { fileTree } from '@/stores/fileTree';
 
@@ -102,4 +102,38 @@ export async function saveFileAndRefresh(file: FileNode, content: string) {
   }
 
   return updated;
+}
+
+/**
+ * 파일 또는 폴더 삭제
+ * @param node 삭제 대상 (FileNode 또는 FolderNode)
+ * @param parentHandle 상위 디렉토리 핸들
+ */
+export async function deleteNode(node: TreeNode, parentHandle?: FileSystemDirectoryHandle) {
+  try {
+    // --- 1️⃣ 실제 FSA 접근 가능할 때
+    if (node.handle && parentHandle) {
+      await parentHandle.removeEntry(node.name, { recursive: node.type === "folder" });
+      console.info(`🗑️ '${node.name}' 삭제됨 (로컬 파일 시스템)`);
+    } else {
+      console.warn("⚠️ FSA 핸들이 없어 store 트리에서만 삭제됩니다.");
+    }
+
+    // --- 2️⃣ 현재 열려 있는 파일이 삭제된 경우 닫기
+    const current = $currentFile.file;
+    if (current && current.id === node.id) {
+      currentFile.close();
+    }
+
+    // --- 3️⃣ 트리 재스캔으로 반영
+    if (parentHandle) {
+      const updatedTree = await readDirectory(parentHandle);
+      fileTree.set(updatedTree);
+    }
+
+    alert(`'${node.name}' 파일이 삭제되었습니다.`);
+  } catch (err) {
+    console.error("❌ 파일 삭제 실패:", err);
+    alert("파일 삭제 중 오류가 발생했습니다.");
+  }
 }

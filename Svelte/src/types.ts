@@ -43,9 +43,10 @@ export type TreeNode = FolderNode | FileNode;
 // Controller Types
 export interface Controller extends FolderNode {
 	serialNumber: string;
-	name: string;
 	state: 'idle' | 'active' | 'error' | 'disconnected';
 	ipAddress: string;
+	sftpPort: number;
+	// apiPort: number;
 	workspaces: FolderNode[]; // 1-depth 폴더 목록
 }
 
