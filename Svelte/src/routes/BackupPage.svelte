@@ -1,9 +1,6 @@
 <script lang="ts">
   import ControllerList from '@features/ApplyControllerList.svelte';
   import { dummyController } from '@/testData';
-  import type { PageProps } from './backup/$types';
-
-  let { data }: PageProps = $props();
 
   let selected = $state<string[]>([]);
   let showBackupOnly = $state(false);
