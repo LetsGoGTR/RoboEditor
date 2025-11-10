@@ -734,7 +734,7 @@ void ComparePage::recalcDiff(const QString &leftText, const QString &leftPath)
     std::string rightContentStr = rightText.toStdString();
     std::string leftContentStr  = leftText.toStdString();
     std::string rightNameStr    = targetPath_.toStdString();
-    std::string leftNameStr     = "ModifyPage";  // 임시 이름
+    std::string leftNameStr     = leftPath.toStdString();
 
     // 파일 타입 감지 (확장자 기반)
     QString                 fileType      = detectFileType(targetPath_);
