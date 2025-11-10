@@ -4,7 +4,7 @@
   import { currentFile } from '@/stores/currentFile';
   import { readTextFile, writeTextFile } from '@/utils/FSA';
   import type { FileNode } from '@/types';
-	import { detectLanguage } from '@/utils/fileConfig';
+	import { detectLanguage, saveFile } from '@/utils/fileAction';
 
   let container: HTMLDivElement;
   let editor: monaco.editor.IStandaloneCodeEditor | null = null;
@@ -16,34 +16,38 @@
   async function loadEditor() {
     const file = state.file as FileNode | null;
     if (!file) {
-      console.warn('⚠️ 선택된 파일이 없습니다.');
+      console.warn("⚠️ 선택된 파일이 없습니다.");
       return;
     }
 
-    // 파일 내용 읽기
     let text: string | null = null;
+
     if (file.handle) {
       text = await readTextFile(file.handle);
     } else if (file.file) {
       text = await file.file.text();
     } else {
-      console.warn('⚠️ 파일 내용을 읽을 수 없습니다.');
-      return;
+      // 새로 만든 파일의 경우 handle/file 없음 → 빈 내용으로 초기화
+      text = "";
     }
 
-    // 에디터 생성 또는 갱신
+    // --- 에디터 생성 또는 갱신
     if (!container) return;
 
     if (editor) {
-      editor.setValue(text ?? '');
+      editor.setValue(text ?? "");
       monaco.editor.setModelLanguage(editor.getModel()!, detectLanguage(file.name));
     } else {
       editor = monaco.editor.create(container, {
-        value: text ?? '',
+        value: text ?? "",
         language: detectLanguage(file.name),
-        theme: 'vs-white',
+        theme: "vs-white",
         automaticLayout: true,
         minimap: { enabled: false },
+      });
+
+      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, async () => {
+        await save();
       });
     }
   }
@@ -51,9 +55,13 @@
   /** 파일 저장 */
   async function save() {
     const file = state.file;
-    if (!editor || !file || !file.handle) return;
+    if (!editor || !file) return;
+
     const content = editor.getValue();
-    await writeTextFile(file.handle, content);
+    const updated = await saveFile(file, content);
+
+    // 변경된 handle, path를 store에 반영
+    currentFile.open(updated);
   }
 
   /** 반응형: store 상태 변경 시 파일 다시 로드 */

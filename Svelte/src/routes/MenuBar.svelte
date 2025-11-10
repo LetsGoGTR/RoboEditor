@@ -1,12 +1,13 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
 	import { page } from "$app/state";
+	import { currentFile } from "@/stores/currentFile";
+	import { createNewFileNode } from "@/utils/fileAction";
 
 	let dialog: HTMLDialogElement;
 
-  function handleCompare() {
-		const path = page.url.pathname;
-		const id = page.params.id && page.params.id !== 'register'
+	function handleCompare() {
+		const id = page.params.id && page.params.id !== "register"
 			? page.params.id
 			: null;
 
@@ -18,15 +19,22 @@
 		goto(`/${id}/compare`);
 	}
 
-	function handleBackup() { goto('/backup'); }
-	function handleApply() { goto('/apply'); }
-	function handleRegister() { goto('/register'); }
+	function handleBackup() { goto("/backup"); }
+	function handleApply() { goto("/apply"); }
+	function handleRegister() { goto("/register"); }
+
+	/** 🆕 새 파일 만들기 (라우팅 + store 메서드 사용) */
+	function handleNewFile() {
+		const newFile = createNewFileNode("untitled.yaml", "workspace/");
+		currentFile.open(newFile);
+		goto(`/${newFile.id}`);
+	}
 </script>
 
 <dialog bind:this={dialog}>
-  <h3>경고</h3>
-  <p>비교할 대상이 선택되지 않았습니다. 먼저 항목을 선택하세요.</p>
-  <button class="confirm-btn" onclick={() => {dialog.close();}}>확인</button>
+	<h3>경고</h3>
+	<p>비교할 대상이 선택되지 않았습니다. 먼저 항목을 선택하세요.</p>
+	<button class="confirm-btn" onclick={() => dialog.close()}>확인</button>
 </dialog>
 
 <div class="full-width" role="menubar">
@@ -34,7 +42,7 @@
 		<li>
 			<span>파일</span>
 			<ul class="dropdown">
-				<li><span>새로 만들기</span></li>
+				<li><button onclick={handleNewFile}>새로 만들기</button></li>
 				<li><span>불러오기</span></li>
 				<li><hr /></li>
 				<li><span>시뮬레이션</span></li>
@@ -46,16 +54,18 @@
 				<li><button onclick={handleCompare}>비교</button></li>
 			</ul>
 		</li>
-		<li><span>제어기</span>
+		<li>
+			<span>제어기</span>
 			<ul class="dropdown">
 				<li><button onclick={handleRegister}>제어기 등록</button></li>
 				<li><button onclick={handleBackup}>제어기로부터 백업</button></li>
 				<li><button onclick={handleApply}>제어기에 적용</button></li>
 			</ul>
-			</li>
+		</li>
 		<li><span>설정</span></li>
 	</ul>
 </div>
+
 
 <style>
 	/* dialog styles */

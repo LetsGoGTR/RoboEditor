@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, onDestroy } from "svelte";
   import * as monaco from "monaco-editor";
   import { currentFile } from "@/stores/currentFile";
   import { readTextFile } from "@/utils/FSA";
-  import { detectLanguage } from "@/utils/fileConfig";
+  import { detectLanguage } from "@/utils/fileAction";
   import type { FileNode } from "@/types";
 
   // --- DOM refs ---
@@ -15,8 +15,17 @@
   // --- Store 구독 ---
   let current = $currentFile;
 
-  // --- 로컬 반응형 상태 ---
+  // --- 로컬 상태 ---
   let rightFile = $state<FileNode | null>(null);
+
+  /** 안전하게 모델 해제 */
+  function safeDisposeModels() {
+    if (diffEditor) diffEditor.setModel(null); // 반드시 먼저 detach
+    leftModel?.dispose();
+    rightModel?.dispose();
+    leftModel = null;
+    rightModel = null;
+  }
 
   /** 좌측(현재 파일) 로드 */
   async function loadLeftModel() {
@@ -27,19 +36,21 @@
     if (file.handle) text = (await readTextFile(file.handle)) ?? "";
     else if (file.file) text = await file.file.text();
 
+    // 기존 모델 제거
     if (leftModel) leftModel.dispose();
+
     leftModel = monaco.editor.createModel(
       text,
       detectLanguage(file.name),
       monaco.Uri.parse(`inmemory://left/${file.name}`)
     );
+
     return leftModel;
   }
 
-  /** 우측 파일 선택 및 로드 (자동 실행용) */
+  /** 우측 파일 선택 및 로드 */
   async function selectRightFile(autoOpen = false) {
     try {
-      // 자동 실행 여부 제어: true면 mount 후 바로 실행
       const [handle] = await (window as any).showOpenFilePicker({
         types: [{ description: "모든 파일", accept: { "*/*": [".*"] } }],
       });
@@ -64,31 +75,35 @@
 
       updateDiffEditor();
     } catch (err) {
-      if (!autoOpen)
-        console.warn("❗ 파일 선택 취소 또는 오류:", err);
+      if (!autoOpen) console.warn("❗ 파일 선택 취소 또는 오류:", err);
     }
   }
 
-  /** DiffEditor에 모델 적용 */
+  /** DiffEditor 모델 갱신 */
   function updateDiffEditor() {
-    if (!diffEditor || !leftModel || !rightModel) return;
+    if (!diffEditor) return;
+    if (!leftModel || leftModel.isDisposed()) return;
+    if (!rightModel || rightModel.isDisposed()) return;
+
     diffEditor.setModel({ original: leftModel, modified: rightModel });
   }
 
-  /** 마운트 시 초기화 */
+  /** --- 마운트 시 초기화 --- */
   onMount(() => {
+    // DiffEditor 생성 (모델은 나중에 적용)
+    diffEditor = monaco.editor.createDiffEditor(diffContainer, {
+      theme: "vs-dark",
+      automaticLayout: true,
+      renderSideBySide: true,
+      originalEditable: false,
+      readOnly: false,
+      minimap: { enabled: false },
+      scrollBeyondLastLine: false,
+    });
+
+    // 비동기 초기화
     (async () => {
       const left = await loadLeftModel();
-
-      diffEditor = monaco.editor.createDiffEditor(diffContainer, {
-        theme: "vs-dark",
-        automaticLayout: true,
-        renderSideBySide: true,
-        originalEditable: false,
-        readOnly: false,
-        minimap: { enabled: false },
-        scrollBeyondLastLine: false,
-      });
 
       if (left) {
         diffEditor.setModel({
@@ -101,22 +116,43 @@
         });
       }
 
-      // ✅ mount 후 즉시 파일 선택 창 자동 실행
+      // mount 후 자동으로 오른쪽 파일 선택 창 열기
       await selectRightFile(true);
     })();
 
+    // 언마운트 시 안전하게 정리
     return () => {
+      safeDisposeModels();
       diffEditor?.dispose();
-      leftModel?.dispose();
-      rightModel?.dispose();
+      diffEditor = null;
     };
   });
 
-  /** currentFile 변경 시 좌측 모델 재로딩 */
+  /** --- currentFile 변경 시 좌측 모델 재로딩 --- */
   $effect(() => {
     (async () => {
-      await loadLeftModel();
-      updateDiffEditor();
+      if (!diffEditor) return;
+
+      // 기존 모델 안전 해제
+      diffEditor.setModel(null);
+      leftModel?.dispose();
+
+      const left = await loadLeftModel();
+      if (!left) return;
+
+      // 오른쪽 모델이 이미 있으면 즉시 갱신
+      if (rightModel && !rightModel.isDisposed()) {
+        diffEditor.setModel({ original: left, modified: rightModel });
+      } else {
+        diffEditor.setModel({
+          original: left,
+          modified: monaco.editor.createModel(
+            "// 비교할 파일을 선택하세요.",
+            "plaintext",
+            monaco.Uri.parse("inmemory://empty/right")
+          ),
+        });
+      }
     })();
   });
 </script>
