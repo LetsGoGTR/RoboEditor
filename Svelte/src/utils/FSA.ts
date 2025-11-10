@@ -26,7 +26,7 @@ export async function openDirectory(): Promise<TreeNode | null> {
 }
 
 // Read Directory
-async function readDirectory(handle: FileSystemDirectoryHandle): Promise<FolderNode> {
+export async function readDirectory(handle: FileSystemDirectoryHandle): Promise<FolderNode> {
 	const children: TreeNode[] = [];
 
 	for await (const [name, entry] of handle.entries()) {

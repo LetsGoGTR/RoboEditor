@@ -4,7 +4,7 @@
   import { currentFile } from '@/stores/currentFile';
   import { readTextFile, writeTextFile } from '@/utils/FSA';
   import type { FileNode } from '@/types';
-	import { detectLanguage, saveFile } from '@/utils/fileAction';
+	import { detectLanguage, saveFileAndRefresh } from '@/utils/fileAction';
 
   let container: HTMLDivElement;
   let editor: monaco.editor.IStandaloneCodeEditor | null = null;
@@ -58,7 +58,7 @@
     if (!editor || !file) return;
 
     const content = editor.getValue();
-    const updated = await saveFile(file, content);
+    const updated = await saveFileAndRefresh(file, content);
 
     // 변경된 handle, path를 store에 반영
     currentFile.open(updated);
@@ -77,6 +77,32 @@
 
 <!-- ✅ 에디터 레이아웃 -->
 <div bind:this={container} style="width:100%; height:100%;"></div>
-<button onclick={save} style="position:absolute; bottom:1rem; right:1rem;">
-  💾 저장
+<button onclick={save} class="save-button">
+  저장
 </button>
+
+<style>
+.save-button {
+  position: absolute;
+  bottom: 1rem;
+  right: 2rem;
+
+  background: #4e83db;              /* 상단 메뉴와 동일한 메인 블루 */
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 0.6rem 1.4rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.1s ease;
+}
+
+.save-button:hover {
+  background: #3f6ac0;              /* hover 시 조금 더 짙은 블루 */
+}
+
+.save-button:active {
+  background: #365ca7;              /* 클릭 시 더 어두운 블루 */
+}
+</style>

@@ -1,5 +1,6 @@
 import type { FileNode } from '@/types';
-import { writeTextFile } from './FSA';
+import { readDirectory, writeTextFile } from './FSA';
+import { fileTree } from '@/stores/fileTree';
 
 export function createNewFileNode(
 	name = 'untitled.yaml',
@@ -51,47 +52,54 @@ export function detectLanguage(name: string): string {
  * @returns 저장 후 갱신된 FileNode
  */
 export async function saveFile(file: FileNode, content: string): Promise<FileNode> {
-  if (!file) throw new Error("FileNode가 지정되지 않았습니다.");
+	if (!file) throw new Error('FileNode가 지정되지 않았습니다.');
 
-  // 1️⃣ 기존 로컬 파일 (FSA handle 존재)
-  if (file.handle) {
-    await writeTextFile(file.handle, content);
-    file.lastModified = Date.now();
-    console.info(`💾 저장 완료: ${file.name}`);
-    return file;
-  }
+	// 1️⃣ 기존 로컬 파일 (FSA handle 존재)
+	if (file.handle) {
+		await writeTextFile(file.handle, content);
+		file.lastModified = Date.now();
+		console.info(`💾 저장 완료: ${file.name}`);
+		return file;
+	}
 
-  // 2️⃣ 새 파일 (handle 없음 → 새로 생성)
-  try {
-    const handle = await window.showSaveFilePicker({
-      suggestedName: file.name ?? "untitled.txt",
-      types: [
-        {
-          description: "Text / Config Files",
-          accept: {
-            "text/plain": [".txt", ".yaml", ".yml", ".json", ".ts", ".js", ".cpp", ".h"]
-          }
-        }
-      ]
-    });
+	// 2️⃣ 새 파일 (handle 없음 → 새로 생성)
+	try {
+		const handle = await window.showSaveFilePicker({
+			suggestedName: file.name ?? 'untitled.txt'
+		});
 
-    await writeTextFile(handle, content);
+		await writeTextFile(handle, content);
 
-    const updated: FileNode = {
-      ...file,
-      handle,
-      path: handle.name,
-      lastModified: Date.now()
-    };
+		const updated: FileNode = {
+			...file,
+			handle,
+			path: handle.name,
+			lastModified: Date.now()
+		};
 
-    console.info(`💾 새 파일 저장 완료: ${updated.path}`);
-    return updated;
-  } catch (err) {
-    if ((err as DOMException).name === "AbortError") {
-      console.warn("❗ 파일 저장이 취소되었습니다.");
-    } else {
-      console.error("❌ 파일 저장 중 오류:", err);
+		console.info(`💾 새 파일 저장 완료: ${updated.path}`);
+		return updated;
+	} catch (err) {
+		if ((err as DOMException).name === 'AbortError') {
+			console.warn('❗ 파일 저장이 취소되었습니다.');
+		} else {
+			console.error('❌ 파일 저장 중 오류:', err);
+		}
+		return file;
+	}
+}
+
+export async function saveFileAndRefresh(file: FileNode, content: string) {
+  const updated = await saveFile(file, content);
+
+  // ✅ 저장된 폴더 기준으로 1회만 리프레시
+  if (updated.handle) {
+    const parentDir = await updated.handle.getParent?.(); // 직접 관리 필요
+    if (parentDir) {
+      const newTree = await readDirectory(parentDir);
+      fileTree.set(newTree);
     }
-    return file;
   }
+
+  return updated;
 }
