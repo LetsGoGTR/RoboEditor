@@ -1,10 +1,8 @@
 <script lang="ts">
-  import Header from '@routes/Header.svelte';
-  import MenuBar from '@routes/MenuBar.svelte';
-  import WorkspaceSection from './WorkspaceSection.svelte';
+  import Header from '@features/Header.svelte';
+  import MenuBar from '@features/MenuBar.svelte';
+  import WorkspaceSection from '@features/WorkspaceSection.svelte';
   import HorizontalSplit from '@layouts/HorizontalSplit.svelte';
-
-  export const ssr = false;
 </script>
 
 <svelte:head>

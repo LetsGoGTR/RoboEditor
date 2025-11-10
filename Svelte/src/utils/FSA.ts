@@ -1,5 +1,7 @@
 import { browser } from '$app/environment';
 import type { FolderNode, TreeNode } from '@/types';
+import { fileTree } from '@/stores/fileTree';
+import { get } from 'svelte/store';
 
 // Type for Browser only
 interface Window {
@@ -161,5 +163,85 @@ export async function writeTextFile(
 	} catch (err) {
 		console.error('❌ 파일 쓰기 실패:', err);
 		return false;
+	}
+}
+
+// Delete Entry (file or folder)
+export async function deleteEntry(
+	parentHandle: FileSystemDirectoryHandle,
+	name: string,
+	recursive = false
+): Promise<boolean> {
+	if (!browser) return false;
+
+	try {
+		await parentHandle.removeEntry(name, { recursive });
+		console.info(`🗑️ '${name}' 삭제 성공`);
+		return true;
+	} catch (err) {
+		console.error(`❌ '${name}' 삭제 실패:`, err);
+		return false;
+	}
+}
+
+/**
+ * 📁 사용자가 폴더를 직접 선택한 뒤, 해당 위치에 새 폴더를 생성
+ * - showDirectoryPicker()로 경로 선택
+ * - 선택된 디렉토리 안에 지정된 이름으로 폴더 생성
+ */
+export async function createFolderWithDialog(): Promise<FileSystemDirectoryHandle | null> {
+	try {
+		// 1️⃣ 폴더 선택
+		const parentHandle = await window.showDirectoryPicker({
+			id: 'roboeditor-folder-select',
+			mode: 'readwrite',
+			startIn: 'documents'
+		});
+
+		// 2️⃣ 새 폴더 이름 입력받기
+		const name = prompt('새 폴더 이름을 입력하세요:', 'new_folder');
+		if (!name) return null;
+
+		// 3️⃣ 동일 이름 검사
+		for await (const [entryName, entry] of parentHandle.entries()) {
+			if (entryName === name && entry.kind === 'directory') {
+				console.warn(`⚠️ 이미 동일한 이름의 폴더가 존재합니다: ${name}`);
+				return entry as FileSystemDirectoryHandle;
+			}
+		}
+
+		// 4️⃣ 폴더 생성
+		const newHandle = await parentHandle.getDirectoryHandle(name, { create: true });
+		console.info(`📁 새 폴더 생성됨: ${parentHandle.name}/${name}`);
+		return newHandle;
+	} catch (err) {
+		console.error('❌ 폴더 생성 실패:', err);
+		return null;
+	}
+}
+
+/**
+ * 🔄 현재 workspace(루트)는 유지하면서 트리 내용을 다시 읽기
+ * - 루트 handle을 재사용
+ * - 내부 구조를 최신 상태로 갱신
+ */
+export async function refreshWorkspaceTree(): Promise<void> {
+	const root = get(fileTree) as FolderNode | null;
+
+	if (!root || !root.handle) {
+		console.warn('⚠️ 현재 열린 workspace 폴더가 없습니다.');
+		return;
+	}
+
+	try {
+		const updated = await readDirectory(root.handle);
+		const newRoot: FolderNode = {
+			...root,
+			children: updated.children // ✅ 내부 항목만 교체
+		};
+		fileTree.set(newRoot);
+		console.info('✅ workspace 갱신 완료');
+	} catch (err) {
+		console.error('❌ workspace 갱신 실패:', err);
 	}
 }

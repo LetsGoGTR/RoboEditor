@@ -2,11 +2,11 @@
 	import TabLayout from '@layouts/TabLayout.svelte';
 	import DirectoryTree from '@components/DirectoryTree.svelte';
 	import type { FileNode, TreeNode } from '@/types';
-	import { goto } from '$app/navigation';
 	import { fileTree } from '@/stores/fileTree';
 	import ControllerDir from './ControllerDir.svelte';
 	import { onDestroy } from 'svelte';
 	import { currentFile } from '@/stores/currentFile';
+	import { gotoPage } from '@/stores/workspaces';
 
 	let tree: TreeNode | null = $derived($fileTree);
 	let activeId: 'left' | 'right' = $state('left');
@@ -15,7 +15,7 @@
 	function handleSelect(node: TreeNode) {
 		if (node.type === 'file') {
 			currentFile.open(node as FileNode);
-			goto(`/${encodeURIComponent(node.id)}`);
+			gotoPage('edit');
 		}
 	}
 
@@ -34,7 +34,7 @@
 <TabLayout
 	leftTab={{ id: 'left', label: 'Controller' }}
 	rightTab={{ id: 'right', label: 'Workspace' }}
-	activeId={activeId}
+	{activeId}
 	onTabChange={handleTabChange}
 >
 	<div slot="left">
@@ -51,10 +51,10 @@
 </TabLayout>
 
 <style>
-.notice {
-	font-size: 0.95rem;
-	color: #333;
-	text-align: center;
-	padding: 0.8rem 0;
-}
+	.notice {
+		font-size: 0.95rem;
+		color: #333;
+		text-align: center;
+		padding: 0.8rem 0;
+	}
 </style>

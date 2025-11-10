@@ -11,6 +11,12 @@ export default defineConfig({
 			publicPath: 'monaco'
 		})
 	],
+	ssr: {
+		noExternal: ['monaco-editor'] // SSR 번들에서 monaco 제외
+	},
+	optimizeDeps: {
+		include: ['monaco-editor']
+	},
 	test: {
 		expect: { requireAssertions: true },
 		projects: [
@@ -45,8 +51,9 @@ export default defineConfig({
 			'@': path.resolve(__dirname, './src'),
 			'@components': path.resolve(__dirname, './src/lib/components'),
 			'@layouts': path.resolve(__dirname, './src/lib/layouts'),
-			'@utils': path.resolve(__dirname, './src/lib/utils'),
+			'@features': path.resolve(__dirname, './src/features'),
 			'@routes': path.resolve(__dirname, './src/routes'),
+			'@utils': path.resolve(__dirname, './src/utils'),
 			'@styles': path.resolve(__dirname, './src/styles')
 		}
 	}
