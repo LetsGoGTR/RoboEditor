@@ -40,29 +40,29 @@ void DropTextEdit::dragMoveEvent(QDragMoveEvent *e)
 
 void DropTextEdit::dropEvent(QDropEvent *e)
 {
+    // 객체의 경로가 유효하지 않을 때
     if (!e->mimeData()->hasUrls()) {
         e->ignore();
         return;
     }
 
     const QList<QUrl> urls = e->mimeData()->urls();
+
+    // 객체의 url형식은 있는데 비어있을 때
     if (urls.isEmpty()) {
         e->ignore();
         return;
     }
 
+    //실제 경로가 진짜 있는지
     const QString path = urls.first().toLocalFile();
     if (path.isEmpty()) {
         e->ignore();
         return;
     }
 
-    // 양쪽 다 true일 수 있음 → 네가 원하는 "아무 트리에서 아무 쪽으로 드롭" 시나리오
-    if (acceptAsLeft_) {
-        emit fileDroppedToLeft(path);
-    }
-    if (acceptAsRight_) {
-        emit fileDroppedToRight(path);
+    if (accept_) {
+        emit fileDropped(path);
     }
 
     e->acceptProposedAction();

@@ -1,6 +1,6 @@
 #ifndef CENTERSTACK_H
 #define CENTERSTACK_H
-
+#pragma once
 #include <QTabWidget>
 #include <QTimer>
 #include <QTreeView>
@@ -48,6 +48,10 @@ class CenterStack : public QWidget
         // 경로 관련
         QString getWorkspacePath() const;
         void    setBackupPath(const QString &path);
+
+        // 설정 저장/복원
+        QByteArray saveSplitterState() const;
+        void       restoreSplitterState(const QByteArray &state);
 
       signals:
         // 메인윈도우가 받을 시그널

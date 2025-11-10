@@ -1,15 +1,24 @@
 #include "ApplyPage.h"
 
+#include <QDir>
 #include <QFile>
 #include <QFileDialog>
+#include <QJsonObject>
 #include <QMessageBox>
+#include <QVBoxLayout>
 
 #include "ConfirmSelection.h"
+#include "ControllerManager.h"
 #include "PasswordManager.h"
 #include "ui_ApplyPage.h"
 #include "ui_ConfirmSelection.h"
 
-ApplyPage::ApplyPage(QWidget *parent) : QWidget(parent), ui(new Ui::ApplyPage)
+ApplyPage::ApplyPage(QWidget *parent) :
+    QWidget(parent),
+    ui(new Ui::ApplyPage),
+    totalApplyRequests_(0),
+    completedApplyRequests_(0),
+    failedApplyRequests_(0)
 {
     ui->setupUi(this);
     selectbackupWidget     = new selectTableWidget(this);
@@ -43,12 +52,22 @@ void ApplyPage::refreshList()
 //apply : 선택한 백업 스페이스 정보, 제어기 정보를 서버에 전송
 void ApplyPage::confirmSelection()
 {
-    qDebug() << "selected : " << selectedBackupDir;
+    selectedControllerList = selectcontrollerWidget->getSelectedControllers();
+
+    if (selectedControllerList.isEmpty()) {
+        QMessageBox::warning(this, "오류", "제어기를 선택해주세요.");
+        return;
+    }
+
+    if (selectedBackupDir.isEmpty()) {
+        QMessageBox::warning(this, "오류", "백업 파일을 선택해주세요.");
+        return;
+    }
 
     for (auto cur : selectedControllerList) {
         qDebug() << "selected : " << cur;
     }
-    selectedControllerList = selectcontrollerWidget->getSelectedControllers();
+
     showPasswordUI();
     qDebug() << "apply clicked";
 }
@@ -83,6 +102,19 @@ void ApplyPage::showPasswordUI()
             ConfirmSelection confirmDialog(this);
             confirmDialog.setApplyPage(this);
 
+            connect(
+                    &confirmDialog,
+                    &ConfirmSelection::applyRequested,
+                    this,
+                    [this]() {
+                        // ConfirmSelection의 [Apply] 버튼 클릭 시
+                        // 선택된 모든 제어기에 대해 바로 applyRequest 호출
+                        for (const QString &sn : selectedControllerList) {
+                            ControllerManager::instance()->applyRequest(sn, selectedBackupDir);
+                        }
+                    },
+                    Qt::SingleShotConnection);
+
             if (confirmDialog.exec() == QDialog::Accepted) {
                 qDebug() << "User confirmed";
             }
@@ -95,6 +127,174 @@ void ApplyPage::showPasswordUI()
         // 사용자가 취소함
         qDebug() << "Password dialog cancelled";
     }
+}
+
+// 큐 시작
+void ApplyPage::startApplyQueue()
+{
+    if (selectedControllerList.isEmpty() || selectedBackupDir.isEmpty()) {
+        QMessageBox::warning(this, "오류", "선택된 제어기 또는 백업 파일 정보가 없습니다.");
+        return;
+    }
+
+    ControllerManager *manager = ControllerManager::instance();
+    QStringList        disconnectedControllers;
+    QStringList        unknownControllers;
+
+    for (const QString &sn : selectedControllerList) {
+        ControllerInfo info = manager->getController(sn);
+        if (info.serialNumber.isEmpty()) {
+            unknownControllers.append(sn);
+            continue;
+        }
+
+        if (!info.isConnected) {
+            disconnectedControllers.append(sn);
+            continue;
+        }
+    }
+
+    if (!unknownControllers.isEmpty()) {
+        QMessageBox::warning(this,
+                             "오류",
+                             QString("등록 정보가 없는 제어기가 선택되었습니다:\n%1")
+                                     .arg(unknownControllers.join(", ")));
+        return;
+    }
+
+    if (!disconnectedControllers.isEmpty()) {
+        QMessageBox::warning(this,
+                             "오류",
+                             QString("다음 제어기가 오프라인 상태입니다:\n%1")
+                                     .arg(disconnectedControllers.join(", ")));
+        return;
+    }
+
+    // 큐 및 카운터 초기화
+    applyQueue_.clear();
+    totalApplyRequests_     = selectedControllerList.size();
+    completedApplyRequests_ = 0;
+    failedApplyRequests_    = 0;
+
+    // Disable controls during apply
+    if (ui->applyBtn)
+        ui->applyBtn->setEnabled(false);
+    if (ui->refreshBtn)
+        ui->refreshBtn->setEnabled(false);
+    if (ui->importBtn)
+        ui->importBtn->setEnabled(false);
+
+    for (const QString &sn : selectedControllerList) {
+        applyQueue_.enqueue(sn);
+    }
+
+    // 큐 처리 시작
+    processNextApply();
+}
+
+// 큐 처리
+void ApplyPage::processNextApply()
+{
+    // 큐가 비어있으면 완료 처리
+    if (applyQueue_.isEmpty()) {
+        qDebug() << "[ApplyPage] Apply queue finished.";
+        onAllAppliesCompleted();  //
+        return;
+    }
+
+    QString serialNumber = applyQueue_.dequeue();
+
+    // 1. public ApiClient 가져오기
+    ApiClient *client = ControllerManager::instance()->getApiClient(serialNumber);
+    if (!client) {
+        qWarning() << "[ApplyPage] Could not get ApiClient for" << serialNumber;
+        onApplyFailed(serialNumber, "ApiClient not found");
+        return;
+    }
+
+    // 2. ApiClient의 시그널에 람다로 연결 (SingleShot으로 자동연결 해제)
+    connect(
+            client,
+            &ApiClient::requestSucceeded,
+            this,
+            [this, serialNumber](const QString &endpoint, const QJsonObject &response) {
+                if (endpoint == "/api/robot/import") {
+                    onApplyCompleted(serialNumber);
+                }
+            },
+            Qt::SingleShotConnection);
+
+    connect(
+            client,
+            &ApiClient::requestFailed,
+            this,
+            [this,
+             serialNumber](const QString &endpoint, const QString &error, const QString &url) {
+                if (endpoint == "/api/robot/import") {
+                    onApplyFailed(serialNumber, error);
+                }
+            },
+            Qt::SingleShotConnection);
+
+    // 3. ApiClient의 public upload 함수 호출
+    // ApiClient::upload는 filePath를 받아 압축(.tar.gz) 후 전송합니다.
+    // selectedBackupDir는 압축할 폴더 또는 파일의 경로여야 합니다.
+    const QString endpoint = "/api/robot/import";
+    qDebug() << "[ApplyPage] Applying to:" << serialNumber << "baseUrl:" << client->getBaseUrl()
+             << "endpoint:" << endpoint << "path:" << selectedBackupDir;
+    ControllerManager::instance()->applyRequest(serialNumber, selectedBackupDir);
+}
+
+// 개별 적용 성공
+void ApplyPage::onApplyCompleted(const QString &serialNumber)
+{
+    completedApplyRequests_++;
+    qDebug() << "[ApplyPage] Apply completed:" << serialNumber << "(" << completedApplyRequests_
+             << "/" << totalApplyRequests_ << ")";
+
+    // 다음 작업 처리
+    processNextApply();
+}
+
+// 개별 적용 실패
+void ApplyPage::onApplyFailed(const QString &serialNumber, const QString &error)
+{
+    failedApplyRequests_++;
+    qWarning() << "[ApplyPage] Apply failed:" << serialNumber << error;
+
+    // 다음 작업 처리
+    processNextApply();
+}
+
+// 모든 Apply 완료 시 창 닫기
+void ApplyPage::onAllAppliesCompleted()  //
+{
+    qDebug() << "[ApplyPage] All applies processed.";
+
+    // BackupPage.cpp의 완료 로직을 참고하여 수정
+    QString message;
+    if (failedApplyRequests_ > 0) {
+        message = QString("적용 완료!\n성공: %1개, 실패: %2개")
+                          .arg(completedApplyRequests_)
+                          .arg(failedApplyRequests_);
+        QMessageBox::warning(this, "적용 완료", message);
+    } else {
+        message = QString("모든 제어기에 성공적으로 적용되었습니다!\n완료: %1개")
+                          .arg(completedApplyRequests_);
+        QMessageBox::information(this, "적용 완료", message);
+    }
+
+    // 창을 자동으로 닫지 않고 사용자가 계속 작업할 수 있도록 유지
+    // 필요 시 외부에서 직접 닫을 수 있게 한다.
+    // this->window()->close();
+
+    // Re-enable controls after processing
+    if (ui->applyBtn)
+        ui->applyBtn->setEnabled(true);
+    if (ui->refreshBtn)
+        ui->refreshBtn->setEnabled(true);
+    if (ui->importBtn)
+        ui->importBtn->setEnabled(true);
 }
 
 ApplyPage::~ApplyPage()
