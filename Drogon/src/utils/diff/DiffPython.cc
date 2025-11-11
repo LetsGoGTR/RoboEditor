@@ -20,7 +20,7 @@ Json::Value DiffPython::runFromText(const std::string& contentA,
     std::vector<NormalizedLine> bNorm = normalizeAll(contentB);
 
     // 2) LCS 기반 diff 생성
-    std::vector<Op> ops = compute(aNorm, bNorm, contentA, contentB);
+    std::vector<Op> ops = compute(aNorm, bNorm);
     std::vector<Diff> diffs = foldOpsToDiffs(ops, aNorm, bNorm, contentA, contentB);
 
     // 3) changes 배열 + 통계 집계
@@ -313,8 +313,8 @@ void DiffPython::trimCommon(const std::vector<int>& Ai, const std::vector<int>& 
     a1 = n; b1 = m;
     while (a1 > a0 && b1 > b0 && Ai[a1 - 1] == Bi[b1 - 1]) { --a1; --b1; }
 
-    for (int i = 0, i < a0; ++i) {
-        ops.push_back({Op::SAME, i, i});
+    for (int i = 0; i < a0; ++i) {
+        ops.emplace_back(Op::SAME, i, i);
     }
 }
 
@@ -375,7 +375,7 @@ void DiffPython::solveWithAnchors(const std::vector<int>& Ai, const std::vector<
         }
 
         if (pa < qa || pb < qb) dcMyers(Ai, Bi, pa, qa, pb, qb, ops);
-        ops.push_back({Op::SAME, qa, qb});
+        ops.emplace_back(Op::SAME, qa, qb);
         pa = qa + 1; 
         pb = qb + 1;
     }
@@ -454,6 +454,7 @@ DiffPython::buildAnchorsHistogram(const std::vector<NormalizedLine>& aNorm,
                                   const std::vector<int>& origB,
                                   int x0,int x1,int y0,int y1, int vocabCap)
 {
+    struct Cand { int pos; double sc; };
     std::vector<std::pair<int, int>> anchors;
     std::unordered_map<std::string,int> freq;
     std::vector<Cand> ca;
@@ -461,7 +462,6 @@ DiffPython::buildAnchorsHistogram(const std::vector<NormalizedLine>& aNorm,
     std::vector<std::vector<int>> buckA;
     std::vector<std::vector<int>> buckB;
     std::vector<std::pair<int, int>> pairs;
-    struct Cand { int pos; double sc; };
 
     freq.reserve((size_t)((x1-x0)+(y1-y0))*6 + 32);
 
@@ -602,8 +602,8 @@ void DiffPython::dpFallback(const std::vector<int>& Ai, const std::vector<int>& 
                             int ax,int ay,int bx,int by,
                             /*inout*/ std::vector<Op>& ops) {
     int n = ay - ax, m = by - bx;
-    if (n == 0) { for (int j = 0; j < m; ++j) ops.push_back({Op::ADD, -1, bx + j}); return; }
-    if (m == 0) { for (int i = 0; i < n; ++i) ops.push_back({Op::DEL, ax + i, -1}); return; }
+    if (n == 0) { for (int j = 0; j < m; ++j) ops.emplace_back(Op::ADD, -1, bx + j); return; }
+    if (m == 0) { for (int i = 0; i < n; ++i) ops.emplace_back(Op::DEL, ax + i, -1); return; }
 
     std::vector<std::vector<int>> dp(n+1, std::vector<int>(m+1, 0));
     std::vector<Op> tmp;
@@ -622,7 +622,7 @@ void DiffPython::dpFallback(const std::vector<int>& Ai, const std::vector<int>& 
         else if (j > 0 && (i == 0 || dp[i][j-1] >= dp[i-1][j])) { tmp.push_back({Op::ADD, -1, bx+j-1}); --j; }
         else { tmp.push_back({Op::DEL, ax+i-1, -1}); --i; }
     }
-    for (int t = static_cast<int>(tmp.size()) - 1; t >= 0; --t) ops.push_back(tmp[t]);
+    for (int t = static_cast<int>(tmp.size()) - 1; t >= 0; --t) ops.emplace_back(tmp[t]);
 }
 
 // 분할정복 Myers (선형 메모리) + 결과 push
@@ -644,15 +644,15 @@ void DiffPython::dcMyers(const std::vector<int>& Ai, const std::vector<int>& Bi,
                          int ax,int ay,int bx,int by,
                          /*inout*/ std::vector<Op>& ops) {
     const int n = ay - ax, m = by - bx;
-    if (n == 0) { for (int j = 0; j < m; ++j) ops.push_back({Op::ADD, -1, bx + j}); return; }
-    if (m == 0) { for (int i = 0; i < n; ++i) ops.push_back({Op::DEL, ax + i, -1}); return; }
+    if (n == 0) { for (int j = 0; j < m; ++j) ops.emplace_back(Op::ADD, -1, bx + j); return; }
+    if (m == 0) { for (int i = 0; i < n; ++i) ops.emplace_back(Op::DEL, ax + i, -1); return; }
     if (n <= 32 || m <= 32) { dpFallback(Ai, Bi, ax, ay, bx, by, ops); return; }
 
     const int delta = n - m;
     const bool odd  = (delta & 1);
     const int Dmax  = (n + m + 1) / 2;
     const int OFF   = Dmax + 1;
-    int xF = yF = xR = yR = 0;
+    int xF = 0, yF = 0, xR = 0, yR = 0;
     bool found = false;
     int snake = 0;
     std::vector<int> Vf(2*Dmax+3, -1), Vr(2*Dmax+3, -1);
@@ -698,7 +698,7 @@ void DiffPython::dcMyers(const std::vector<int>& Ai, const std::vector<int>& Bi,
     while (xF + snake < xR && yF + snake < yR && Ai[ax+xF+snake] == Bi[bx+yF+snake]) ++snake;
 
     dcMyers(Ai, Bi, ax, ax + xF, bx, bx + yF, ops);
-    for (int t = 0; t < snake; ++t) ops.push_back({Op::SAME, ax + xF + t, bx + yF + t});
+    for (int t = 0; t < snake; ++t) ops.emplace_back(Op::SAME, ax + xF + t, bx + yF + t);
     dcMyers(Ai, Bi, ax + xF + snake, ay, bx + yF + snake, by, ops);
 }
 
@@ -709,7 +709,7 @@ void DiffPython::appendSuffixSame(const std::vector<int>& Ai, const std::vector<
     const int n = static_cast<int>(Ai.size());
     const int m = static_cast<int>(Bi.size());
     for (int i = a1, j = b1; i < n && j < m; ++i, ++j) {
-        ops.push_back({Op::SAME, i, j});
+        ops.emplace_back(Op::SAME, i, j);
     }
 }
 
