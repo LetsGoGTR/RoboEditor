@@ -60,8 +60,44 @@ void FT::apply(const HttpRequestPtr &req, std::function<void(const HttpResponseP
         return;
     }
 
+    auto sftpHostIt = parameters.find("sftpHost");
+    if (sftpHostIt == parameters.end() || sftpHostIt->second.empty()) {
+        Json::Value error;
+        error["success"] = false;
+        error["error"]   = "Missing required field: sftpHost";
+        auto resp        = HttpResponse::newHttpJsonResponse(error);
+        resp->setStatusCode(k400BadRequest);
+        callback(resp);
+        return;
+    }
+
+    auto sftpPortIt = parameters.find("sftpPort");
+    if (sftpPortIt == parameters.end() || sftpPortIt->second.empty()) {
+        Json::Value error;
+        error["success"] = false;
+        error["error"]   = "Missing required field: sftpPort";
+        auto resp        = HttpResponse::newHttpJsonResponse(error);
+        resp->setStatusCode(k400BadRequest);
+        callback(resp);
+        return;
+    }
+
+    auto apiIt = parameters.find("api");
+    if (apiIt == parameters.end() || apiIt->second.empty()) {
+        Json::Value error;
+        error["success"] = false;
+        error["error"]   = "Missing required field: api";
+        auto resp        = HttpResponse::newHttpJsonResponse(error);
+        resp->setStatusCode(k400BadRequest);
+        callback(resp);
+        return;
+    }
+
     std::string user     = userIt->second;
     std::string password = passwordIt->second;
+    std::string sftpHost = sftpHostIt->second;
+    int         sftpPort = std::stoi(sftpPortIt->second);
+    std::string api      = apiIt->second;
 
     // 첫 번째 파일 가져오기
     auto &file = files[0];
@@ -70,9 +106,9 @@ void FT::apply(const HttpRequestPtr &req, std::function<void(const HttpResponseP
     std::string tmpPath = "/tmp/uploaded_workspace_" + std::to_string(std::time(nullptr)) + ".tgz";
     file.saveAs(tmpPath);
 
-    auto task = [tmpPath, user, password, callback]() {
+    auto task = [tmpPath, user, password, sftpHost, sftpPort, api, callback]() {
         FileTransferService service;
-        auto                result = service.applyWorkspace(tmpPath, user, password);
+        auto                result = service.applyWorkspace(tmpPath, user, password, sftpHost, sftpPort, api);
 
         // 처리 후 임시 파일 삭제
         try {
@@ -110,19 +146,10 @@ void FT::backup(const HttpRequestPtr &req, std::function<void(const HttpResponse
     }
 
     // 필수 파라미터 검증
-    if (!jsonBody->isMember("host") || (*jsonBody)["host"].asString().empty()) {
+    if (!jsonBody->isMember("sftpHost") || (*jsonBody)["sftpHost"].asString().empty()) {
         Json::Value error;
         error["success"] = false;
-        error["error"]   = "Missing required field: host";
-        auto resp        = HttpResponse::newHttpJsonResponse(error);
-        resp->setStatusCode(k400BadRequest);
-        callback(resp);
-        return;
-    }
-    if (!jsonBody->isMember("username") || (*jsonBody)["username"].asString().empty()) {
-        Json::Value error;
-        error["success"] = false;
-        error["error"]   = "Missing required field: username";
+        error["error"]   = "Missing required field: sftpHost";
         auto resp        = HttpResponse::newHttpJsonResponse(error);
         resp->setStatusCode(k400BadRequest);
         callback(resp);
@@ -156,13 +183,20 @@ void FT::backup(const HttpRequestPtr &req, std::function<void(const HttpResponse
         return;
     }
 
-    SFTPConfig config((*jsonBody)["host"].asString(),
-                      (*jsonBody)["port"].asInt(),
-                      (*jsonBody)["username"].asString(),
+    // sftpPort 기본값 22
+    int sftpPort = 22;
+    if (jsonBody->isMember("sftpPort")) {
+        sftpPort = (*jsonBody)["sftpPort"].asInt();
+    }
+
+    SFTPConfig config((*jsonBody)["sftpHost"].asString(),
+                      sftpPort,
+                      (*jsonBody)["user"].asString(),
                       (*jsonBody)["password"].asString());
 
     std::string user       = (*jsonBody)["user"].asString();
     std::string remotePath = (*jsonBody)["remotePath"].asString();
+    std::string api        = jsonBody->isMember("api") ? (*jsonBody)["api"].asString() : "";
 
     // localPath는 선택적 파라미터
     std::string localPath;
@@ -170,9 +204,9 @@ void FT::backup(const HttpRequestPtr &req, std::function<void(const HttpResponse
         localPath = (*jsonBody)["localPath"].asString();
     }
 
-    auto task = [config, user, remotePath, localPath, callback]() {
+    auto task = [config, user, remotePath, localPath, api, callback]() {
         FileTransferService service;
-        auto                result = service.backupFromRemote(config, user, remotePath, localPath);
+        auto                result = service.backupFromRemote(config, user, remotePath, localPath, api);
 
         if (!result.success) {
             Json::Value error;

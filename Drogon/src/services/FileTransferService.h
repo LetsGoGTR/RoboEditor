@@ -14,16 +14,21 @@ class FileTransferService
     services::ServiceResult backupFromRemote(const SFTPConfig  &sftpConfig,
                                              const std::string &user,
                                              const std::string &remotePath,
-                                             const std::string &localPath);
+                                             const std::string &localPath,
+                                             const std::string &api = "");
 
     // 워크스페이스 복원 (HTTP 업로드)
     services::ServiceResult applyWorkspace(const std::string &uploadedFilePath,
                                            const std::string &user,
-                                           const std::string &password);
+                                           const std::string &password,
+                                           const std::string &sftpHost,
+                                           int                sftpPort,
+                                           const std::string &api);
 
   private:
     // Workspace API 호출 메서드
-    bool extractWorkspace(const std::string &user,
-                         const std::string &password,
-                         const std::string &archivePath);
+    std::pair<bool, std::string> extractWorkspace(const std::string &user,
+                                                   const std::string &password,
+                                                   const std::string &archivePath,
+                                                   const std::string &api);
 };

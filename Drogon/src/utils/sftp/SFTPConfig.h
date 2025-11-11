@@ -6,7 +6,7 @@ class SFTPConfig
   public:
     std::string host;
     int         port;
-    std::string username;
+    std::string user;
     std::string password;
     int         timeout;  // 초 단위
 
@@ -17,7 +17,7 @@ class SFTPConfig
                int                t   = 60) :
         host(h),
         port(p),
-        username(u),
+        user(u),
         password(pwd),
         timeout(t)
     {

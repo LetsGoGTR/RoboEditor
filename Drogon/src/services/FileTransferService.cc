@@ -13,7 +13,8 @@ namespace fs = std::filesystem;
 services::ServiceResult FileTransferService::backupFromRemote(const SFTPConfig  &sftpConfig,
                                                                const std::string &user,
                                                                const std::string &remotePath,
-                                                               const std::string &localPath)
+                                                               const std::string &localPath,
+                                                               const std::string &api)
 {
     std::string downloadPath;
 
@@ -21,9 +22,10 @@ services::ServiceResult FileTransferService::backupFromRemote(const SFTPConfig  
         utils::logging::info("원격 백업 다운로드 시작: user=" + user + ", remote=" + remotePath);
 
         // 1. 먼저 원격 서버의 workspace compress API 호출
-        utils::logging::info("원격 서버 압축 API 호출: http://" + sftpConfig.host + ":80/api/workspace/compress");
+        std::string apiUrl = api.empty() ? ("https://" + sftpConfig.host) : api;
+        utils::logging::info("원격 서버 압축 API 호출: " + apiUrl + "/api/workspace/compress");
 
-        auto client = drogon::HttpClient::newHttpClient("http://" + sftpConfig.host + ":80");
+        auto client = drogon::HttpClient::newHttpClient(apiUrl);
         auto req    = drogon::HttpRequest::newHttpJsonRequest(Json::Value());
         req->setMethod(drogon::Post);
         req->setPath("/api/workspace/compress");
@@ -184,7 +186,10 @@ services::ServiceResult FileTransferService::backupFromRemote(const SFTPConfig  
 
 services::ServiceResult FileTransferService::applyWorkspace(const std::string &uploadedFilePath,
                                                             const std::string &user,
-                                                            const std::string &password)
+                                                            const std::string &password,
+                                                            const std::string &sftpHost,
+                                                            int                sftpPort,
+                                                            const std::string &api)
 {
     try {
         utils::logging::info("워크스페이스 복원 시작 (HTTP 업로드): user=" + user +
@@ -197,8 +202,9 @@ services::ServiceResult FileTransferService::applyWorkspace(const std::string &u
         }
 
         // Workspace Extract API 호출하여 압축 해제
-        if (!extractWorkspace(user, password, uploadedFilePath)) {
-            return services::ServiceResult::createError("워크스페이스 압축 해제 실패");
+        auto [success, errorMsg] = extractWorkspace(user, password, uploadedFilePath, api);
+        if (!success) {
+            return services::ServiceResult::createError(errorMsg);
         }
 
         utils::logging::info("워크스페이스 압축 해제 성공");
@@ -217,9 +223,10 @@ services::ServiceResult FileTransferService::applyWorkspace(const std::string &u
     }
 }
 
-bool FileTransferService::extractWorkspace(const std::string &user,
-                                           const std::string &password,
-                                           const std::string &archivePath)
+std::pair<bool, std::string> FileTransferService::extractWorkspace(const std::string &user,
+                                                                    const std::string &password,
+                                                                    const std::string &archivePath,
+                                                                    const std::string &api)
 {
     try {
         utils::logging::info("Workspace 압축 해제 준비: user=" + user + ", archive=" + archivePath);
@@ -231,12 +238,13 @@ bool FileTransferService::extractWorkspace(const std::string &user,
         try {
             fs::copy_file(archivePath, targetPath, fs::copy_options::overwrite_existing);
         } catch (const std::exception &e) {
-            utils::logging::error("압축 파일 복사 실패: " + std::string(e.what()));
-            return false;
+            std::string error = "압축 파일 복사 실패: " + std::string(e.what());
+            utils::logging::error(error);
+            return {false, error};
         }
 
         // 2. Workspace Extract API 호출
-        auto client = drogon::HttpClient::newHttpClient("http://localhost:80");
+        auto client = drogon::HttpClient::newHttpClient(api);
         auto req    = drogon::HttpRequest::newHttpJsonRequest(Json::Value());
         req->setMethod(drogon::Post);
         req->setPath("/api/workspace/extract");
@@ -247,44 +255,58 @@ bool FileTransferService::extractWorkspace(const std::string &user,
         req->setBody(body.toStyledString());
         req->setContentTypeCode(drogon::CT_APPLICATION_JSON);
 
-        std::promise<bool> promise;
-        auto               future = promise.get_future();
+        std::promise<std::pair<bool, std::string>> promise;
+        auto                                       future = promise.get_future();
 
         client->sendRequest(req, [&promise](drogon::ReqResult                result,
                                             const drogon::HttpResponsePtr &response) {
             if (result != drogon::ReqResult::Ok) {
-                utils::logging::error("Workspace 압축 해제 API 호출 실패: 네트워크 오류");
-                promise.set_value(false);
+                std::string error = "Workspace 압축 해제 API 호출 실패: 네트워크 오류";
+                utils::logging::error(error);
+                promise.set_value({false, error});
                 return;
             }
 
-            if (response->getStatusCode() != drogon::k200OK) {
-                utils::logging::error("Workspace 압축 해제 API 실패: HTTP " +
-                                      std::to_string(response->getStatusCode()));
-                promise.set_value(false);
+            int statusCode = response->getStatusCode();
+            if (statusCode != drogon::k200OK) {
+                std::string error;
+                if (statusCode == drogon::k401Unauthorized) {
+                    error = "인증 실패: 비밀번호가 올바르지 않습니다";
+                } else {
+                    error = "Workspace 압축 해제 API 실패: HTTP " + std::to_string(statusCode);
+                }
+                utils::logging::error(error);
+                promise.set_value({false, error});
                 return;
             }
 
             auto jsonResponse = response->getJsonObject();
             if (!jsonResponse || !jsonResponse->isMember("success")) {
-                utils::logging::error("Workspace 압축 해제 API 응답 형식 오류");
-                promise.set_value(false);
+                std::string error = "Workspace 압축 해제 API 응답 형식 오류";
+                utils::logging::error(error);
+                promise.set_value({false, error});
                 return;
             }
 
             bool success = (*jsonResponse)["success"].asBool();
             if (success) {
                 utils::logging::info("Workspace 압축 해제 성공");
+                promise.set_value({true, ""});
             } else {
-                utils::logging::error("Workspace 압축 해제 실패");
+                std::string error = "Workspace 압축 해제 실패";
+                if (jsonResponse->isMember("error")) {
+                    error = (*jsonResponse)["error"].asString();
+                }
+                utils::logging::error(error);
+                promise.set_value({false, error});
             }
-            promise.set_value(success);
         });
 
         return future.get();
 
     } catch (const std::exception &e) {
-        utils::logging::error("Workspace 압축 해제 중 오류: " + std::string(e.what()));
-        return false;
+        std::string error = "Workspace 압축 해제 중 오류: " + std::string(e.what());
+        utils::logging::error(error);
+        return {false, error};
     }
 }

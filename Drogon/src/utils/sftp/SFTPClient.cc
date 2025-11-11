@@ -84,9 +84,9 @@ bool SFTPClient::createSocket()
 bool SFTPClient::authenticatePassword()
 {
     clearError();
-    if (libssh2_userauth_password(session, config.username.c_str(), config.password.c_str()) != 0) {
-        lastError = "인증 실패 (사용자명: " + config.username + ")";
-        utils::logging::error("SFTP 인증 실패: " + config.username);
+    if (libssh2_userauth_password(session, config.user.c_str(), config.password.c_str()) != 0) {
+        lastError = "인증 실패 (사용자명: " + config.user + ")";
+        utils::logging::error("SFTP 인증 실패: " + config.user);
         return false;
     }
     return true;
