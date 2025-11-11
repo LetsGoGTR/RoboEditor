@@ -2,10 +2,10 @@ import { writable } from 'svelte/store';
 import type { FileNode } from '@/types';
 
 /** 페이지 종류 타입 */
-export type WorkspacePage = 'empty' | 'edit' | 'compare' | 'apply' | 'backup' | 'register';
+export type WorkspacePage = 'edit' | 'compare' | 'apply' | 'backup' | 'register';
 
 /** 현재 활성화된 페이지 */
-export const currentPage = writable<WorkspacePage>('empty');
+export const currentPage = writable<WorkspacePage>('edit');
 
 /** 현재 선택된 파일 정보 */
 export const currentFile = writable<FileNode | null>(null);
@@ -24,5 +24,5 @@ export function openFile(file: FileNode) {
 /** 초기화 */
 export function resetWorkspace() {
 	currentFile.set(null);
-	currentPage.set('empty');
+	currentPage.set('edit');
 }

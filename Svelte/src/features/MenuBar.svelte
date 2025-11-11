@@ -58,8 +58,11 @@
 				<li><button onclick={handleNewFile}>새 텍스트 파일</button></li>
 				<li><button onclick={handleNewFolder}>새 폴더</button></li>
 				<li><hr /></li>
-				<li><button onclick={handleNewFolder}>파일 불러오기</button></li>
-				<li><button onclick={handleOpenBackup}>백업 불러오기</button></li>
+				<li><button onclick={handleNewFolder}>파일 열기</button></li>
+				<li><button onclick={handleOpenBackup}>백업 폴더 열기</button></li>
+				<li><hr /></li>
+				<li><button>저장</button></li>
+				<li><button>다른 이름으로 저장</button></li>
 			</ul>
 		</li>
 		<li>

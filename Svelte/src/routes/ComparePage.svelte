@@ -29,7 +29,7 @@
 
   /** 좌측(현재 파일) 로드 */
   async function loadLeftModel() {
-    const file = current.file as FileNode | null;
+    const file = current.active.file as FileNode | null;
     if (!file) return null;
 
     let text = "";
