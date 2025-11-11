@@ -4,7 +4,6 @@
 	import BackupPage from "./BackupPage.svelte";
 	import ComparePage from "./ComparePage.svelte";
 	import EditorPage from "./EditorPage.svelte";
-	import EmptyPage from "./EmptyPage.svelte";
 	import RegisterPage from "./RegisterPage.svelte";
 </script>
 
@@ -19,8 +18,6 @@
 		<BackupPage />
 	{:else if $currentPage === 'register'}
 		<RegisterPage />
-	{:else}
-		<EmptyPage />
 	{/if}
 </main>
 

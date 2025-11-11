@@ -1,11 +1,18 @@
 // Components Items
-// Tabs
+// Fixed Tabs
 export type FixedTabId = 'left' | 'right';
 
 export interface FixedTab {
 	id: FixedTabId;
 	label: string;
 	disabled?: boolean;
+}
+
+// addable Tabs
+export interface TabItem {
+	id: string;
+	name: string;
+	path?: string | null;
 }
 
 // Business Items

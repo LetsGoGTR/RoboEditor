@@ -1,33 +1,50 @@
 <script lang="ts">
-	import { page } from '$app/state';
 	import { currentFile } from '@/stores/currentFile';
 	import { fileTree } from '@/stores/fileTree';
 	import { gotoPage } from '@/stores/workspaces';
+	import type { FileNode } from '@/types';
 	import { createNewFileNode } from '@/utils/fileAction';
-	import { createFolderWithDialog, openDirectory, readDirectory } from '@/utils/FSA';
+	import { createFolderWithDialog, openDirectory, openFile, readDirectory } from '@/utils/FSA';
 
 	let dialog: HTMLDialogElement;
 
-	function handleCompare() {
-		const id = page.params.id && page.params.id !== 'register' ? page.params.id : null;
+	
+	async function handleCompare() {
+		const state = $currentFile;
+		const left = state.active?.file;
 
-		if (!id) {
+		if (!left) {
 			dialog.showModal();
 			return;
 		}
 
+		// ✅ FSA: 사용자에게 비교 대상(right) 파일 선택 요청
+		const rightHandle = await openFile();
+		if (!rightHandle) {
+			dialog.showModal();
+			return;
+		}
+
+		const file = await rightHandle.getFile();
+		const right: FileNode = {
+			id: crypto.randomUUID(),
+			name: file.name,
+			type: 'file',
+			path: file.name,
+			size: file.size,
+			lastModified: file.lastModified,
+			handle: rightHandle,
+			kind: 'file'
+		};
+
+		// ✅ diff 모드 진입
+		currentFile.openDiff(left, right);
 		gotoPage('compare');
 	}
 
-	function handleBackup() {
-		gotoPage('backup');
-	}
-	function handleApply() {
-		gotoPage('apply');
-	}
-	function handleRegister() {
-		gotoPage('register');
-	}
+	function handleApply() { gotoPage('apply'); }
+	function handleBackup() { gotoPage('backup'); }
+	function handleRegister() { gotoPage('register'); }
 
 	// create a new file
 	function handleNewFile() {
@@ -68,10 +85,12 @@
 			<ul class="dropdown">
 				<li><button onclick={handleNewFile}>새 텍스트 파일</button></li>
 				<li><button onclick={handleNewFolder}>새 폴더</button></li>
-				<li><button onclick={handleNewFolder}>불러오기</button></li>
-				<li><span>불러오기</span></li>
 				<li><hr /></li>
-				<li><span>시뮬레이션</span></li>
+				<li><button onclick={handleNewFolder}>파일 열기</button></li>
+				<li><button onclick={handleOpenBackup}>백업 폴더 열기</button></li>
+				<li><hr /></li>
+				<li><button>저장</button></li>
+				<li><button>다른 이름으로 저장</button></li>
 			</ul>
 		</li>
 		<li>
@@ -84,7 +103,6 @@
 			<span>제어기</span>
 			<ul class="dropdown">
 				<li><button onclick={handleRegister}>제어기 등록</button></li>
-				<li><button onclick={handleRegister}>제어기 폴더 불러오기</button></li>
 				<li><button onclick={handleBackup}>제어기로부터 백업</button></li>
 				<li><button onclick={handleApply}>제어기에 적용</button></li>
 			</ul>
