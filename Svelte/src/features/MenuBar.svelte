@@ -1,16 +1,44 @@
 <script lang="ts">
-	import { page } from '$app/state';
 	import { currentFile } from '@/stores/currentFile';
 	import { fileTree } from '@/stores/fileTree';
 	import { gotoPage } from '@/stores/workspaces';
+	import type { FileNode } from '@/types';
 	import { createNewFileNode } from '@/utils/fileAction';
-	import { createFolderWithDialog, openDirectory, readDirectory } from '@/utils/FSA';
+	import { createFolderWithDialog, openDirectory, openFile, readDirectory } from '@/utils/FSA';
 
 	let dialog: HTMLDialogElement;
 
-	function handleCompare() {
-		const id = page.params.id && page.params.id !== 'register' ? page.params.id : null;
-		if (!id) { dialog.showModal(); return; }
+	
+	async function handleCompare() {
+		const state = $currentFile;
+		const left = state.active?.file;
+
+		if (!left) {
+			dialog.showModal();
+			return;
+		}
+
+		// ✅ FSA: 사용자에게 비교 대상(right) 파일 선택 요청
+		const rightHandle = await openFile();
+		if (!rightHandle) {
+			dialog.showModal();
+			return;
+		}
+
+		const file = await rightHandle.getFile();
+		const right: FileNode = {
+			id: crypto.randomUUID(),
+			name: file.name,
+			type: 'file',
+			path: file.name,
+			size: file.size,
+			lastModified: file.lastModified,
+			handle: rightHandle,
+			kind: 'file'
+		};
+
+		// ✅ diff 모드 진입
+		currentFile.openDiff(left, right);
 		gotoPage('compare');
 	}
 
