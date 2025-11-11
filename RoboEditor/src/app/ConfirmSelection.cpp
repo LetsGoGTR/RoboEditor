@@ -88,13 +88,13 @@ void ConfirmSelection::requestApply()
         return;
     }
 
-    // Apply 요청을 큐에 추가
-    emit applyRequested();
-
     QMessageBox::information(this, "적용 시작",
                              QString("선택된 %1개 제어기에 백업을 적용합니다.\n백업 파일: %2")
                                      .arg(controllers.size())
                                      .arg(backupDir));
+
+    // Apply 요청을 큐에 추가
+    emit applyRequested();
 
     // 다이얼로그 닫기
     accept();
