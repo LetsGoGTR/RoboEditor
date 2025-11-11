@@ -149,13 +149,13 @@ QLabel#status_disconnected {
 QLineEdit {
     min-width: 70px;
     min-height: 20px;
-    font-size: 10px;
+    font-size: 12px;
     padding: 2px 6px;
 }
 QSpinBox {
     min-width: 70px;
     min-height: 20px;
-    font-size: 10px;
+    font-size: 12px;
     padding: 2px 6px;
 }
 QSpinBox::up-button, QSpinBox::down-button {

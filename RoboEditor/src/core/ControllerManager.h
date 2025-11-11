@@ -48,8 +48,10 @@ class ControllerManager : public QObject
         void saveToFile(const QString &filePath = "");
         void loadFromFile(const QString &filePath = "");
 
-        void backupRequest(const QString &serialNumber);
-        void applyRequest(const QString &serialNumber, const QString &filePath);
+        bool backupRequest(const QString &serialNumber,
+                           const QString &baseBackupDir);
+        bool applyRequest(const QString &serialNumber,
+                          const QString &filePath);
 
         bool receive(const QString &serialNumber,
                      const QString &remoteTarGz,

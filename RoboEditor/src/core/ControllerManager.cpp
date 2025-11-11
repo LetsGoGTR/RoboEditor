@@ -4,6 +4,7 @@
 
 #include <QDir>
 #include <QFile>
+#include <QDateTime>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -293,14 +294,14 @@ void ControllerManager::updateControllersStates()
         updateConnectionState(c.serialNumber, false);
 
         client->get("/api/robot/running");
-        // if(c.serialNumber =="SN1"){
+        if(c.serialNumber =="SN1"){
 
-        // ControllerManager *manager = ControllerManager::instance();
+        ControllerManager *manager = ControllerManager::instance();
 
-        // QStringList localFiles;
-        // localFiles << "C:/Users/SSAFY/workspace3.tar.gz";  // 로컬 파일 (Windows 경로)
+        QStringList localFiles;
+        localFiles << "C:/Users/SSAFY/workspace3.tar.gz";  // 로컬 파일 (Windows 경로)
 
-        // QString remoteDir = "/workspace/";  // 원격 디렉토리 (리눅스 경로)
+        QString remoteDir = "/workspace/";  // 원격 디렉토리 (리눅스 경로)
 
         // bool success = manager->send("SN1",       // 시리얼 번호
         // localFiles,  // 로컬 파일들 (압축할 파일 목록)
@@ -313,7 +314,7 @@ void ControllerManager::updateControllersStates()
         // "C:/Download"               // 로컬 폴더 경로
         // );
 
-        // }
+        }
     }
 }
 
@@ -488,33 +489,95 @@ void ControllerManager::loadFromFile(const QString &filePath)
 
     emit controllerListChanged();
 }
-void ControllerManager::backupRequest(const QString &serialNumber)
+// void ControllerManager::backupRequest(const QString &serialNumber)
+// {
+//     ApiClient *client = getApiClient(serialNumber);
+//     if (!client) {
+//         qWarning() << "[ControllerManager] No client for" << serialNumber;
+//         return;
+//     }
+
+//     // 백업 저장 경로 설정
+//     QString backupDir = QString("C:/backup/%1").arg(serialNumber);
+
+//     //bool uploadFile(const QString &localPath, const QString &remotePath);
+//     //bool downloadFile(const QString &remotePath, const QString &localPath);
+
+//     //https용
+//     //client->download("/api/robot/export", backupDir, serialNumber);
+// }
+// void ControllerManager::applyRequest(const QString &serialNumber, const QString &filePath)
+// {
+//     ApiClient *client = getApiClient(serialNumber);
+//     if (!client) {
+//         qWarning() << "[ControllerManager] No client for" << serialNumber;
+//         return;
+//     }
+
+//     //https용
+//     //client->upload("/api/robot/import", filePath);
+// }
+bool ControllerManager::backupRequest(const QString &serialNumber,
+                                      const QString &baseBackupDir)
 {
-    ApiClient *client = getApiClient(serialNumber);
-    if (!client) {
-        qWarning() << "[ControllerManager] No client for" << serialNumber;
-        return;
+    ControllerInfo info = getController(serialNumber);
+    if (info.serialNumber.isEmpty()) {
+        qWarning() << "[ControllerManager][backupRequest] Controller not found:" << serialNumber;
+        return false;
     }
 
-    // 백업 저장 경로 설정
-    QString backupDir = QString("C:/backup/%1").arg(serialNumber);
+    // 1) 원격 tar.gz 경로: 고정 "/workspace/workspace3.tar.gz"
+    //QString remoteTarGz = "/workspace/workspace3.tar.gz";
+    QString remoteTarGz = info.wsPath + "/workspace3.tar.gz";
 
-    //bool uploadFile(const QString &localPath, const QString &remotePath);
-    //bool downloadFile(const QString &remotePath, const QString &localPath);
 
-    //https용
-    //client->download("/api/robot/export", backupDir, serialNumber);
+
+    // 2) 로컬 저장 경로: baseBackupDir / <시리얼> / <시리얼_yyyyMMdd_HHmmss>
+    QDir baseDir(baseBackupDir);
+    if (!baseDir.exists() && !baseDir.mkpath(".")) {
+        qWarning() << "[backupRequest] Cannot create base dir:" << baseBackupDir;
+        return false;
+    }
+
+    QString timestamp = QDateTime::currentDateTime().toString("yyyy-MM-dd_HHmmss");
+    QString localDestDir =
+            baseDir.filePath(info.serialNumber + "_" + timestamp);
+
+    if (!QDir().mkpath(localDestDir)) {
+        qWarning() << "[backupRequest] Cannot create dest dir:" << localDestDir;
+        return false;
+    }
+
+    // 3) SFTP로 받아서 localDestDir 에 풀기
+    return receive(serialNumber, remoteTarGz, localDestDir);
 }
-void ControllerManager::applyRequest(const QString &serialNumber, const QString &filePath)
+bool ControllerManager::applyRequest(const QString &serialNumber,
+                                     const QString &filePath)
 {
-    ApiClient *client = getApiClient(serialNumber);
-    if (!client) {
-        qWarning() << "[ControllerManager] No client for" << serialNumber;
-        return;
+    ControllerInfo info = getController(serialNumber);
+    if (info.serialNumber.isEmpty()) {
+        qWarning() << "[ControllerManager][applyRequest] Controller not found:" << serialNumber;
+        return false;
     }
 
-    //https용
-    //client->upload("/api/robot/import", filePath);
+    if (filePath.isEmpty()) {
+        qWarning() << "[ControllerManager][applyRequest] filePath is empty";
+        return false;
+    }
+
+    QStringList localPaths;
+    localPaths << filePath;   // ex) C:/backup/1234/123_2025-11-07_150404
+
+    // "/workspace"로 고정
+    QString remoteDir = "/workspace";
+
+    bool ok = send(serialNumber, localPaths, remoteDir);
+    if (!ok) {
+        qWarning() << "[ControllerManager][applyRequest] send failed for" << serialNumber;
+        return false;
+    }
+
+    return true;
 }
 
 bool ControllerManager::send(const QString     &serialNumber,
