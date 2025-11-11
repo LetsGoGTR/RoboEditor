@@ -61,35 +61,16 @@ void BackupPage::confirmSelection()
     if (ui->BrowseBtn) ui->BrowseBtn->setEnabled(false);
     if (ui->refreshBtn) ui->refreshBtn->setEnabled(false);
 
-    // 각 선택된 제어기에 대해 백업 요청
+    // 각 선택된 제어기에 대해 SFTP 기반 백업 요청
     for (const QString &serialNumber : selectedControllerList) {
-        qDebug() << "Backup request for:" << serialNumber;
-        ApiClient *client = manager->getApiClient(serialNumber);
+        qDebug() << "[BackupPage] Backup request for:" << serialNumber;
 
-        if (!client) {
-            qWarning() << "[BackupPage] Could not get ApiClient for" << serialNumber;
-            onBackupFailed(serialNumber, "ApiClient not found");
-            continue;
+        bool ok = manager->backupRequest(serialNumber, selectedBackupDir);
+        if (ok) {
+            onBackupCompleted(serialNumber);
+        } else {
+            onBackupFailed(serialNumber, tr("SFTP 백업 실패"));
         }
-
-        connect(client, &ApiClient::requestSucceeded, this,
-                [this, serialNumber](const QString &endpoint, const QJsonObject &response) {
-                    if (endpoint == "/api/robot/export") {
-                        onBackupCompleted(serialNumber);
-                    }
-                }, Qt::SingleShotConnection);
-
-        connect(client, &ApiClient::requestFailed, this,
-                [this, serialNumber](const QString &endpoint, const QString &error, const QString &url) {
-                    if (endpoint == "/api/robot/export") {
-                        onBackupFailed(serialNumber, error);
-                    }
-                }, Qt::SingleShotConnection);
-
-        qDebug() << "[BackupPage] Download from:" << client->getBaseUrl()
-                 << "endpoint:" << "/api/robot/export"
-                 << "dest:" << selectedBackupDir;
-        client->download("/api/robot/export", selectedBackupDir, serialNumber);
     }
 
     QMessageBox::information(this, "백업 시작",

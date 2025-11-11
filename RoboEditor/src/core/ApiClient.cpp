@@ -26,53 +26,25 @@ ApiClient::ApiClient(const QString &baseUrl, QObject *parent) :
 }
 
 ApiClient::~ApiClient() {}
-// url 정규화, ip:port또는도메인
+// url 정규화
 QString ApiClient::normalizeBaseUrl(const QString &baseUrl)
 {
     QString input = baseUrl.trimmed();
-    QUrl    url;
 
-    // 이미 스킴이 있는 경우
-    if (input.startsWith("https://") || input.startsWith("https://")) {
-        url = QUrl(input);
-    }
-    // 스킴이 없는 경우 http 기본값
-    else {
-        if (input.contains(":443")) {
-            url = QUrl("https://" + input);
-        } else {
-            url = QUrl("https://" + input);
-        }
+    if (input.startsWith("https://")) {
+        input.remove(0, 8);  // "https://" 제거
     }
 
-    // URL이 유효하지 않으면 원본 반환
+    QUrl url("https://" + input);
+
+    // URL 유효성 검사
     if (!url.isValid() || url.host().isEmpty()) {
-        qWarning() << "[normalizeBaseUrl] Invalid URL:" << input;
-        return input;
+        qWarning() << "[normalizeBaseUrl] Invalid URL:" << baseUrl;
+        return baseUrl;
     }
 
-    // 포트 처리
-    int     port   = url.port();
-    QString scheme = url.scheme();
-
-    // 포트가 명시되지 않은 경우 스킴 기본 포트 사용
-    if (port == -1) {
-        if (scheme == "https") {
-            port = 443;
-        } else {
-            port = 80;
-        }
-    }
-
-    // 표준 포트는 생략
-    QString result;
-    if ((scheme == "http" && port == 80) || (scheme == "https" && port == 443)) {
-        result = QString("%1://%2").arg(scheme).arg(url.host());
-    } else {
-        result = QString("%1://%2:%3").arg(scheme).arg(url.host()).arg(port);
-    }
-
-    qDebug() << "[normalizeBaseUrl]" << input << "->" << result;
+    QString result = QString("https://%1").arg(url.host());
+    qDebug() << "[normalizeBaseUrl]" << baseUrl << "->" << result;
     return result;
 }
 

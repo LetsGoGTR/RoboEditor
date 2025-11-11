@@ -1,7 +1,7 @@
 // PasswordManager.h
 #ifndef PASSWORDMANAGER_H
 #define PASSWORDMANAGER_H
-
+#pragma once
 #include <QDialog>
 #include <QString>
 

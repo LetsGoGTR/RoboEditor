@@ -1,6 +1,6 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
-
+#pragma once
 #include <QDir>
 #include <QFileDialog>
 #include <QMainWindow>

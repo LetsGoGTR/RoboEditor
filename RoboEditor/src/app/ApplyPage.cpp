@@ -101,11 +101,8 @@ void ApplyPage::showPasswordUI()
 
             connect(&confirmDialog, &ConfirmSelection::applyRequested,
                     this, [this]() {
-                        // ConfirmSelection의 [Apply] 버튼 클릭 시
-                        // 선택된 모든 제어기에 대해 바로 applyRequest 호출
-                        for (const QString &sn : selectedControllerList) {
-                            ControllerManager::instance()->applyRequest(sn, selectedBackupDir);
-                        }
+                        // 비밀번호 + 최종 확인 후, 여기서부터 실제 Apply 시작
+                        startApplyQueue();
                     },
                     Qt::SingleShotConnection);
 
@@ -134,6 +131,7 @@ void ApplyPage::startApplyQueue()
     ControllerManager *manager = ControllerManager::instance();
     QStringList        disconnectedControllers;
     QStringList        unknownControllers;
+    QStringList        runningControllers;
 
     for (const QString &sn : selectedControllerList) {
         ControllerInfo info = manager->getController(sn);
@@ -144,6 +142,11 @@ void ApplyPage::startApplyQueue()
 
         if (!info.isConnected) {
             disconnectedControllers.append(sn);
+            continue;
+        }
+
+        if (info.isRunning) {
+            runningControllers.append(sn);
             continue;
         }
     }
@@ -163,6 +166,15 @@ void ApplyPage::startApplyQueue()
                 "오류",
                 QString("다음 제어기가 오프라인 상태입니다:\n%1")
                         .arg(disconnectedControllers.join(", ")));
+        return;
+    }
+
+    if (!runningControllers.isEmpty()) {
+        QMessageBox::warning(
+                this,
+                "오류",
+                QString("제어기가 동작중입니다. 전체 적용을 취소합니다:\n%1")
+                        .arg(runningControllers.join(", ")));
         return;
     }
 
@@ -191,44 +203,21 @@ void ApplyPage::processNextApply()
     // 큐가 비어있으면 완료 처리
     if (applyQueue_.isEmpty()) {
         qDebug() << "[ApplyPage] Apply queue finished.";
-        onAllAppliesCompleted(); //
+        onAllAppliesCompleted();
         return;
     }
 
     QString serialNumber = applyQueue_.dequeue();
 
-    // 1. public ApiClient 가져오기
-    ApiClient *client = ControllerManager::instance()->getApiClient(serialNumber);
-    if (!client) {
-        qWarning() << "[ApplyPage] Could not get ApiClient for" << serialNumber;
-        onApplyFailed(serialNumber, "ApiClient not found");
-        return;
-    }
-
-    // 2. ApiClient의 시그널에 람다로 연결 (SingleShot으로 자동연결 해제)
-    connect(client, &ApiClient::requestSucceeded, this,
-            [this, serialNumber](const QString &endpoint, const QJsonObject &response) {
-                if (endpoint == "/api/robot/import") {
-                    onApplyCompleted(serialNumber);
-                }
-            }, Qt::SingleShotConnection);
-
-    connect(client, &ApiClient::requestFailed, this,
-            [this, serialNumber](const QString &endpoint, const QString &error, const QString &url) {
-                if (endpoint == "/api/robot/import") {
-                    onApplyFailed(serialNumber, error);
-                }
-            }, Qt::SingleShotConnection);
-
-    // 3. ApiClient의 public upload 함수 호출
-    // ApiClient::upload는 filePath를 받아 압축(.tar.gz) 후 전송합니다.
-    // selectedBackupDir는 압축할 폴더 또는 파일의 경로여야 합니다.
-    const QString endpoint = "/api/robot/import";
     qDebug() << "[ApplyPage] Applying to:" << serialNumber
-             << "baseUrl:" << client->getBaseUrl()
-             << "endpoint:" << endpoint
-             << "path:" << selectedBackupDir;
-    ControllerManager::instance()->applyRequest(serialNumber, selectedBackupDir);
+             << "backup dir:" << selectedBackupDir;
+
+    bool ok = ControllerManager::instance()->applyRequest(serialNumber, selectedBackupDir);
+    if (ok) {
+        onApplyCompleted(serialNumber);
+    } else {
+        onApplyFailed(serialNumber, tr("SFTP 적용 실패"));
+    }
 }
 
 // 개별 적용 성공

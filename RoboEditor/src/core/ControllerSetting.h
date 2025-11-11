@@ -1,6 +1,6 @@
 #ifndef CONTROLLERSETTING_H
 #define CONTROLLERSETTING_H
-
+#pragma once
 #include <QDialog>
 
 #include "ControllerManager.h"

@@ -321,7 +321,6 @@ void CenterStack::updateControllerList()
         item->setToolTip(QString("IP: %1\nSFTP: %2\nAPI: %3\nUser: %4\nWorkspace: %5")
                                  .arg(c.ip)
                                  .arg(c.sftpPort)
-                                 .arg(c.apiPort)
                                  .arg(c.username));
 
         QColor iconColor;

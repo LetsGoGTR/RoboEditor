@@ -1,6 +1,6 @@
 #ifndef API_CLIENT_H
 #define API_CLIENT_H
-
+#pragma once
 #include <QTimer>
 
 #include <QJsonDocument>
