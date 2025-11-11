@@ -293,18 +293,27 @@ void ControllerManager::updateControllersStates()
         updateConnectionState(c.serialNumber, false);
 
         client->get("/api/robot/running");
+        // if(c.serialNumber =="SN1"){
 
-        ControllerManager *manager = ControllerManager::instance();
+        // ControllerManager *manager = ControllerManager::instance();
 
-        QStringList localFiles;
-        localFiles << "C:/Users/SSAFY/workspace3.tar.gz";  // 로컬 파일 (Windows 경로)
+        // QStringList localFiles;
+        // localFiles << "C:/Users/SSAFY/workspace3.tar.gz";  // 로컬 파일 (Windows 경로)
 
-        QString remoteDir = "/home/default";  // 원격 디렉토리 (리눅스 경로)
+        // QString remoteDir = "/workspace/";  // 원격 디렉토리 (리눅스 경로)
 
-        bool success = manager->send("SN1",       // 시리얼 번호
-                                     localFiles,  // 로컬 파일들 (압축할 파일 목록)
-                                     remoteDir    // 원격 저장 경로
-        );
+        // bool success = manager->send("SN1",       // 시리얼 번호
+        // localFiles,  // 로컬 파일들 (압축할 파일 목록)
+        // remoteDir    // 원격 저장 경로
+        // );
+
+        // bool success = manager->receive(
+        // "SN1",                      // 시리얼 번호
+        // "/workspace/test.tar.gz",   // 원격 파일 경로
+        // "C:/Download"               // 로컬 폴더 경로
+        // );
+
+        // }
     }
 }
 
@@ -542,7 +551,7 @@ bool ControllerManager::send(const QString     &serialNumber,
         return false;
     }
 
-    QString remotePath = remoteDir + "/test.tar.gz";
+    QString remotePath = remoteDir + "/workspace3.tar.gz";
     qDebug() << "Uploading to:" << remotePath;
 
     bool uploadSuccess = client.uploadFile(tarGzPath, remotePath);

@@ -43,6 +43,7 @@ SFTPClient::~SFTPClient()
 }
 bool SFTPClient::connectToServer()
 {
+    // TCP 소켓 생성
     socket_.connectToHost(host_, port_);
     if (!socket_.waitForConnected(5000)) {
         qWarning() << "TCP connect failed:" << socket_.errorString();
