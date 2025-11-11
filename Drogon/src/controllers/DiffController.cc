@@ -200,7 +200,7 @@ void api::v1::Diff::diffWorkspaces(const drogon::HttpRequestPtr                 
     }
 
     auto diffResult =
-            services::DiffService::diffDirectories(fullA.generic_string(), fullB.generic_string());
+            services::DiffService::diffTree(fullA.generic_string(), fullB.generic_string());
     if (!diffResult.success) {
         Json::Value error;
         error["error"]   = "Failed to perform workspace diff";
