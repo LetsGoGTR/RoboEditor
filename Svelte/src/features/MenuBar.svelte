@@ -10,24 +10,13 @@
 
 	function handleCompare() {
 		const id = page.params.id && page.params.id !== 'register' ? page.params.id : null;
-
-		if (!id) {
-			dialog.showModal();
-			return;
-		}
-
+		if (!id) { dialog.showModal(); return; }
 		gotoPage('compare');
 	}
 
-	function handleBackup() {
-		gotoPage('backup');
-	}
-	function handleApply() {
-		gotoPage('apply');
-	}
-	function handleRegister() {
-		gotoPage('register');
-	}
+	function handleApply() { gotoPage('apply'); }
+	function handleBackup() { gotoPage('backup'); }
+	function handleRegister() { gotoPage('register'); }
 
 	// create a new file
 	function handleNewFile() {
@@ -68,10 +57,9 @@
 			<ul class="dropdown">
 				<li><button onclick={handleNewFile}>새 텍스트 파일</button></li>
 				<li><button onclick={handleNewFolder}>새 폴더</button></li>
-				<li><button onclick={handleNewFolder}>불러오기</button></li>
-				<li><span>불러오기</span></li>
 				<li><hr /></li>
-				<li><span>시뮬레이션</span></li>
+				<li><button onclick={handleNewFolder}>파일 불러오기</button></li>
+				<li><button onclick={handleOpenBackup}>백업 불러오기</button></li>
 			</ul>
 		</li>
 		<li>
@@ -84,7 +72,6 @@
 			<span>제어기</span>
 			<ul class="dropdown">
 				<li><button onclick={handleRegister}>제어기 등록</button></li>
-				<li><button onclick={handleRegister}>제어기 폴더 불러오기</button></li>
 				<li><button onclick={handleBackup}>제어기로부터 백업</button></li>
 				<li><button onclick={handleApply}>제어기에 적용</button></li>
 			</ul>
