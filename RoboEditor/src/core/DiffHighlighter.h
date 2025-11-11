@@ -1,6 +1,6 @@
 #ifndef DIFFHIGHLIGHTER_H
 #define DIFFHIGHLIGHTER_H
-
+#pragma once
 #include <QColor>
 #include <QMap>
 #include <QObject>

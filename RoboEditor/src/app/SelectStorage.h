@@ -1,3 +1,5 @@
+#ifndef SELECTSTORAGE_H
+#define SELECTSTORAGE_H
 #pragma once
 #include <QTableView>
 
@@ -38,3 +40,5 @@ class selectTableWidget : public QWidget
 
         void showSubFolders(const QString &path);
 };
+
+#endif  // SELECTSTORAGE_H

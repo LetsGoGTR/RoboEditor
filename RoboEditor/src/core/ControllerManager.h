@@ -1,6 +1,6 @@
 #ifndef CONTROLLERMANAGER_H
 #define CONTROLLERMANAGER_H
-
+#pragma once
 #include <QList>
 #include <QMap>
 #include <QMutex>

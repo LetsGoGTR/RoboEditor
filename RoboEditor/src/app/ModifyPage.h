@@ -1,6 +1,6 @@
 #ifndef MODIFYPAGE_H
 #define MODIFYPAGE_H
-
+#pragma once
 #include <QTabWidget>
 #include <QTextStream>
 #include <QTimer>

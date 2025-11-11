@@ -1,6 +1,6 @@
 #ifndef SFTPCLIENT_H
 #define SFTPCLIENT_H
-
+#pragma once
 #include <QTcpSocket>
 
 #include <QFile>
