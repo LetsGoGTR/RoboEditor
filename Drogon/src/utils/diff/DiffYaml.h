@@ -163,6 +163,8 @@ namespace diff_utils
     // 기존 독립 함수들 (하위 호환성을 위해 유지)
     Json::Value compareFiles(const std::string &file1, const std::string &file2);
 
+    Json::Value fileToJson(const std::string &content);
+
 #endif  // DIFFYAML_H
 
 }  // namespace diff_utils

@@ -44,7 +44,6 @@ namespace {
             // 또는: dst.try_emplace(std::move(fullKey), kv.second);
         }
     }
-    static void ExtractArchiveTo(const std::filesystem::path&, const std::filesystem::path&);
 }
 // 내부 유틸 (해시 함수)
 void DiffTree::SHA256::init(){
@@ -317,7 +316,7 @@ std::string DiffTree::HashSubtree(const std::filesystem::path& dir){
 }
 
 // 파일을 utf8로 읽기
-static std::string ReadWholeFileUtf8(const std::filesystem::path& p) {
+std::string DiffTree::ReadWholeFileUtf8(const std::filesystem::path& p) {
     std::ifstream in(p, std::ios::binary);
     if (!in) throw std::runtime_error("open fail: " + p.string());
     std::string s;
@@ -367,7 +366,7 @@ std::string DiffTree::ComputeFileFingerprint(const std::filesystem::path& p) {
         if (lower == ".yaml" || lower == ".yml") {
             // 1) YAML → JSON → 정규 직렬화 → 해시
             std::string text = ReadWholeFileUtf8(p);
-            Json::Value j = diff_utils::diffToJson(text);
+            Json::Value j = diff_utils::fileToJson(text);
             std::string canon = CanonicalJson(j);
             return Sha256OfString(canon);
         }
@@ -413,7 +412,7 @@ bool DiffTree::IsArchivePath(const std::filesystem::path& p) {
     return false;
 }
 
-static void ExtractArchiveTo(const std::filesystem::path& src,
+void DiffTree::ExtractArchiveTo(const std::filesystem::path& src,
                              const std::filesystem::path& out) {
     struct archive* a = archive_read_new();
     archive_read_support_filter_all(a);

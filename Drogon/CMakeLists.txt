@@ -100,3 +100,44 @@ target_sources(${PROJECT_NAME}
                ${UTILS_ROBOT_SRC}
                ${UTILS_SFTP_SRC}
 )
+
+
+#[[
+find_package(GTest REQUIRED)
+find_package(Threads REQUIRED)
+
+add_executable(test_diff_v4
+    test/test_diff_v4.cpp
+    src/utils/diff/DiffPython.cc
+    src/utils/diff/DiffYaml.cc
+    src/utils/diff/DiffTree.cc
+)
+
+target_link_libraries(test_diff_v4
+    PRIVATE
+    GTest::gtest                    # ✅ gtest 심볼
+    GTest::gtest_main               # ✅ main 제공
+    Threads::Threads                # ✅ (리눅스) gtest가 pthread 의존
+    Drogon::Drogon
+    yaml-cpp
+    LibArchive::LibArchive
+    bcrypt
+)
+
+if (TARGET JsonCpp::JsonCpp)
+    target_link_libraries(test_diff_v4 PRIVATE JsonCpp::JsonCpp)
+elseif (DEFINED jsoncpp_LIBRARIES)
+    target_include_directories(test_diff_v4 PRIVATE ${jsoncpp_INCLUDE_DIRS})
+    target_link_libraries(test_diff_v4 PRIVATE ${jsoncpp_LIBRARIES})
+endif()
+
+target_include_directories(test_diff_v4
+    PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/models
+    ${CMAKE_CURRENT_SOURCE_DIR}/external/libbcrypt/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/utils/diff
+    ${LibArchive_INCLUDE_DIRS}
+)
+]]

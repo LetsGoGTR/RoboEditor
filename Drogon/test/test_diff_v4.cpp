@@ -19,6 +19,18 @@ static std::string joinLines(const std::vector<std::string>& v) {
     return s;
 }
 
+// 새 구조 어댑터: Op -> Diff 접기까지 한 번에
+static std::vector<Diff> computeDiffs(
+    const std::vector<NormalizedLine>& aNorm,
+    const std::vector<NormalizedLine>& bNorm,
+    const std::string& contentA,
+    const std::string& contentB)
+{
+    auto ops = DiffPython::compute(aNorm, bNorm);
+    return DiffPython::foldOpsToDiffs(ops, aNorm, bNorm, contentA, contentB);
+}
+
+
 // ─────────────────────────────────────────────────────────────
 // 1) DiffEngine : Normalize 테스트
 // ─────────────────────────────────────────────────────────────
@@ -33,7 +45,7 @@ TEST(NormalizeTest, TC001_RemoveLeadingAndTrailingWhitespace) {
     std::string contentB = joinLines(B);
     auto aNorm = DiffPython::normalizeAll(contentA);
     auto bNorm = DiffPython::normalizeAll(contentB);
-    auto diffs = DiffPython::compute(aNorm, bNorm, contentA, contentB);
+    auto diffs = computeDiffs(aNorm, bNorm, contentA, contentB);
 
     int nonSame = 0; for (auto &d: diffs) if (d.kind != Diff::SAME) nonSame++;
     EXPECT_EQ(nonSame, 0);
@@ -48,7 +60,7 @@ TEST(NormalizeTest, TC002_CollapseInternalWhitespaceToSingleSpace) {
     std::string contentB = joinLines(B);
     auto aNorm = DiffPython::normalizeAll(contentA);
     auto bNorm = DiffPython::normalizeAll(contentB);
-    auto diffs = DiffPython::compute(aNorm, bNorm, contentA, contentB);
+    auto diffs = computeDiffs(aNorm, bNorm, contentA, contentB);
 
     int nonSame = 0; for (auto &d: diffs) if (d.kind != Diff::SAME) nonSame++;
     EXPECT_EQ(nonSame, 0);
@@ -63,7 +75,7 @@ TEST(NormalizeTest, TC003_ConvertWhitespaceOnlyToEmptyLine) {
     std::string contentB = joinLines(B);
     auto aNorm = DiffPython::normalizeAll(contentA);
     auto bNorm = DiffPython::normalizeAll(contentB);
-    auto diffs = DiffPython::compute(aNorm, bNorm, contentA, contentB);
+    auto diffs = computeDiffs(aNorm, bNorm, contentA, contentB);
 
     int nonSame = 0; for (auto &d: diffs) if (d.kind != Diff::SAME) nonSame++;
     EXPECT_EQ(nonSame, 0);
@@ -89,7 +101,7 @@ TEST(NormalizeTest, TC004_LongLineMixedWhitespace_ToSame) {
         if (i < 1999) Bline += " ";
     }
 
-    auto diffs = DiffPython::compute(
+    auto diffs = computeDiffs(
         DiffPython::normalizeAll(Aline),
         DiffPython::normalizeAll(Bline),
         Aline, 
@@ -106,7 +118,7 @@ TEST(NormalizeTest, TC005_TokenSplit_NotIn) {
     std::string B = "if x notin s:\n    pass\n";
     auto aNorm = DiffPython::normalizeAll(A);
     auto bNorm = DiffPython::normalizeAll(B);
-    auto diffs = DiffPython::compute(aNorm, bNorm, A, B);
+    auto diffs = computeDiffs(aNorm, bNorm, A, B);
 
     EXPECT_EQ(diffs[0].kind, Diff::MOD);
     EXPECT_EQ(diffs[0].baseLine,    0);
@@ -123,7 +135,7 @@ TEST(NormalizeTest, TC006_CommentIgnore_SameLine) {
     std::string B = "if# x notin s:\n    pass\n";
     auto aNorm = DiffPython::normalizeAll(A);
     auto bNorm = DiffPython::normalizeAll(B);
-    auto diffs = DiffPython::compute(aNorm, bNorm, A, B);
+    auto diffs = computeDiffs(aNorm, bNorm, A, B);
 
     int nonSame = 0;
     for (auto &d: diffs) if (d.kind != Diff::SAME) ++nonSame;
@@ -136,7 +148,7 @@ TEST(NormalizeTest, TC007_CommentIsolation_NextLine) {
     std::string B = "if# x notin s:\n    pass\n";
     auto aNorm = DiffPython::normalizeAll(A);
     auto bNorm = DiffPython::normalizeAll(B);
-    auto diffs = DiffPython::compute(aNorm, bNorm, A, B);
+    auto diffs = computeDiffs(aNorm, bNorm, A, B);
 
     int nonSame = 0;
     for (auto &d: diffs) if (d.kind != Diff::SAME) ++nonSame;
@@ -155,7 +167,7 @@ TEST(DiffEngineTest, TC101_AllLinesIdentical_AllSAME) {
     std::string contentA = joinLines(A);
     std::string contentB = joinLines(B);
 
-    auto diffs = DiffPython::compute(
+    auto diffs = computeDiffs(
         DiffPython::normalizeAll(contentA),
         DiffPython::normalizeAll(contentB),
         contentA, 
@@ -174,7 +186,7 @@ TEST(DiffEngineTest, TC102_Detect_ModifiedLines_Only) {
     std::string contentA = joinLines(A);
     std::string contentB = joinLines(B);
 
-    auto diffs = DiffPython::compute(
+    auto diffs = computeDiffs(
         DiffPython::normalizeAll(contentA),
         DiffPython::normalizeAll(contentB),
         contentA, 
@@ -201,7 +213,7 @@ TEST(DiffEngineTest, TC103_EmptyInputs_ReturnsEmptyDiff) {
     std::string contentA = joinLines(A);
     std::string contentB = joinLines(B);
 
-    auto diffs = DiffPython::compute(
+    auto diffs = computeDiffs(
         DiffPython::normalizeAll(contentA),
         DiffPython::normalizeAll(contentB),
         contentA, 
@@ -219,7 +231,7 @@ TEST(DiffEngineTest, TC104_AllLinesAdded_ReturnsAddOnly) {
     std::string contentA = joinLines(A);
     std::string contentB = joinLines(B);
 
-    auto diffs = DiffPython::compute(
+    auto diffs = computeDiffs(
         DiffPython::normalizeAll(contentA),
         DiffPython::normalizeAll(contentB),
         contentA, 
@@ -247,7 +259,7 @@ TEST(DiffEngineTest, TC105_AllLinesDeleted_ReturnsDelOnly) {
     std::string contentA = joinLines(A);
     std::string contentB = joinLines(B);
 
-    auto diffs = DiffPython::compute(
+    auto diffs = computeDiffs(
         DiffPython::normalizeAll(contentA),
         DiffPython::normalizeAll(contentB),
         contentA, 
@@ -279,7 +291,7 @@ TEST(DiffEngineTest, TC106_ComplexPattern_CorrectlyClassified) {
     std::string contentA = joinLines(A);
     std::string contentB = joinLines(B);
 
-    auto diffs = DiffPython::compute(
+    auto diffs = computeDiffs(
         DiffPython::normalizeAll(contentA),
         DiffPython::normalizeAll(contentB),
         contentA, 
@@ -313,7 +325,7 @@ TEST(DiffEngineTest, TC107_SingleChangeInLargeBlock_OneModDetected) {
     std::string contentA = joinLines(A);
     std::string contentB = joinLines(B);
 
-    auto diffs = DiffPython::compute(
+    auto diffs = computeDiffs(
         DiffPython::normalizeAll(contentA),
         DiffPython::normalizeAll(contentB),
         contentA, 
@@ -337,7 +349,7 @@ TEST(DiffEngineTest, TC108_DuplicateLines_DeleteMiddleOnly) {
     std::string contentA = joinLines(A);
     std::string contentB = joinLines(B);
 
-    auto diffs = DiffPython::compute(
+    auto diffs = computeDiffs(
         DiffPython::normalizeAll(contentA),
         DiffPython::normalizeAll(contentB),
         contentA, 
@@ -365,13 +377,13 @@ TEST(DiffEngineTest, TC109_AddDelSymmetry_Holds) {
     std::string contentA = joinLines(A);
     std::string contentB = joinLines(B);
 
-    auto ab = DiffPython::compute(
+    auto ab = computeDiffs(
         DiffPython::normalizeAll(contentA),
         DiffPython::normalizeAll(contentB),
         contentA, 
         contentB
     );
-    auto ba = DiffPython::compute(
+    auto ba = computeDiffs(
         DiffPython::normalizeAll(contentB),
         DiffPython::normalizeAll(contentA),
         contentB, 
@@ -408,7 +420,7 @@ TEST(JsonBuildTest, TC201_JSONStructure_ExactMatch) {
     std::string contentA = joinLines(A);
     std::string contentB = joinLines(B);
 
-    auto diffs = DiffPython::compute(
+    auto diffs = computeDiffs(
         DiffPython::normalizeAll(contentA),
         DiffPython::normalizeAll(contentB),
         contentA, 
@@ -458,7 +470,7 @@ TEST(JsonBuildTest, TC202_EmptyLinesAroundChange_LineNumbersCorrect) {
     std::string contentA = joinLines(A);
     std::string contentB = joinLines(B);
 
-    auto diffs = DiffPython::compute(
+    auto diffs = computeDiffs(
         DiffPython::normalizeAll(contentA),
         DiffPython::normalizeAll(contentB),
         contentA, 
@@ -484,7 +496,7 @@ TEST(JsonBuildTest, TC203_LeadingTrailingEmptyLines_Counted) {
     std::string contentA = joinLines(A);
     std::string contentB = joinLines(B);
 
-    auto diffs = DiffPython::compute(
+    auto diffs = computeDiffs(
         DiffPython::normalizeAll(contentA),
         DiffPython::normalizeAll(contentB),
         contentA, 
@@ -519,7 +531,7 @@ TEST(JsonBuildTest, TC204_PathIsNull_StatsMatch) {
     std::string contentA = joinLines(A);
     std::string contentB = joinLines(B);
 
-    auto diffs = DiffPython::compute(
+    auto diffs = computeDiffs(
         DiffPython::normalizeAll(contentA),
         DiffPython::normalizeAll(contentB),
         contentA, 
@@ -596,7 +608,7 @@ teeq '''
 )CODE";
     auto aNorm = DiffPython::normalizeAll(A);
     auto bNorm = DiffPython::normalizeAll(B);
-    auto diffs = DiffPython::compute(aNorm, bNorm, A, B);
+    auto diffs = computeDiffs(aNorm, bNorm, A, B);
 
     int add=0, del=0, mod=0, same=0;
     for (const auto& d: diffs) {

@@ -61,7 +61,7 @@ public:
     static std::vector<std::pair<std::string, int>> normalizeBodies(const std::string& content);
 
 
-// private:
+private:
     // 한 줄[start, endExcl) 정규화.
     // 양끝 공백 제거 + 내부 연속 공백 축약 + 주석 처리 + rank 처리
     static NormalizedLine normalizeOne(const std::string& content,
