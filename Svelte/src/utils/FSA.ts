@@ -245,3 +245,35 @@ export async function refreshWorkspaceTree(): Promise<void> {
 		console.error('❌ workspace 갱신 실패:', err);
 	}
 }
+
+/**
+ * 📄 단일 파일 선택 (File System Access API)
+ * - 비교 대상 파일 선택용
+ * - YAML, JSON, TXT 등 텍스트 파일에 적합
+ */
+export async function openFile(): Promise<FileSystemFileHandle | null> {
+	if (!('showOpenFilePicker' in window)) {
+		alert('이 브라우저는 File System Access API를 지원하지 않습니다.');
+		return null;
+	}
+
+	try {
+		const [handle] = await window.showOpenFilePicker({
+			id: 'roboeditor-file-select',
+			multiple: false,
+			startIn: 'documents',
+			types: [
+				{
+					description: 'Text and Config Files',
+					accept: {
+						'text/*': ['.yaml', '.yml', '.json', '.txt', '.xml', '.cfg']
+					}
+				}
+			]
+		});
+		return handle;
+	} catch (err) {
+		console.warn('❗ 파일 선택 취소 또는 접근 거부:', err);
+		return null;
+	}
+}
