@@ -25,7 +25,7 @@ namespace FileCompressor
             return false;
         }
 
-        // 🔹 gzip 필터 추가 (tar.gz로 만들기)
+        // 🔹 gzip 필터 추가 (tgz로 만들기)
         if (archive_write_add_filter_gzip(a) != ARCHIVE_OK) {
             qWarning() << "[createTarGz] add_filter_gzip failed:" << archive_error_string(a);
             archive_write_free(a);

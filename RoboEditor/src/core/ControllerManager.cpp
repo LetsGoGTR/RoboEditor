@@ -299,7 +299,7 @@ void ControllerManager::updateControllersStates()
         ControllerManager *manager = ControllerManager::instance();
 
         QStringList localFiles;
-        localFiles << "C:/Users/SSAFY/workspace3.tar.gz";  // 로컬 파일 (Windows 경로)
+        localFiles << "C:/Users/SSAFY/workspace.tgz";  // 로컬 파일 (Windows 경로)
 
         QString remoteDir = "/workspace/";  // 원격 디렉토리 (리눅스 경로)
 
@@ -310,7 +310,7 @@ void ControllerManager::updateControllersStates()
 
         // bool success = manager->receive(
         // "SN1",                      // 시리얼 번호
-        // "/workspace/test.tar.gz",   // 원격 파일 경로
+        // "/workspace/test.tgz",   // 원격 파일 경로
         // "C:/Download"               // 로컬 폴더 경로
         // );
 
@@ -526,9 +526,9 @@ bool ControllerManager::backupRequest(const QString &serialNumber,
         return false;
     }
 
-    // 1) 원격 tar.gz 경로: 고정 "/workspace/workspace3.tar.gz"
-    //QString remoteTarGz = "/workspace/workspace3.tar.gz";
-    QString remoteTarGz = info.wsPath + "/workspace3.tar.gz";
+    // 1) 원격 tgz 경로: 고정 "/workspace/workspace.tgz"
+    //QString remoteTarGz = "/workspace/workspace.tgz";
+    QString remoteTarGz = info.wsPath + "/workspace.tgz";
 
 
 
@@ -569,7 +569,7 @@ bool ControllerManager::applyRequest(const QString &serialNumber,
     localPaths << filePath;   // ex) C:/backup/1234/123_2025-11-07_150404
 
     // "/workspace"로 고정
-    QString remoteDir = "/workspace";
+    QString remoteDir = info.wsPath;
 
     bool ok = send(serialNumber, localPaths, remoteDir);
     if (!ok) {
@@ -591,18 +591,18 @@ bool ControllerManager::send(const QString     &serialNumber,
         return false;
     }
 
-    // 2. 임시 디렉토리에서 tar.gz 생성
+    // 2. 임시 디렉토리에서 tgz 생성
     QTemporaryDir tempDir;
     if (!tempDir.isValid()) {
         qWarning() << "Cannot create temporary directory";
         return false;
     }
 
-    QString tarGzPath = tempDir.path() + "/upload.tar.gz";
+    QString tarGzPath = tempDir.path() + "/upload.tgz";
 
-    qDebug() << "Creating tar.gz:" << tarGzPath;
+    qDebug() << "Creating tgz:" << tarGzPath;
     if (!FileCompressor::createTarGz(localPaths, tarGzPath)) {
-        qWarning() << "Failed to create tar.gz";
+        qWarning() << "Failed to create tgz";
         return false;
     }
 
@@ -614,7 +614,7 @@ bool ControllerManager::send(const QString     &serialNumber,
         return false;
     }
 
-    QString remotePath = remoteDir + "/workspace3.tar.gz";
+    QString remotePath = remoteDir + "/workspace.tgz";
     qDebug() << "Uploading to:" << remotePath;
 
     bool uploadSuccess = client.uploadFile(tarGzPath, remotePath);
@@ -656,7 +656,7 @@ bool ControllerManager::receive(const QString &serialNumber,
         return false;
     }
 
-    QString localTarPath = tempDir.path() + "/download.tar.gz";
+    QString localTarPath = tempDir.path() + "/download.tgz";
     qDebug() << "Downloading from:" << remoteTarGz << "to:" << localTarPath;
 
     bool downloadSuccess = client.downloadFile(remoteTarGz, localTarPath);
@@ -670,7 +670,7 @@ bool ControllerManager::receive(const QString &serialNumber,
     // 3. 압축 해제
     qDebug() << "Extracting to:" << localDestDir;
     if (!FileCompressor::extractTarGz(localTarPath, localDestDir)) {
-        qWarning() << "Failed to extract tar.gz";
+        qWarning() << "Failed to extract tgz";
         return false;
     }
 
