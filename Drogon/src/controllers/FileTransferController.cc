@@ -60,6 +60,17 @@ void FT::apply(const HttpRequestPtr &req, std::function<void(const HttpResponseP
         return;
     }
 
+    auto sftpPasswordIt = parameters.find("sftpPassword");
+    if (sftpPasswordIt == parameters.end() || sftpPasswordIt->second.empty()) {
+        Json::Value error;
+        error["success"] = false;
+        error["error"]   = "Missing required field: sftpPassword";
+        auto resp        = HttpResponse::newHttpJsonResponse(error);
+        resp->setStatusCode(k400BadRequest);
+        callback(resp);
+        return;
+    }
+
     auto sftpHostIt = parameters.find("sftpHost");
     if (sftpHostIt == parameters.end() || sftpHostIt->second.empty()) {
         Json::Value error;
@@ -93,11 +104,12 @@ void FT::apply(const HttpRequestPtr &req, std::function<void(const HttpResponseP
         return;
     }
 
-    std::string user     = userIt->second;
-    std::string password = passwordIt->second;
-    std::string sftpHost = sftpHostIt->second;
-    int         sftpPort = std::stoi(sftpPortIt->second);
-    std::string api      = apiIt->second;
+    std::string user         = userIt->second;
+    std::string password     = passwordIt->second;
+    std::string sftpPassword = sftpPasswordIt->second;
+    std::string sftpHost     = sftpHostIt->second;
+    int         sftpPort     = std::stoi(sftpPortIt->second);
+    std::string api          = apiIt->second;
 
     // 첫 번째 파일 가져오기
     auto &file = files[0];
@@ -106,9 +118,9 @@ void FT::apply(const HttpRequestPtr &req, std::function<void(const HttpResponseP
     std::string tmpPath = "/tmp/uploaded_workspace_" + std::to_string(std::time(nullptr)) + ".tgz";
     file.saveAs(tmpPath);
 
-    auto task = [tmpPath, user, password, sftpHost, sftpPort, api, callback]() {
+    auto task = [tmpPath, user, password, sftpPassword, sftpHost, sftpPort, api, callback]() {
         FileTransferService service;
-        auto                result = service.applyWorkspace(tmpPath, user, password, sftpHost, sftpPort, api);
+        auto                result = service.applyWorkspace(tmpPath, user, password, sftpPassword, sftpHost, sftpPort, api);
 
         // 처리 후 임시 파일 삭제
         try {
@@ -155,10 +167,10 @@ void FT::backup(const HttpRequestPtr &req, std::function<void(const HttpResponse
         callback(resp);
         return;
     }
-    if (!jsonBody->isMember("password")) {
+    if (!jsonBody->isMember("sftpPassword")) {
         Json::Value error;
         error["success"] = false;
-        error["error"]   = "Missing required field: password";
+        error["error"]   = "Missing required field: sftpPassword";
         auto resp        = HttpResponse::newHttpJsonResponse(error);
         resp->setStatusCode(k400BadRequest);
         callback(resp);
@@ -192,7 +204,7 @@ void FT::backup(const HttpRequestPtr &req, std::function<void(const HttpResponse
     SFTPConfig config((*jsonBody)["sftpHost"].asString(),
                       sftpPort,
                       (*jsonBody)["user"].asString(),
-                      (*jsonBody)["password"].asString());
+                      (*jsonBody)["sftpPassword"].asString());
 
     std::string user       = (*jsonBody)["user"].asString();
     std::string remotePath = (*jsonBody)["remotePath"].asString();

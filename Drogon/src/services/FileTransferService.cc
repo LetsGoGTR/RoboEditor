@@ -47,8 +47,22 @@ services::ServiceResult FileTransferService::backupFromRemote(const SFTPConfig  
             }
 
             if (response->getStatusCode() != drogon::k200OK) {
-                utils::logging::error("원격 압축 API 실패: HTTP " +
-                                      std::to_string(response->getStatusCode()));
+                std::string errorMsg = "원격 압축 API 실패: HTTP " +
+                                       std::to_string(response->getStatusCode());
+
+                // 응답 본문에서 에러 메시지 추출
+                auto jsonResponse = response->getJsonObject();
+                if (jsonResponse && jsonResponse->isMember("error")) {
+                    errorMsg += " - " + (*jsonResponse)["error"].asString();
+                } else {
+                    // JSON이 아니면 body 텍스트 출력
+                    auto body = response->getBody();
+                    if (!body.empty() && body.size() < 200) {
+                        errorMsg += " - " + std::string(body);
+                    }
+                }
+
+                utils::logging::error(errorMsg);
                 compressPromise.set_value(false);
                 return;
             }
@@ -187,6 +201,7 @@ services::ServiceResult FileTransferService::backupFromRemote(const SFTPConfig  
 services::ServiceResult FileTransferService::applyWorkspace(const std::string &uploadedFilePath,
                                                             const std::string &user,
                                                             const std::string &password,
+                                                            const std::string &sftpPassword,
                                                             const std::string &sftpHost,
                                                             int                sftpPort,
                                                             const std::string &api)
@@ -201,8 +216,25 @@ services::ServiceResult FileTransferService::applyWorkspace(const std::string &u
                                                         uploadedFilePath);
         }
 
+        // SFTP로 원격 서버에 파일 업로드
+        SFTPConfig sftpConfig(sftpHost, sftpPort, user, sftpPassword);
+        SFTPClient sftpClient(sftpConfig);
+
+        if (!sftpClient.connect()) {
+            return services::ServiceResult::createError("SFTP 연결 실패: " + sftpClient.getLastError());
+        }
+
+        std::string remotePath = "/home/" + user + "/workspace.tgz";
+        utils::logging::info("SFTP 파일 업로드 시작: " + uploadedFilePath + " -> " + remotePath);
+
+        if (!sftpClient.uploadFile(uploadedFilePath, remotePath)) {
+            return services::ServiceResult::createError("SFTP 파일 업로드 실패: " + sftpClient.getLastError());
+        }
+
+        utils::logging::info("SFTP 파일 업로드 성공");
+
         // Workspace Extract API 호출하여 압축 해제
-        auto [success, errorMsg] = extractWorkspace(user, password, uploadedFilePath, api);
+        auto [success, errorMsg] = extractWorkspace(user, password, api);
         if (!success) {
             return services::ServiceResult::createError(errorMsg);
         }
@@ -225,25 +257,12 @@ services::ServiceResult FileTransferService::applyWorkspace(const std::string &u
 
 std::pair<bool, std::string> FileTransferService::extractWorkspace(const std::string &user,
                                                                     const std::string &password,
-                                                                    const std::string &archivePath,
                                                                     const std::string &api)
 {
     try {
-        utils::logging::info("Workspace 압축 해제 준비: user=" + user + ", archive=" + archivePath);
+        utils::logging::info("Workspace 압축 해제 API 호출 준비: user=" + user);
 
-        // 1. 다운로드한 압축 파일을 고정 경로로 복사
-        std::string targetPath = "/home/" + user + "/workspace.tgz";
-        utils::logging::info("압축 파일 복사: " + archivePath + " -> " + targetPath);
-
-        try {
-            fs::copy_file(archivePath, targetPath, fs::copy_options::overwrite_existing);
-        } catch (const std::exception &e) {
-            std::string error = "압축 파일 복사 실패: " + std::string(e.what());
-            utils::logging::error(error);
-            return {false, error};
-        }
-
-        // 2. Workspace Extract API 호출
+        // Workspace Extract API 호출
         auto client = drogon::HttpClient::newHttpClient(api);
         auto req    = drogon::HttpRequest::newHttpJsonRequest(Json::Value());
         req->setMethod(drogon::Post);

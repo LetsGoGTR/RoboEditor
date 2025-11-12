@@ -21,6 +21,7 @@ class FileTransferService
     services::ServiceResult applyWorkspace(const std::string &uploadedFilePath,
                                            const std::string &user,
                                            const std::string &password,
+                                           const std::string &sftpPassword,
                                            const std::string &sftpHost,
                                            int                sftpPort,
                                            const std::string &api);
@@ -29,6 +30,5 @@ class FileTransferService
     // Workspace API 호출 메서드
     std::pair<bool, std::string> extractWorkspace(const std::string &user,
                                                    const std::string &password,
-                                                   const std::string &archivePath,
                                                    const std::string &api);
 };
