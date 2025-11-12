@@ -52,15 +52,32 @@ namespace FileCompressor
             return false;
         }
 
+        // relPath를 workspace 기준으로 바꿔주는 헬퍼
+        auto mapToWorkspace = [](const QString& rel, bool isDir, bool isTop) -> QByteArray {
+            // rel: root(=부모) 기준 상대경로. 최상위는 "원래최상위" 또는 "파일명" 형태
+            if (isTop) {
+                // 최상위 디렉토리라면 폴더명 자체를 "workspace"로
+                if (isDir) return QFile::encodeName(QStringLiteral("workspace"));
+                // 최상위 파일이면 "workspace/<파일명>"
+                return QFile::encodeName(QStringLiteral("workspace/") + rel);
+            }
+            // 하위 항목은 "원래최상위/꼬리" → "workspace/꼬리" 로 바꾼다
+            int slash = rel.indexOf('/');
+            QString tail = (slash >= 0) ? rel.mid(slash + 1) : rel; // 슬래시 없으면 rel 그대로
+            if (tail.isEmpty()) return QFile::encodeName(QStringLiteral("workspace"));
+            return QFile::encodeName(QStringLiteral("workspace/") + tail);
+        };
+
         // 🔹 재귀적 파일 추가 함수
-        std::function<bool(const QString &, const QString &)> addPath =
-                [&](const QString &path, const QString &root) -> bool {
+        std::function<bool(const QString &, const QString &, bool)> addPath =
+                [&](const QString &path, const QString &root, bool isTop) -> bool {
             QFileInfo     info(path);
             const QString relPath = QDir(root).relativeFilePath(path);
 
             if (info.isDir()) {
                 struct archive_entry *dirEntry = archive_entry_new();
-                archive_entry_set_pathname(dirEntry, QFile::encodeName(relPath).constData());
+                //archive_entry_set_pathname(dirEntry, QFile::encodeName(relPath).constData());
+                archive_entry_set_pathname(dirEntry, mapToWorkspace(relPath, /*isDir*/true,  isTop).constData());
                 archive_entry_set_filetype(dirEntry, AE_IFDIR);
                 archive_entry_set_perm(dirEntry, 0755);
                 archive_write_header(a, dirEntry);
@@ -69,7 +86,7 @@ namespace FileCompressor
                 QDir dir(path);
                 for (const QFileInfo &child :
                      dir.entryInfoList(QDir::NoDotAndDotDot | QDir::AllEntries))
-                    addPath(child.filePath(), root);
+                    addPath(child.filePath(), root, /*isTop*/false);
                 return true;
             }
 
@@ -81,7 +98,8 @@ namespace FileCompressor
                 return false;
 
             struct archive_entry *entry = archive_entry_new();
-            archive_entry_set_pathname(entry, QFile::encodeName(relPath).constData());
+            //archive_entry_set_pathname(entry, QFile::encodeName(relPath).constData());
+            archive_entry_set_pathname(entry, mapToWorkspace(relPath, /*isDir*/false, isTop).constData());
             archive_entry_set_filetype(entry, AE_IFREG);
             archive_entry_set_perm(entry, 0644);
             archive_entry_set_size(entry, file.size());
@@ -107,8 +125,12 @@ namespace FileCompressor
                 continue;
             }
 
-            const QString root = fi.isDir() ? fi.absoluteFilePath() : fi.absolutePath();
-            overallOK          = addPath(fi.absoluteFilePath(), root) && overallOK;
+            // const QString root = fi.isDir() ? fi.absoluteFilePath() : fi.absolutePath();
+            // overallOK          = addPath(fi.absoluteFilePath(), root) && overallOK;
+
+            // root는 "부모"로 고정, 최초 호출에만 isTop=true
+            const QString root = fi.absolutePath();
+            overallOK = addPath(fi.absoluteFilePath(), root, /*isTop*/true) && overallOK;
         }
 
         // 🔹 닫기 및 정리

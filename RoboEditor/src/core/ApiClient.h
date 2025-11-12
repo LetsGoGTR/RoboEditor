@@ -34,6 +34,12 @@ class ApiClient : public QObject
             return m_baseUrl;
         }
 
+        bool postJson(const QString& endpoint, const QJsonObject& body, int timeoutMs = 10000);
+
+        // workspace(래퍼)
+        bool postWorkspaceCompress(const QString& user);
+        bool postWorkspaceExtract(const QString& user, const QString& password);
+
       signals:
         void robotStateChanged(bool isRunning);  //로봇의 상태가 변화했을 때 신호
         void requestSucceeded(const QString     &endpoint,
