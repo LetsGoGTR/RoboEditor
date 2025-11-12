@@ -53,15 +53,46 @@
     applyDlg?.open();
   }
 
-  $effect(() => {
-    if (!applyDlg) return;
-    const off = applyDlg.$on('apply', (e: any) => {
-      const { password } = e.detail;
-      console.log('적용 실행', { selected, selectTree, password });
-      // TODO: 실제 적용 로직
-    });
-    return () => off();
-  });
+  async function handleApplyDialog(event: CustomEvent<{ password: string }>) {
+    const { password } = event.detail;
+    console.log('적용 실행', { selected, selectTree, password });
+    // TODO: 실제 적용 로직
+    if (!selectTree) return;
+
+    const archiveName = 'app.tar.gz';
+    const localPath = `${selectTree.path}/${archiveName}`;
+    const remotePath = `/home/default/${archiveName}`;
+    try {
+      const targets = filteredControllers
+        .filter((c) => selected.includes(c.serialNumber))
+        .map((c) => ({
+          host: "k13s205.p.ssafy.io",//c.ipAddress,           // 또는 c.host / c.address 등 실제 필드에 맞게
+          port: 22, // 이미 number면 Number() 없어도 됨
+          username: 'default', // 또는 c.user / c.id 등 실제 계정 필드
+          password: '1234',             // 다이얼로그에서 받은 비번
+        }));
+
+      const res = await fetch('/api', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          targets,
+          localPath,
+          remotePath
+        }),
+      });
+
+      if (!res.ok) {
+        const msg = await res.text();
+        throw new Error(`서버 에러(${res.status}): ${msg}`);
+      }
+
+      const data = await res.json();
+      console.log('적용 성공 :', data);
+    } catch (err) {
+      console.error('요청 실패:', err);
+    }
+  }
 </script>
 
 <main>
@@ -104,6 +135,7 @@
     bind:this={applyDlg}
     {selected}
     folderName={selectTree?.name ?? ''}
+    on:apply={handleApplyDialog}
   />
 </main>
 
