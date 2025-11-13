@@ -66,7 +66,7 @@
       const targets = filteredControllers
         .filter((c) => selected.includes(c.serialNumber))
         .map((c) => ({
-          host: "k13s205.p.ssafy.io",//c.ipAddress,           // 또는 c.host / c.address 등 실제 필드에 맞게
+          host: c.ipAddress,           // 또는 c.host / c.address 등 실제 필드에 맞게
           port: 22, // 이미 number면 Number() 없어도 됨
           username: 'default', // 또는 c.user / c.id 등 실제 계정 필드
           password: '1234',             // 다이얼로그에서 받은 비번
