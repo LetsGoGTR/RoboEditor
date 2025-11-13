@@ -74,6 +74,8 @@ class ControllerManager : public QObject
       signals:
         void controllerListChanged();
         void controllerStateUpdated(const QString &serialNumber, bool isConnected, bool isRunning);
+        void backupCompleted(const QString &serialNumber);
+        void backupFailed(const QString &serialNumber, const QString &error);
 
       private:
         explicit ControllerManager(QObject *parent = nullptr);

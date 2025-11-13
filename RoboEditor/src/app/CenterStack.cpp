@@ -20,6 +20,7 @@
 #include "ComparePage.h"
 #include "ControllerManager.h"
 #include "ModifyPage.h"
+#include "WorkspaceContextMenuController.h"
 
 static QIcon makeCircleIcon(const QColor &color, int size = 12)
 {
@@ -189,6 +190,13 @@ void CenterStack::setupUI()
     tab2Layout->addWidget(workspaceTree_);
     tab2->setLayout(tab2Layout);
 
+    workspaceMenuController_ = new WorkspaceContextMenuController(
+            workspaceTree_,
+            workspaceModel_,
+            workspaceModel_->rootPath(),   // 초기 root는 "C:/backup"
+            this
+    );
+
     // ===== 탭 추가 =====
     treeTabWidget_->addTab(tab1, "Controller");
     treeTabWidget_->addTab(tab2, "Workspace");
@@ -256,6 +264,10 @@ void CenterStack::setupUI()
         workspacePath_ = selectedPath;
         workspaceTree_->setRootIndex(workspaceModel_->index(workspacePath_));
         treeTabWidget_->setCurrentIndex(1);
+
+        if (workspaceMenuController_) {
+            workspaceMenuController_->setWorkspaceRoot(workspacePath_);
+        }
 
         emit workspaceSelected(workspacePath_);
         qDebug() << "Backup selected, switching to workspace:" << workspacePath_;
@@ -354,6 +366,10 @@ void CenterStack::setBackupPath(const QString &path)
 
     backupModel_->setRootPath(backupRootPath_);
     workspaceModel_->setRootPath(backupRootPath_);
+
+    if (workspaceMenuController_) {
+        workspaceMenuController_->setWorkspaceRoot(backupRootPath_);
+    }
 }
 
 void CenterStack::onControllerTreeClicked(const QModelIndex &index)
