@@ -17,6 +17,9 @@ ProgressDialog::ProgressDialog(QWidget *parent)
     progressBar_ = new QProgressBar();
     progressBar_->setRange(0, 100);
 
+    statusLabel_ = new QLabel("");
+    statusLabel_->setWordWrap(true);
+
     cancelBtn_ = new QPushButton("취소");
 
     auto layout = new QVBoxLayout(this);
@@ -24,6 +27,7 @@ ProgressDialog::ProgressDialog(QWidget *parent)
     layout->addWidget(countLabel_);
     layout->addWidget(timeLabel_);
     layout->addWidget(progressBar_);
+    layout->addWidget(statusLabel_);
     layout->addWidget(cancelBtn_);
 
     connect(cancelBtn_, &QPushButton::clicked,
@@ -62,4 +66,28 @@ void ProgressDialog::updateElapsedTime()
 {
     int secs = elapsed_.elapsed() / 1000;
     timeLabel_->setText(QString("%1s...").arg(secs));
+}
+
+void ProgressDialog::setStatusText(const QString &text)
+{
+    if (statusLabel_) {
+        statusLabel_->setText(text);
+    }
+}
+
+void ProgressDialog::setFinishedMode(bool finished)
+{
+    if (finished) {
+        // 완료 모드
+        cancelBtn_->setText("닫기");
+        setWindowTitle("백업 완료");
+
+        if (timer_) timer_->stop();
+    }
+    else {
+        // 진행 모드
+        cancelBtn_->setText("취소");
+        setWindowTitle("진행 중...");
+        if (timer_) timer_->start(1000);
+    }
 }

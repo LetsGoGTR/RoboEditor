@@ -9,6 +9,7 @@
 #include "ControllerManager.h"
 #include "ui_BackupPage.h"
 #include "ProgressDialog.h"
+#include "ControllerManager.h"
 
 BackupPage::BackupPage(QWidget *parent) : QWidget(parent), ui(new Ui::BackupPage), totalBackupRequests_(0), completedBackupRequests_(0), failedBackupRequests_(0)
 {
@@ -29,6 +30,13 @@ BackupPage::BackupPage(QWidget *parent) : QWidget(parent), ui(new Ui::BackupPage
     connect(selectcontrollerWidget, &selectcontroller::controllerSelectionChanged, this, [this]() {
         updateConfirmState();
     });
+
+    // ControllerManager의 백업 완료/실패 시그널을 받도록 연결
+    ControllerManager *manager = ControllerManager::instance();
+    connect(manager, &ControllerManager::backupCompleted,
+            this, &BackupPage::onBackupCompleted);
+    connect(manager, &ControllerManager::backupFailed,
+            this, &BackupPage::onBackupFailed);
 
 }
 
@@ -55,20 +63,34 @@ void BackupPage::confirmSelection()
 
     qDebug() << "Backup to:" << selectedBackupDir;
 
-    QMessageBox::information(this, "백업 시작",
-                             QString("선택된 %1개 제어기의 백업이 시작되었습니다.\n저장 경로: %2")
-                                     .arg(selectedControllerList.size())
-                                     .arg(selectedBackupDir));
-
     ControllerManager *manager = ControllerManager::instance();
+
+    if (!backupProgressDialog_) {
+        backupProgressDialog_ = new ProgressDialog(this);
+        connect(backupProgressDialog_, &ProgressDialog::cancelRequested,
+                this, [this]() {
+                    // 일단 취소 누르면 창만 닫는 정도로
+                    if (backupProgressDialog_) {
+                        backupProgressDialog_->close();
+                    }
+                    // 나중에 진짜 "백업 중단" 로직 붙이고 싶으면 여기에서 처리
+                });
+    }
+    backupProgressDialog_->setWindowTitle("백업 진행 중...");
+    backupProgressDialog_->setTotalCount(totalBackupRequests_);
+    backupProgressDialog_->setCurrentIndex(0);
+    backupProgressDialog_->setSerialNumber("-");
+    backupProgressDialog_->setProgress(0);
+    backupProgressDialog_->show();
 
     // Disable controls during backup
     if (ui->ConfirmBtn) ui->ConfirmBtn->setEnabled(false);
-    if (ui->BrowseBtn) ui->BrowseBtn->setEnabled(false);
-    if (ui->refreshBtn) ui->refreshBtn->setEnabled(false);
 
     // 각 선택된 제어기에 대해 SFTP 기반 백업 요청
+    int idx = 0;
     for (const QString &serialNumber : selectedControllerList) {
+        ++idx;
+
         ControllerInfo info = manager->getController(serialNumber);
 
         if (info.serialNumber.isEmpty()) {
@@ -83,13 +105,18 @@ void BackupPage::confirmSelection()
             continue;
         }
 
+        if (backupProgressDialog_) {
+            backupProgressDialog_->setCurrentIndex(idx);
+            backupProgressDialog_->setSerialNumber(serialNumber);
+        }
+
         qDebug() << "[BackupPage] Backup request for:" << serialNumber;
 
         bool ok = manager->backupRequest(serialNumber, selectedBackupDir);
-        if (ok) {
-            onBackupCompleted(serialNumber);
-        } else {
-            onBackupFailed(serialNumber, tr("SFTP 백업 실패"));
+
+        // "백업 요청을 아예 시작 못했을 때"만 즉시 실패 처리
+        if (!ok) {
+            onBackupFailed(serialNumber, tr("백업 요청을 시작하지 못했습니다."));
         }
     }
 
@@ -128,29 +155,33 @@ void BackupPage::onBackupCompleted(const QString &serialNumber)
     qDebug() << "[BackupPage] Backup completed:" << serialNumber
              << "(" << completedBackupRequests_ << "/" << totalBackupRequests_ << ")";
 
-    // 모든 백업 완료 시 창 닫기
-    if (completedBackupRequests_ + failedBackupRequests_ >= totalBackupRequests_) {
-        QString message;
-        if (failedBackupRequests_ > 0) {
-            message = QString("백업 완료!\n성공: %1개, 실패: %2개")
-                              .arg(completedBackupRequests_)
-                              .arg(failedBackupRequests_);
-        } else {
-            message = QString("모든 백업이 성공적으로 완료되었습니다!\n완료: %1개")
-                              .arg(completedBackupRequests_);
+    int doneCount = completedBackupRequests_ + failedBackupRequests_;
+
+    if (backupProgressDialog_ && totalBackupRequests_ > 0) {
+        int percent = (doneCount * 100) / totalBackupRequests_;
+        backupProgressDialog_->setProgress(percent);
+    }
+    // 모든 백업 완료 시
+    if (doneCount >= totalBackupRequests_) {
+        // ProgressDialog 닫고 정리
+        if (backupProgressDialog_) {
+
+            backupProgressDialog_->setFinishedMode(true);
+
+            if (failedBackupRequests_ == 0) {
+                backupProgressDialog_->setStatusText(
+                        QString("백업이 완료되었습니다. (총 %1대, 모두 성공)")
+                                .arg(completedBackupRequests_));
+            } else {
+                backupProgressDialog_->setStatusText(
+                        QString("백업이 완료되었습니다.\n성공: %1대, 실패: %2대")
+                                .arg(completedBackupRequests_)
+                                .arg(failedBackupRequests_));
+            }
         }
 
-        QMessageBox::information(this, "백업 완료", message);
-        // 창을 자동으로 닫지 않고 유지하여 후속 작업이 가능하도록 한다.
-        // Re-enable controls after processing
+        // 버튼 다시 활성화
         if (ui->ConfirmBtn) ui->ConfirmBtn->setEnabled(true);
-        if (ui->BrowseBtn) ui->BrowseBtn->setEnabled(true);
-        if (ui->refreshBtn) ui->refreshBtn->setEnabled(true);
-        // Re-enable controls after processing
-        if (ui->ConfirmBtn) ui->ConfirmBtn->setEnabled(true);
-        if (ui->BrowseBtn) ui->BrowseBtn->setEnabled(true);
-        if (ui->refreshBtn) ui->refreshBtn->setEnabled(true);
-        // this->window()->close();
     }
 }
 
@@ -160,14 +191,29 @@ void BackupPage::onBackupFailed(const QString &serialNumber, const QString &erro
     failedBackupRequests_++;
     qWarning() << "[BackupPage] Backup failed:" << serialNumber << error;
 
-    // 모든 백업 처리 완료 시 창 닫기
-    if (completedBackupRequests_ + failedBackupRequests_ >= totalBackupRequests_) {
-        QString message = QString("백업 완료!\n성공: %1개, 실패: %2개")
-                                  .arg(completedBackupRequests_)
-                                  .arg(failedBackupRequests_);
+    int doneCount = completedBackupRequests_ + failedBackupRequests_;
 
-        QMessageBox::warning(this, "백업 완료", message);
-        // 창을 자동으로 닫지 않는다.
-        // this->window()->close();
+    // 진행률 퍼센트 갱신
+    if (backupProgressDialog_ && totalBackupRequests_ > 0) {
+        int percent = (doneCount * 100) / totalBackupRequests_;
+        backupProgressDialog_->setProgress(percent);
+    }
+
+    // 모든 백업 처리 완료 시
+    if (doneCount >= totalBackupRequests_) {
+
+        backupProgressDialog_->setFinishedMode(true);
+
+        // ProgressDialog 닫고 정리
+        if (backupProgressDialog_) {
+            backupProgressDialog_->setStatusText(
+                    QString("백업이 완료되었습니다.\n성공: %1대, 실패: %2대")
+                            .arg(completedBackupRequests_)
+                            .arg(failedBackupRequests_));
+
+        }
+
+        // 버튼 다시 활성화
+        if (ui->ConfirmBtn) ui->ConfirmBtn->setEnabled(true);
     }
 }

@@ -18,6 +18,8 @@ class ProgressDialog : public QDialog {
     void setCurrentIndex(int index);
     void setSerialNumber(const QString &sn);
     void setProgress(int percent);
+    void setStatusText(const QString &text);
+    void setFinishedMode(bool finished);
 
   signals:
     void cancelRequested();
@@ -29,6 +31,7 @@ class ProgressDialog : public QDialog {
     QLabel *serialLabel_;
     QLabel *countLabel_;
     QLabel *timeLabel_;
+    QLabel *statusLabel_;
     QProgressBar *progressBar_;
     QPushButton *cancelBtn_;
 
