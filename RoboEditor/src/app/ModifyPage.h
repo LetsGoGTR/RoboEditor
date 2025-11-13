@@ -1,6 +1,6 @@
 #ifndef MODIFYPAGE_H
 #define MODIFYPAGE_H
-
+#pragma once
 #include <QTabWidget>
 #include <QTextStream>
 #include <QTimer>
@@ -14,6 +14,7 @@
 #include <QPlainTextEdit>
 #include <QSplitter>
 #include <QVBoxLayout>
+#include <QWheelEvent>
 #include <QWidget>
 
 //Document : 개별 파일 관리
@@ -85,19 +86,21 @@ class ModifyPage : public QWidget
         void              setCurrentDocument(int index);
         void              closeDocument(int index);
         void              closeDocument(Document * doc);
+        QString           formatPath(const QString &fullPath) const;
+        void              buildUi();
+        void              ensureCompare(const QString &targetPath);
+        QString           currentLeftText() const;
+        QString           currentLeftPath() const;
+        QSplitter        *mainSplit_{nullptr};  // [0] editorHost, [1] comparePane(옵션)
+        QWidget          *editorHost_{nullptr};
+        QPlainTextEdit   *editor_{nullptr};  // 현재 탭의 에디터(CodeEditor)
+        ComparePage      *comparePane_{nullptr};
+        QString           lastComparedPath_;  // 마지막으로 비교한 파일 경로 저장
 
-        void            buildUi();
-        void            ensureCompare(const QString &targetPath);
-        QString         currentLeftText() const;
-        QSplitter      *mainSplit_{nullptr};  // [0] editorHost, [1] comparePane(옵션)
-        QWidget        *editorHost_{nullptr};
-        QPlainTextEdit *editor_{nullptr};  // 현재 탭의 에디터(CodeEditor)
-        ComparePage    *comparePane_{nullptr};
-        QString         lastComparedPath_;  // 마지막으로 비교한 파일 경로 저장
-        
         // Debouncing을 위한 타이머
         QTimer *diffDebounceTimer_{nullptr};
-        
+        QMetaObject::Connection editorTextChangedConnection_;  // editorTextChangedForDiff 연결 추적
+
         // 라인번호
         LineNumberArea *lineArea_{nullptr};
         int             lineNumberAreaWidth() const;
@@ -140,7 +143,14 @@ class ModifyPage : public QWidget
       public slots:
         void showCompare();  // Compare 버튼 진입: "닫힘→파일선택", "열림→재비교"
         void showCompareFolders();  // 폴더 비교 버튼: 파일 유무에 따라 동작 분기
-        void closeCompare();  // ComparePane의 [X] 클릭 시 호출
+        void closeCompare();        // ComparePane의 [X] 클릭 시 호출
+
+      public:
+        // 설정 저장/복원
+        QByteArray saveSplitterState() const;
+        void       restoreSplitterState(const QByteArray &state);
+        void       saveComparePageState();    // ComparePage의 상태 저장
+        void       restoreCompareSettings();  // ComparePage 설정 복원
 
       protected:
         void dragEnterEvent(QDragEnterEvent * event) override;

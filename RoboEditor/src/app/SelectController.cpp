@@ -62,6 +62,11 @@ void selectcontroller::setupUI()
 }
 void selectcontroller::updateTable()
 {
+    // 현재 체크박스 상태 저장
+    for (int i = 0; i < checkBoxes.size() && i < controllerState.size(); ++i) {
+        checkBoxStates_[controllerState[i].serialNumber] = checkBoxes[i]->isChecked();
+    }
+
     model->removeRows(0, model->rowCount());  // 기존 행 제거
     checkBoxes.clear();
 
@@ -134,6 +139,12 @@ void selectcontroller::updateTable()
         // CheckBox 추가
         int          row       = model->rowCount() - 1;
         QCheckBox   *checkBox  = new QCheckBox();
+
+        // 이전 체크 상태 복원
+        if (checkBoxStates_.contains(info.serialNumber)) {
+            checkBox->setChecked(checkBoxStates_[info.serialNumber]);
+        }
+
         QWidget     *container = new QWidget();
         QHBoxLayout *layout    = new QHBoxLayout(container);
         layout->addWidget(checkBox);

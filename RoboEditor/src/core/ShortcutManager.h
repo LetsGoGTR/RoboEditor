@@ -1,6 +1,6 @@
 #ifndef SHORTCUTMANAGER_H
 #define SHORTCUTMANAGER_H
-
+#pragma once
 #include <QAction>
 #include <QObject>
 

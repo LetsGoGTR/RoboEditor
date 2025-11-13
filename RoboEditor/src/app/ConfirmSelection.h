@@ -1,7 +1,9 @@
 #ifndef CONFIRMSELECTION_H
 #define CONFIRMSELECTION_H
-
+#pragma once
 #include <QDialog>
+#include <QQueue>
+#include <QPair>
 
 namespace Ui
 {
