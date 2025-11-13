@@ -1,7 +1,7 @@
 <script lang="ts">
   import GroupTabs from '@layouts/GroupTabs.svelte';
   import { currentFile } from '@/stores/currentFile';
-  import { onMount } from 'svelte';
+  import { onDestroy, onMount, tick } from 'svelte';
   import type { FileNode } from '@/types';
   import { readTextFile } from '@utils/FSA';
   import { detectLanguage, saveFileAndRefresh } from '@utils/fileAction';
@@ -21,13 +21,20 @@
     if (activeFile) await loadFile(activeFile);
   });
 
+  // --- 안전한 초기화 보장 ---
+  async function tryInitEditor() {
+    await tick(); // DOM 렌더 보장
+    const file = state.active.file;
+    if (!file || !container || !monacoInstance) return;
+    await loadFile(file);
+  }
+
   // --- 파일 로드 ---
   async function loadFile(file: FileNode) {
     if (!monacoInstance || !container) return;
 
-    const text = file.handle
-      ? (await readTextFile(file.handle)) ?? ''
-      : (await file.file?.text()) ?? '';
+    const text =
+      file.handle ? (await readTextFile(file.handle)) ?? '' : (await file.file?.text()) ?? '';
 
     const language = detectLanguage(file.name);
     const model = monacoInstance.editor.createModel(text, language);
@@ -44,7 +51,6 @@
         minimap: { enabled: false }
       });
 
-      // ⌨️ Ctrl+S 단축키
       editor.addCommand(monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyCode.KeyS, save);
     }
   }
@@ -74,16 +80,28 @@
   // --- 파일 변경 감시 ---
   $effect(() => {
     const file = $currentFile.active.file;
-    if (file && monacoInstance) loadFile(file);
+    if (file && monacoInstance) tryInitEditor();
+    else if (!file && editor) {
+      editor.dispose();
+      editor = null;
+    }
+  });
+
+  // --- 컴포넌트 종료 ---
+  onDestroy(() => {
+    if (editor) {
+      editor.dispose();
+      editor = null;
+    }
   });
 </script>
 
-<!-- ✅ Wrapping 구조 -->
+<!-- Wrapping 구조 -->
 <div class="editor-tabs-root">
   <GroupTabs
     tabs={state.group
       .map((g) => g.file)
-      .filter((file): file is FileNode => file !== null) // 🔹 null 제거 타입가드
+      .filter((file): file is FileNode => file !== null)
       .map((file) => ({
         id: file.id,
         name: file.name,
@@ -98,7 +116,6 @@
 </div>
 
 <style>
-/* 루트는 부모 컨테이너의 flex 전파를 보장 */
 .editor-tabs-root {
   display: flex;
   flex-direction: column;
@@ -108,11 +125,9 @@
   overflow: hidden;
 }
 
-/* Monaco 영역은 남은 공간 전부 차지 */
 .editor-container {
   flex: 1;
   width: 100%;
   height: 100%;
-  background: #1e1e1e;
 }
 </style>
