@@ -211,6 +211,8 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         RoboEditor.qrc
         src/core/WorkspaceContextMenuController.h
         src/core/WorkspaceContextMenuController.cpp
+        src/app/ProgressDialog.cpp
+        src/app/ProgressDialog.h
     )
     qt_create_translation(QM_FILES ${CMAKE_SOURCE_DIR} ${TS_FILES})
 else()

@@ -8,6 +8,7 @@
 
 #include "ControllerManager.h"
 #include "ui_BackupPage.h"
+#include "ProgressDialog.h"
 
 BackupPage::BackupPage(QWidget *parent) : QWidget(parent), ui(new Ui::BackupPage), totalBackupRequests_(0), completedBackupRequests_(0), failedBackupRequests_(0)
 {
