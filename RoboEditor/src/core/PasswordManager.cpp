@@ -9,6 +9,7 @@
 #include <QMessageBox>
 #include <QStandardPaths>
 
+#include "ControllerManager.h"
 #include "ui_PasswordInput.h"
 
 PasswordManager::PasswordManager(QWidget *parent) : QDialog(parent), ui(new Ui::PasswordInput)
@@ -30,7 +31,7 @@ PasswordManager::~PasswordManager()
     delete ui;
 }
 
-QString PasswordManager::getPassword() const
+QString PasswordManager::getMasterPassword() const
 {
     return ui->passwordLineEdit->text();
 }
@@ -164,4 +165,47 @@ void PasswordManager::changePassword()
     savePasswordToConfig(hashedPswd);
 
     QMessageBox::information(this, tr("완료"), tr("비밀번호가 변경되었습니다."));
+}
+
+QString PasswordManager::encrypt(QString pswd)
+{
+    //제어기 시리얼 넘버에 저장하기, hased password : 마스터 비밀번호
+
+    std::string master = hashedPswd.toStdString();
+
+    unsigned char key = 0;
+    for (auto i : master) {
+        key ^= i;
+    }
+    if (key == 0)
+        key = 1;
+
+    std::string encryptedPswd = pswd.toUtf8().toStdString();
+    for (int i = 0; i < pswd.size(); i++) {
+        encryptedPswd[i] ^= key;
+        encryptedPswd[i] = ((encryptedPswd[i] << 1) | ((encryptedPswd[i] & 0x40) >> 6)) & 0x7F;
+    }
+
+    return QString::fromUtf8(encryptedPswd.c_str());
+}
+QString PasswordManager::decrypt(QString pswd)
+{
+    std::string master = hashedPswd.toStdString();
+
+    unsigned char key = 0;
+    for (auto i : master) {
+        key ^= i;
+    }
+    if (key == 0)
+        key = 1;
+
+    // 제어기 비밀번호 해독
+
+    std::string decryptedPswd = pswd.toUtf8().toStdString();
+    for (int i = 0; i < decryptedPswd.size(); i++) {
+        decryptedPswd[i] = ((decryptedPswd[i] >> 1) | ((decryptedPswd[i] & 0x1) << 6));
+        decryptedPswd[i] ^= key;
+    }
+
+    return QString::fromUtf8(decryptedPswd.c_str());
 }

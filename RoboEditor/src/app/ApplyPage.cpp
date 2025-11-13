@@ -7,13 +7,18 @@
 #include <QMessageBox>
 #include <QVBoxLayout>
 
-#include "ControllerManager.h"
 #include "ConfirmSelection.h"
+#include "ControllerManager.h"
 #include "PasswordManager.h"
 #include "ui_ApplyPage.h"
 #include "ui_ConfirmSelection.h"
 
-ApplyPage::ApplyPage(QWidget *parent) : QWidget(parent), ui(new Ui::ApplyPage), totalApplyRequests_(0), completedApplyRequests_(0),failedApplyRequests_(0)
+ApplyPage::ApplyPage(QWidget *parent) :
+    QWidget(parent),
+    ui(new Ui::ApplyPage),
+    totalApplyRequests_(0),
+    completedApplyRequests_(0),
+    failedApplyRequests_(0)
 {
     ui->setupUi(this);
     selectbackupWidget     = new selectTableWidget(this);
@@ -36,7 +41,6 @@ ApplyPage::ApplyPage(QWidget *parent) : QWidget(parent), ui(new Ui::ApplyPage), 
                 ui->selectedDir->setText(selectedBackupDir);
                 qDebug() << "ApplyPage received:" << selectedBackupDir;
             });
-
 }
 
 //refresh : 제어기 목록 새로고침
@@ -92,16 +96,18 @@ void ApplyPage::showPasswordUI()
     PasswordManager manager(this);
 
     if (manager.exec() == QDialog::Accepted) {
-        QString inputPassword = manager.getPassword();
+        QString inputPassword = manager.getMasterPassword();
         if (manager.isCorrect(inputPassword)) {
             // 비밀번호 검증 성공
             ConfirmSelection confirmDialog(this);
             confirmDialog.setApplyPage(this);
             apiPassword_ = inputPassword;
 
-
-            connect(&confirmDialog, &ConfirmSelection::applyRequested,
-                    this, [this]() {
+            connect(
+                    &confirmDialog,
+                    &ConfirmSelection::applyRequested,
+                    this,
+                    [this]() {
                         // 비밀번호 + 최종 확인 후, 여기서부터 실제 Apply 시작
                         startApplyQueue();
                     },
@@ -153,42 +159,42 @@ void ApplyPage::startApplyQueue()
     }
 
     if (!unknownControllers.isEmpty()) {
-        QMessageBox::warning(
-                this,
-                "오류",
-                QString("등록 정보가 없는 제어기가 선택되었습니다:\n%1")
-                        .arg(unknownControllers.join(", ")));
+        QMessageBox::warning(this,
+                             "오류",
+                             QString("등록 정보가 없는 제어기가 선택되었습니다:\n%1")
+                                     .arg(unknownControllers.join(", ")));
         return;
     }
 
     if (!disconnectedControllers.isEmpty()) {
-        QMessageBox::warning(
-                this,
-                "오류",
-                QString("다음 제어기가 오프라인 상태입니다:\n%1")
-                        .arg(disconnectedControllers.join(", ")));
+        QMessageBox::warning(this,
+                             "오류",
+                             QString("다음 제어기가 오프라인 상태입니다:\n%1")
+                                     .arg(disconnectedControllers.join(", ")));
         return;
     }
 
     if (!runningControllers.isEmpty()) {
-        QMessageBox::warning(
-                this,
-                "오류",
-                QString("제어기가 동작중입니다. 전체 적용을 취소합니다:\n%1")
-                        .arg(runningControllers.join(", ")));
+        QMessageBox::warning(this,
+                             "오류",
+                             QString("제어기가 동작중입니다. 전체 적용을 취소합니다:\n%1")
+                                     .arg(runningControllers.join(", ")));
         return;
     }
 
     // 큐 및 카운터 초기화
     applyQueue_.clear();
-    totalApplyRequests_ = selectedControllerList.size();
+    totalApplyRequests_     = selectedControllerList.size();
     completedApplyRequests_ = 0;
-    failedApplyRequests_ = 0;
+    failedApplyRequests_    = 0;
 
     // Disable controls during apply
-    if (ui->applyBtn) ui->applyBtn->setEnabled(false);
-    if (ui->refreshBtn) ui->refreshBtn->setEnabled(false);
-    if (ui->importBtn) ui->importBtn->setEnabled(false);
+    if (ui->applyBtn)
+        ui->applyBtn->setEnabled(false);
+    if (ui->refreshBtn)
+        ui->refreshBtn->setEnabled(false);
+    if (ui->importBtn)
+        ui->importBtn->setEnabled(false);
 
     for (const QString &sn : selectedControllerList) {
         applyQueue_.enqueue(sn);
@@ -210,10 +216,10 @@ void ApplyPage::processNextApply()
 
     QString serialNumber = applyQueue_.dequeue();
 
-    qDebug() << "[ApplyPage] Applying to:" << serialNumber
-             << "backup dir:" << selectedBackupDir;
+    qDebug() << "[ApplyPage] Applying to:" << serialNumber << "backup dir:" << selectedBackupDir;
 
-    bool ok = ControllerManager::instance()->applyRequest(serialNumber, selectedBackupDir, apiPassword_);
+    bool ok = ControllerManager::instance()->applyRequest(
+            serialNumber, selectedBackupDir, apiPassword_);
     if (ok) {
         onApplyCompleted(serialNumber);
     } else {
@@ -225,8 +231,8 @@ void ApplyPage::processNextApply()
 void ApplyPage::onApplyCompleted(const QString &serialNumber)
 {
     completedApplyRequests_++;
-    qDebug() << "[ApplyPage] Apply completed:" << serialNumber
-             << "(" << completedApplyRequests_ << "/" << totalApplyRequests_ << ")";
+    qDebug() << "[ApplyPage] Apply completed:" << serialNumber << "(" << completedApplyRequests_
+             << "/" << totalApplyRequests_ << ")";
 
     // 다음 작업 처리
     processNextApply();
@@ -243,7 +249,7 @@ void ApplyPage::onApplyFailed(const QString &serialNumber, const QString &error)
 }
 
 // 모든 Apply 완료 시 창 닫기
-void ApplyPage::onAllAppliesCompleted() //
+void ApplyPage::onAllAppliesCompleted()  //
 {
     qDebug() << "[ApplyPage] All applies processed.";
 
@@ -265,9 +271,12 @@ void ApplyPage::onAllAppliesCompleted() //
     // this->window()->close();
 
     // Re-enable controls after processing
-    if (ui->applyBtn) ui->applyBtn->setEnabled(true);
-    if (ui->refreshBtn) ui->refreshBtn->setEnabled(true);
-    if (ui->importBtn) ui->importBtn->setEnabled(true);
+    if (ui->applyBtn)
+        ui->applyBtn->setEnabled(true);
+    if (ui->refreshBtn)
+        ui->refreshBtn->setEnabled(true);
+    if (ui->importBtn)
+        ui->importBtn->setEnabled(true);
 }
 
 ApplyPage::~ApplyPage()

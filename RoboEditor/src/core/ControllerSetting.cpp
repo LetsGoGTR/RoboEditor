@@ -13,9 +13,11 @@ ControllerSetting::ControllerSetting(QWidget *parent) :
     connect(ui->OKBtn, &QPushButton::clicked, this, &ControllerSetting::onAcceptBtn);
     connect(ui->CancelBtn, &QPushButton::clicked, this, &ControllerSetting::onRejectBtn);
 
-    ui->WPBox->setText("/home/samsung/workspace");
-    ui->sftpSpinBox->setValue(8890);
+    ui->WPBox->setText("/home/default");
+    ui->sftpSpinBox->setValue(22);
     ui->sftpSpinBox->setRange(1, 65535);
+
+    ui->pswdBox->setEchoMode(QLineEdit::NoEcho);
 }
 
 ControllerSetting::~ControllerSetting()
