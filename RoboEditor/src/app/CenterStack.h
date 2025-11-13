@@ -1,6 +1,6 @@
 #ifndef CENTERSTACK_H
 #define CENTERSTACK_H
-
+#pragma once
 #include <QTabWidget>
 #include <QTimer>
 #include <QTreeView>
@@ -19,7 +19,7 @@ class QMainWindow;
 class ComparePage;
 class BackupPage;
 class ModifyPage;
-
+class WorkspaceContextMenuController;
 class CenterStack : public QWidget
 {
     Q_OBJECT
@@ -48,6 +48,10 @@ class CenterStack : public QWidget
         // 경로 관련
         QString getWorkspacePath() const;
         void    setBackupPath(const QString &path);
+
+        // 설정 저장/복원
+        QByteArray saveSplitterState() const;
+        void       restoreSplitterState(const QByteArray &state);
 
       signals:
         // 메인윈도우가 받을 시그널
@@ -93,6 +97,8 @@ class CenterStack : public QWidget
         // 경로
         QString workspacePath_;
         QString backupRootPath_;
+
+        WorkspaceContextMenuController *workspaceMenuController_ = nullptr;
 
         //타이머
         QTimer *m_pollingTimer;

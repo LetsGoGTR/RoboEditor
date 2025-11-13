@@ -13,9 +13,11 @@ ControllerSetting::ControllerSetting(QWidget *parent) :
     connect(ui->OKBtn, &QPushButton::clicked, this, &ControllerSetting::onAcceptBtn);
     connect(ui->CancelBtn, &QPushButton::clicked, this, &ControllerSetting::onRejectBtn);
 
-    ui->WPBox->setText("/home/samsung/workspace");
-    ui->apiBox->setText("80");
+    ui->WPBox->setText("/home/default");
     ui->sftpSpinBox->setValue(22);
+    ui->sftpSpinBox->setRange(1, 65535);
+
+    ui->pswdBox->setEchoMode(QLineEdit::NoEcho);
 }
 
 ControllerSetting::~ControllerSetting()
@@ -42,27 +44,26 @@ ControllerInfo ControllerSetting::getControllerInfo()
 {
     ControllerInfo info;
 
-    QString sn   = ui->SNBox->text().trimmed();
-    QString ip   = ui->ipBox->text().trimmed();
-    QString user = ui->usernameBox->text().trimmed();
-    QString wp   = ui->WPBox->text().trimmed();
-    int     sftp = ui->sftpSpinBox->value();
-    int     api  = ui->apiBox->text().toInt();
+    QString sn     = ui->SNBox->text().trimmed();
+    QString ip     = ui->ipBox->text().trimmed();
+    QString user   = ui->usernameBox->text().trimmed();
+    QString pswd   = ui->pswdBox->text().trimmed();
+    QString wsPath = ui->WPBox->text().trimmed();
+    int     sftp   = ui->sftpSpinBox->value();
 
-    if (sn.isEmpty() || ip.isEmpty() || user.isEmpty() || wp.isEmpty()) {
+    if (sn.isEmpty() || ip.isEmpty() || user.isEmpty() || wsPath.isEmpty()) {
         QMessageBox::warning(this, "입력 오류", "모든 항목을 입력해야 합니다.");
         return ControllerInfo();  // 빈 구조체
     }
 
-    info.serialNumber  = ui->SNBox->text().trimmed();
-    info.ip            = ui->ipBox->text().trimmed();
-    info.username      = ui->usernameBox->text().trimmed();
-    info.sftpPort      = ui->sftpSpinBox->value();
-    info.apiPort       = ui->apiBox->text().toInt();
-    info.workspacePath = ui->WPBox->text().trimmed();
-
-    info.isConnected = m_info.isConnected;
-    info.isRunning   = m_info.isRunning;
+    info.serialNumber = ui->SNBox->text().trimmed();
+    info.ip           = ui->ipBox->text().trimmed();
+    info.username     = ui->usernameBox->text().trimmed();
+    info.sftpPort     = ui->sftpSpinBox->value();
+    info.pswd         = ui->pswdBox->text().trimmed();
+    info.wsPath       = ui->WPBox->text().trimmed();
+    info.isConnected  = m_info.isConnected;
+    info.isRunning    = m_info.isRunning;
 
     return info;
 }
@@ -75,6 +76,6 @@ void ControllerSetting::setControllerInfo(const ControllerInfo &info)
     ui->ipBox->setText(info.ip);
     ui->usernameBox->setText(info.username);
     ui->sftpSpinBox->setValue(info.sftpPort);
-    ui->apiBox->setText(QString::number(info.apiPort));
-    ui->WPBox->setText(info.workspacePath);
+    ui->WPBox->setText(info.wsPath);
+    ui->pswdBox->setText(info.pswd);
 }

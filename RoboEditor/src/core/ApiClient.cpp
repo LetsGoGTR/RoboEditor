@@ -1,7 +1,19 @@
 #include "ApiClient.h"
 
+#include <QTemporaryFile>
+
+#include <QDateTime>
 #include <QDebug>
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
+#include <QHttpMultiPart>
+#include <QHttpPart>
 #include <QJsonParseError>
+#include <QTimer>
+#include <QJsonDocument>
+
+#include "FileCompressor.h"
 
 ApiClient::ApiClient(const QString &baseUrl, QObject *parent) :
     QObject(parent),
@@ -16,49 +28,25 @@ ApiClient::ApiClient(const QString &baseUrl, QObject *parent) :
 }
 
 ApiClient::~ApiClient() {}
-// url 정규화, ip:port또는도메인
+// url 정규화
 QString ApiClient::normalizeBaseUrl(const QString &baseUrl)
 {
     QString input = baseUrl.trimmed();
-    QUrl    url;
 
-    // 이미 스킴이 있는 경우
-    if (input.startsWith("http://") || input.startsWith("https://")) {
-        url = QUrl(input);
-    }
-    // 스킴이 없는 경우 http 기본값
-    else {
-        url = QUrl("http://" + input);
+    if (input.startsWith("https://")) {
+        input.remove(0, 8);  // "https://" 제거
     }
 
-    // URL이 유효하지 않으면 원본 반환
+    QUrl url("https://" + input);
+
+    // URL 유효성 검사
     if (!url.isValid() || url.host().isEmpty()) {
-        qWarning() << "[normalizeBaseUrl] Invalid URL:" << input;
-        return input;
+        qWarning() << "[normalizeBaseUrl] Invalid URL:" << baseUrl;
+        return baseUrl;
     }
 
-    // 포트 처리
-    int     port   = url.port();
-    QString scheme = url.scheme();
-
-    // 포트가 명시되지 않은 경우 스킴 기본 포트 사용
-    if (port == -1) {
-        if (scheme == "https") {
-            port = 443;
-        } else {
-            port = 80;
-        }
-    }
-
-    // 표준 포트는 생략
-    QString result;
-    if ((scheme == "http" && port == 80) || (scheme == "https" && port == 443)) {
-        result = QString("%1://%2").arg(scheme).arg(url.host());
-    } else {
-        result = QString("%1://%2:%3").arg(scheme).arg(url.host()).arg(port);
-    }
-
-    qDebug() << "[normalizeBaseUrl]" << input << "->" << result;
+    QString result = QString("https://%1").arg(url.host());
+    qDebug() << "[normalizeBaseUrl]" << baseUrl << "->" << result;
     return result;
 }
 
@@ -73,12 +61,6 @@ QNetworkRequest ApiClient::createRequest(const QString &endpoint)
     request.setRawHeader("Connection", "keep-alive");
 
     return request;
-}
-
-//제어기의 connected, running 업데이트
-void ApiClient::checkRobotRunning()
-{
-    get("/api/robot/running");
 }
 
 //서버사이드에서 데이터 받아오기
@@ -117,31 +99,124 @@ void ApiClient::get(const QString &endpoint)
     timeoutTimer->start();
 }
 
-//서버사이드에서 데이터 전송
-void ApiClient::post(const QString &endpoint, const QJsonObject &data)
+//서버사이드에 데이터 전송
+void ApiClient::upload(const QString &endpoint, const QString &filePath)
 {
-    QNetworkRequest request  = createRequest(endpoint);
-    QByteArray      jsonData = QJsonDocument(data).toJson(QJsonDocument::Compact);
+    QStringList filesToCompress = {filePath};
 
-    QNetworkReply *reply = m_manager->post(request, jsonData);
+    QString baseName      = QFileInfo(filePath).completeBaseName();
+    QString tempTarGzPath = QDir::temp().filePath(baseName + ".tar.gz");
+
+    if (QFile::exists(tempTarGzPath))
+        QFile::remove(tempTarGzPath);
+
+    if (!FileCompressor::createTarGz(filesToCompress, tempTarGzPath)) {
+        qWarning() << "[ApiClient] Failed to create tar.gz file for upload:" << tempTarGzPath;
+        QString url = createRequest(endpoint).url().toString();
+        emit    requestFailed(endpoint, "Failed to compress file before upload", url);
+        return;
+    }
+
+    QFile *file = new QFile(tempTarGzPath);
+    if (!file->open(QIODevice::ReadOnly)) {
+        qWarning() << "[ApiClient] Failed to open compressed file:" << tempTarGzPath;
+        QString url = createRequest(endpoint).url().toString();
+        emit    requestFailed(endpoint, "Cannot open compressed file", url);
+        delete file;
+        QFile::remove(tempTarGzPath);
+        return;
+    }
+
+    QHttpMultiPart *multiPart = new QHttpMultiPart(QHttpMultiPart::FormDataType);
+    QHttpPart       filePart;
+    filePart.setHeader(QNetworkRequest::ContentDispositionHeader,
+                       QVariant(QString("form-data; name=\"file\"; filename=\"%1\"")
+                                        .arg(QFileInfo(tempTarGzPath).fileName())));
+
+    filePart.setBodyDevice(file);
+    file->setParent(multiPart);
+    multiPart->append(filePart);
+
+    // *** 수정: Content-Type을 설정하지 않음 (QHttpMultiPart가 자동 설정) ***
+    QNetworkRequest request;
+    QString         fullUrl = m_baseUrl + endpoint;
+    request.setUrl(QUrl(fullUrl));
+    // application/json 헤더를 설정하지 않음!
+    request.setRawHeader("Connection", "keep-alive");
+
+    QNetworkReply *reply = m_manager->post(request, multiPart);
+    multiPart->setParent(reply);
+
     reply->setProperty("endpoint", endpoint);
     reply->setProperty("method", "POST");
+    reply->setProperty("tempTarGzPath", tempTarGzPath);
 
-    qDebug() << "[ApiClient] POST request sent to:" << endpoint;
+    qDebug() << "[ApiClient] File POST request sent to:" << endpoint << "->" << tempTarGzPath
+             << "size =" << QFileInfo(tempTarGzPath).size() << "bytes";
+
+    QTimer *timeoutTimer = new QTimer(reply);
+    timeoutTimer->setSingleShot(true);
+    timeoutTimer->setInterval(30000);
+
+    connect(timeoutTimer, &QTimer::timeout, this, [reply, endpoint]() {
+        if (reply->isRunning()) {
+            reply->abort();
+            qWarning() << "[ApiClient] File upload timeout:" << endpoint;
+        }
+    });
+
+    connect(reply, &QNetworkReply::finished, timeoutTimer, [timeoutTimer]() {
+        if (timeoutTimer->isActive())
+            timeoutTimer->stop();
+        timeoutTimer->deleteLater();
+    });
+
+    timeoutTimer->start();
+}
+void ApiClient::download(const QString &endpoint,
+                         const QString &destPath,
+                         const QString &serialNumber)
+{
+    QNetworkRequest request = createRequest(endpoint);
+    QNetworkReply  *reply   = m_manager->get(request);
+
+    reply->setProperty("endpoint", endpoint);
+    reply->setProperty("method", "GET");
+    reply->setProperty("destPath", destPath);
+    reply->setProperty("serialNumber", serialNumber);
+    qDebug() << "[ApiClient] Download request sent to:" << endpoint;
+    qDebug() << "[ApiClient] Destination path:" << destPath;
+
+    // 다운로드 진행률 모니터링
+    connect(reply,
+            &QNetworkReply::downloadProgress,
+            this,
+            [endpoint](qint64 bytesReceived, qint64 bytesTotal) {
+                if (bytesTotal > 0) {
+                    int progress = (bytesReceived * 100) / bytesTotal;
+                    qDebug() << "[ApiClient]" << endpoint << "downloading:" << progress << "%"
+                             << "(" << bytesReceived << "/" << bytesTotal << "bytes)";
+                } else {
+                    // 서버가 Content-Length를 보내지 않는 경우
+                    qDebug() << "[ApiClient]" << endpoint << "downloading:" << bytesReceived
+                             << "bytes";
+                }
+            });
 }
 
 void ApiClient::onFinished(QNetworkReply *reply)
 {
     reply->deleteLater();
 
-    QString endpoint = reply->property("endpoint").toString();
-    QString method   = reply->property("method").toString();
-    QString url      = reply->url().toString();
+    QString endpoint     = reply->property("endpoint").toString();
+    QString method       = reply->property("method").toString();
+    QString url          = reply->url().toString();
+    QString serialNumber = reply->property("serialNumber").toString();
 
-    // 네트워크 에러 확인, 연결이 안됐을 때, 아이콘 x
+    // 네트워크 에러 확인, 연결이 안됐을 때
     if (reply->error() != QNetworkReply::NoError) {
         QString errorString = reply->errorString();
-        qWarning() << "[ApiClient] Request failed:" << method << endpoint
+        qWarning() << "[ApiClient1] Request failed:" << method << endpoint
                    << "Error:" << errorString;
 
         emit requestFailed(endpoint, errorString, url);
@@ -150,17 +225,85 @@ void ApiClient::onFinished(QNetworkReply *reply)
 
     // HTTP 상태 코드 확인
     int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-    qDebug() << "[ApiClient] Response received from" << endpoint << "Status code:" << statusCode;
+    qDebug() << "[ApiClient5] Response received from" << endpoint << "Status code:" << statusCode;
 
-    //연결은 됐지만 서버 응답 실패 :  아이콘 : 주황
+    //서버 응답 실패
     if (statusCode >= 400) {
         QString errorMsg = QString("HTTP %1 error").arg(statusCode);
-        qWarning() << "[ApiClient]" << errorMsg << "for" << endpoint;
+        qWarning() << "[ApiClient2]" << errorMsg << "for" << endpoint;
         emit requestFailed(endpoint, errorMsg, url);
         return;
     }
 
-    // 응답 본문 읽기
+    // 업로드 응답 처리
+    if (method == "POST" && reply->property("tempTarGzPath").isValid()) {
+        QString tempTarGzPath = reply->property("tempTarGzPath").toString();
+        QFile::remove(tempTarGzPath);
+        qDebug() << "[ApiClient3] Removed temp tarGz file after upload:" << tempTarGzPath;
+    }
+    // 다운로드 응답 처리
+    if (method == "GET" && reply->property("destPath").isValid()) {
+        QString destPath = reply->property("destPath").toString();
+
+        // 바이너리 데이터 읽기 (tar.gz 파일)
+        QByteArray compressedData = reply->readAll();
+        qDebug() << "[ApiClient4] Downloaded compressed file size:" << compressedData.size()
+                 << "bytes";
+
+        QString timestamp     = QDateTime::currentDateTime().toString("yyyy-MM-dd_HHmmss");
+        QString tempFileName  = QString("%1_%2.tar.gz").arg(serialNumber).arg(timestamp);
+        QString tempTarGzPath = QDir::temp().filePath(tempFileName);
+
+        QFile tempFile(tempTarGzPath);
+        if (!tempFile.open(QIODevice::WriteOnly)) {
+            qWarning() << "[ApiClient] Failed to create temp file:" << tempTarGzPath
+                       << "for robot:" << serialNumber;
+            emit requestFailed(endpoint, "Cannot create temp file", url);
+            return;
+        }
+
+        tempFile.write(compressedData);
+        tempFile.close();
+
+        // ---------------------- 압축 풀 폴더 설정 ----------------------
+        // 압축 파일명(확장자 제외)을 폴더 이름으로 사용
+        QString folderName  = QFileInfo(tempTarGzPath).baseName();  // 예: SN1234_2025-11-06_153022
+        QString extractPath = QDir(destPath).filePath(folderName);
+
+        // 같은 이름의 폴더가 이미 존재하면 고유한 이름으로 변경
+        QString uniqueExtractPath = extractPath;
+        int     counter           = 1;
+        while (QDir(uniqueExtractPath).exists()) {
+            uniqueExtractPath = QString("%1(%2)").arg(extractPath).arg(counter);
+            counter++;
+        }
+
+        // 최종 폴더 생성
+        QDir dir;
+        if (!dir.mkpath(uniqueExtractPath)) {
+            qWarning() << "[ApiClient] Failed to create extract directory:" << uniqueExtractPath;
+            emit requestFailed(endpoint, "Cannot create extract directory", url);
+            QFile::remove(tempTarGzPath);
+            return;
+        }
+
+        // ---------------------- 압축 해제 ----------------------
+        if (!FileCompressor::extractTarGz(tempTarGzPath, uniqueExtractPath)) {
+            qWarning() << "[ApiClient] Failed to extract tar.gz file to:" << uniqueExtractPath;
+            emit requestFailed(endpoint, "Failed to extract downloaded file", url);
+            QFile::remove(tempTarGzPath);
+            return;
+        }
+
+        // 임시 파일 삭제
+        QFile::remove(tempTarGzPath);
+
+        qDebug() << "[ApiClient] Download and extraction completed:" << uniqueExtractPath;
+        emit requestSucceeded(endpoint, QJsonObject());
+        return;
+    }
+
+    // 로봇 상태 응답 처리
     QByteArray responseData = reply->readAll();
 
     // 로봇 상태 파싱
@@ -214,4 +357,42 @@ void ApiClient::parseRunningStateResponse(const QByteArray &responseData)
         qDebug() << "[ApiClient] Robot state changed:" << (m_robotRunning ? "RUNNING" : "IDLE");
         emit robotStateChanged(m_robotRunning);
     }
+}
+
+bool ApiClient::postJson(const QString& endpoint, const QJsonObject& body, int timeoutMs)
+{
+    QNetworkRequest request = createRequest(endpoint); // baseUrl + endpoint, JSON 헤더 설정됨 :contentReference[oaicite:1]{index=1}
+    QNetworkReply* reply = m_manager->post(request, QJsonDocument(body).toJson());
+    reply->setProperty("endpoint", endpoint);
+    reply->setProperty("method", "POST");
+
+    QTimer* timeoutTimer = new QTimer(reply);
+    timeoutTimer->setSingleShot(true);
+    timeoutTimer->setInterval(timeoutMs);
+    connect(timeoutTimer, &QTimer::timeout, this, [=]() {
+        if (reply->isRunning()) {
+            reply->abort();
+            qWarning() << "[ApiClient] Timeout for" << endpoint;
+            emit requestFailed(endpoint, "Timeout - no response", request.url().toString());
+        }
+        timeoutTimer->deleteLater();
+    });
+    connect(reply, &QNetworkReply::finished, timeoutTimer, [timeoutTimer]() {
+        if (timeoutTimer->isActive()) timeoutTimer->stop();
+        timeoutTimer->deleteLater();
+    });
+    timeoutTimer->start();
+    return true; // 비동기. 성공/실패는 onFinished에서 emit됨 :contentReference[oaicite:2]{index=2}
+}
+
+bool ApiClient::postWorkspaceCompress(const QString& user)
+{
+    QJsonObject j; j["user"] = user;
+    return postJson("/api/workspace/compress", j);
+}
+
+bool ApiClient::postWorkspaceExtract(const QString& user, const QString& password)
+{
+    QJsonObject j; j["user"] = user; j["password"] = password;
+    return postJson("/api/workspace/extract", j);
 }

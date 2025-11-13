@@ -1,6 +1,6 @@
 #ifndef API_CLIENT_H
 #define API_CLIENT_H
-
+#pragma once
 #include <QTimer>
 
 #include <QJsonDocument>
@@ -24,14 +24,21 @@ class ApiClient : public QObject
 
         //api요청
         void get(const QString &endpoint);
-        void post(const QString &endpoint, const QJsonObject &data);
+        void upload(const QString &endpoint, const QString &filePath);
+        void download(
+                const QString &endpoint, const QString &destPath, const QString &serialNumber);
 
-        void           checkRobotRunning();
         static QString normalizeBaseUrl(const QString &baseUrl);
         QString        getBaseUrl() const
         {
             return m_baseUrl;
         }
+
+        bool postJson(const QString& endpoint, const QJsonObject& body, int timeoutMs = 10000);
+
+        // workspace(래퍼)
+        bool postWorkspaceCompress(const QString& user);
+        bool postWorkspaceExtract(const QString& user, const QString& password);
 
       signals:
         void robotStateChanged(bool isRunning);  //로봇의 상태가 변화했을 때 신호
