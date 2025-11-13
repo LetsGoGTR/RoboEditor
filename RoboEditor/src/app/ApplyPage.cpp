@@ -97,6 +97,7 @@ void ApplyPage::showPasswordUI()
             // 비밀번호 검증 성공
             ConfirmSelection confirmDialog(this);
             confirmDialog.setApplyPage(this);
+            apiPassword_ = inputPassword;
 
 
             connect(&confirmDialog, &ConfirmSelection::applyRequested,
@@ -212,7 +213,7 @@ void ApplyPage::processNextApply()
     qDebug() << "[ApplyPage] Applying to:" << serialNumber
              << "backup dir:" << selectedBackupDir;
 
-    bool ok = ControllerManager::instance()->applyRequest(serialNumber, selectedBackupDir);
+    bool ok = ControllerManager::instance()->applyRequest(serialNumber, selectedBackupDir, apiPassword_);
     if (ok) {
         onApplyCompleted(serialNumber);
     } else {

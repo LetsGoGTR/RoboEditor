@@ -51,11 +51,13 @@ class ControllerManager : public QObject
         bool backupRequest(const QString &serialNumber,
                            const QString &baseBackupDir);
         bool applyRequest(const QString &serialNumber,
-                          const QString &filePath);
+                          const QString &filePath,
+                          const QString& apiPassword);
 
         bool receive(const QString &serialNumber,
                      const QString &remoteTarGz,
-                     const QString &localDestDir);
+                     const QString& parentDir,        // C:\backup\<SN>
+                     const QString& targetDirName);
         bool send(const QString     &serialNumber,
                   const QStringList &localPaths,
                   const QString     &remoteDir);

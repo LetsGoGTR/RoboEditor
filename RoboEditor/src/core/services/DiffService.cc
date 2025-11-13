@@ -7,7 +7,7 @@
 #include "../utils/diff/DiffPython.h"
 #include "../utils/diff/DiffText.h"
 #include "../utils/diff/DiffYaml.h"
-#include "../utils/diff/treediff.h"
+#include "../utils/diff/DiffTree.h"
 #include "../utils/logging/Logger.h"
 
 namespace fs = std::filesystem;
@@ -119,9 +119,9 @@ services::ServiceResult services::DiffService::diffDirectories(const std::string
 
     Json::Value j;
     try {
-        j = treediff::Run(rootA, rootB);
+        j = DiffTree::Run(rootA, rootB);
     } catch (const std::exception &e) {
-        result.errorMessage = std::string("treediff failed: ") + e.what();
+        result.errorMessage = std::string("DiffTree failed: ") + e.what();
         return result;
     }
 

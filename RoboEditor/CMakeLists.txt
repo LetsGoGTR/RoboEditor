@@ -186,9 +186,9 @@ set(PROJECT_SOURCES
         src/core/utils/diff/DiffPython.cc
         src/core/utils/diff/DiffYaml.h
         src/core/utils/diff/DiffYaml.cc
-        src/core/utils/diff/treediff.h
-        src/core/utils/diff/treediff.cpp
-        src/core/utils/diff/line-diff-v6+.cpp
+        src/core/utils/diff/DiffTree.h
+        src/core/utils/diff/DiffTree.cc
+
 
         src/ui/mainwindow.ui
         src/ui/ApplyPage.ui
