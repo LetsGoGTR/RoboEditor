@@ -667,6 +667,11 @@ void ModifyPage::openFile()
 
 void ModifyPage::saveFile()
 {
+    if (documents.isEmpty() || currentDocumentIndex < 0
+        || currentDocumentIndex >= documents.size()) {
+        return;
+    }
+
     Document *doc = documents[currentDocumentIndex];
     if (!doc)
         return;
@@ -699,6 +704,11 @@ void ModifyPage::saveFile()
 }
 void ModifyPage::saveAsFile()
 {
+    if (documents.isEmpty() || currentDocumentIndex < 0
+        || currentDocumentIndex >= documents.size()) {
+        return;
+    }
+
     Document *doc = documents[currentDocumentIndex];
     if (!doc)
         return;
@@ -753,6 +763,13 @@ bool ModifyPage::hasUnsavedChanges(Document *doc)
 void ModifyPage::closeCurrentTab()
 {
     int index = tabWidget->currentIndex();
+
+    if (index < 0)
+        return;
+
+    if (documents.isEmpty() || index >= documents.size())
+        return;
+
     if (index >= 0)
         closeFile(index);
 }
