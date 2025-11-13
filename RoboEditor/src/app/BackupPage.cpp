@@ -54,6 +54,11 @@ void BackupPage::confirmSelection()
 
     qDebug() << "Backup to:" << selectedBackupDir;
 
+    QMessageBox::information(this, "백업 시작",
+                             QString("선택된 %1개 제어기의 백업이 시작되었습니다.\n저장 경로: %2")
+                                     .arg(selectedControllerList.size())
+                                     .arg(selectedBackupDir));
+
     ControllerManager *manager = ControllerManager::instance();
 
     // Disable controls during backup
@@ -63,6 +68,20 @@ void BackupPage::confirmSelection()
 
     // 각 선택된 제어기에 대해 SFTP 기반 백업 요청
     for (const QString &serialNumber : selectedControllerList) {
+        ControllerInfo info = manager->getController(serialNumber);
+
+        if (info.serialNumber.isEmpty()) {
+            qWarning() << "[BackupPage] Unknown controller:" << serialNumber;
+            onBackupFailed(serialNumber, tr("등록 정보가 없는 제어기입니다."));
+            continue;
+        }
+
+        if (!info.isConnected) {
+            qWarning() << "[BackupPage] Controller offline:" << serialNumber;
+            onBackupFailed(serialNumber, tr("제어기가 오프라인 상태입니다."));
+            continue;
+        }
+
         qDebug() << "[BackupPage] Backup request for:" << serialNumber;
 
         bool ok = manager->backupRequest(serialNumber, selectedBackupDir);
@@ -73,10 +92,7 @@ void BackupPage::confirmSelection()
         }
     }
 
-    QMessageBox::information(this, "백업 시작",
-                             QString("선택된 %1개 제어기의 백업이 시작되었습니다.\n저장 경로: %2")
-                                     .arg(selectedControllerList.size())
-                                     .arg(selectedBackupDir));
+
 }
 
 void BackupPage::importAnySpace()

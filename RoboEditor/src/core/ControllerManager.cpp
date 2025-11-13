@@ -299,7 +299,7 @@ void ControllerManager::updateControllersStates()
         ControllerManager *manager = ControllerManager::instance();
 
         QStringList localFiles;
-        localFiles << "C:/Users/SSAFY/workspace3.tar.gz";  // 로컬 파일 (Windows 경로)
+        localFiles << "C:/Users/SSAFY/workspace.tgz";  // 로컬 파일 (Windows 경로)
 
         QString remoteDir = "/workspace/";  // 원격 디렉토리 (리눅스 경로)
 
@@ -310,7 +310,7 @@ void ControllerManager::updateControllersStates()
 
         // bool success = manager->receive(
         // "SN1",                      // 시리얼 번호
-        // "/workspace/test.tar.gz",   // 원격 파일 경로
+        // "/workspace/test.tgz",   // 원격 파일 경로
         // "C:/Download"               // 로컬 폴더 경로
         // );
 
@@ -517,46 +517,102 @@ void ControllerManager::loadFromFile(const QString &filePath)
 //     //https용
 //     //client->upload("/api/robot/import", filePath);
 // }
-bool ControllerManager::backupRequest(const QString &serialNumber,
-                                      const QString &baseBackupDir)
+bool ControllerManager::backupRequest(const QString& serialNumber,
+                                      const QString& baseBackupDir)
 {
     ControllerInfo info = getController(serialNumber);
-    if (info.serialNumber.isEmpty()) {
-        qWarning() << "[ControllerManager][backupRequest] Controller not found:" << serialNumber;
+    if (info.serialNumber.isEmpty()) return false;
+    ApiClient* client = getApiClient(serialNumber);
+    if (!client) return false;
+
+    QDir base(baseBackupDir);
+    QString sn = info.serialNumber;
+    QString snDir; // 항상 C:\backup\123 형태로 맞춤
+    {
+        QString tail = QFileInfo(base.path()).fileName();
+        if (tail == sn) snDir = base.path();
+        else            snDir = base.filePath(sn);
+    }
+    if (!QDir().mkpath(snDir)) {
+        qWarning() << "[backupRequest] cannot mkpath:" << snDir;
         return false;
     }
 
-    // 1) 원격 tar.gz 경로: 고정 "/workspace/workspace3.tar.gz"
-    //QString remoteTarGz = "/workspace/workspace3.tar.gz";
-    QString remoteTarGz = info.wsPath + "/workspace3.tar.gz";
+    // 타임스탬프 이름 계산 (폴더명 & 내부 workspace rename 용)
+    const QString ts = QDateTime::currentDateTime().toString("yyyy-MM-dd_HHmmss");
+    const QString targetDirName = sn + "_" + ts;      // 예: 123_2025-11-12_153723
+    const QString remoteTarGz   = info.wsPath + "/workspace.tgz";
 
+    // compress 완료 콜백에서만 받기
+    QMetaObject::Connection okConn, failConn;
+    okConn = connect(client, &ApiClient::requestSucceeded, this,
+                     [=](const QString& endpoint, const QJsonObject&) {
+                         if (endpoint != "/api/workspace/compress") return;
+                         QObject::disconnect(okConn);
+                         QObject::disconnect(failConn);
 
+                         // receive는 snDir(부모 폴더) + targetDirName(원하는 최상위 폴더명)으로 호출
+                         bool ok = receive(serialNumber, remoteTarGz, snDir, targetDirName);
+                         if (!ok) qWarning() << "[backupRequest] receive failed for" << serialNumber;
+                         else     qDebug()   << "[backupRequest] completed at"
+                                      << QDir(snDir).filePath(targetDirName);
+                     },
+                     Qt::QueuedConnection);
 
-    // 2) 로컬 저장 경로: baseBackupDir / <시리얼> / <시리얼_yyyyMMdd_HHmmss>
-    QDir baseDir(baseBackupDir);
-    if (!baseDir.exists() && !baseDir.mkpath(".")) {
-        qWarning() << "[backupRequest] Cannot create base dir:" << baseBackupDir;
+    failConn = connect(client, &ApiClient::requestFailed, this,
+                       [=](const QString& endpoint, const QString& err, const QString&) {
+                           if (endpoint != "/api/workspace/compress") return;
+                           QObject::disconnect(okConn);
+                           QObject::disconnect(failConn);
+                           qWarning() << "[backupRequest] compress failed:" << err;
+                       },
+                       Qt::QueuedConnection);
+
+    if (!client->postWorkspaceCompress(info.username)) {
+        QObject::disconnect(okConn);
+        QObject::disconnect(failConn);
+        qWarning() << "[backupRequest] failed to send compress request";
         return false;
     }
-
-    QString timestamp = QDateTime::currentDateTime().toString("yyyy-MM-dd_HHmmss");
-    QString localDestDir =
-            baseDir.filePath(info.serialNumber + "_" + timestamp);
-
-    if (!QDir().mkpath(localDestDir)) {
-        qWarning() << "[backupRequest] Cannot create dest dir:" << localDestDir;
-        return false;
-    }
-
-    // 3) SFTP로 받아서 localDestDir 에 풀기
-    return receive(serialNumber, remoteTarGz, localDestDir);
+    return true;
 }
+
+
 bool ControllerManager::applyRequest(const QString &serialNumber,
-                                     const QString &filePath)
+                                     const QString &filePath,
+                                     const QString& apiPassword)
 {
+    // 0) 입력 검증 먼저
+    if (filePath.isEmpty()) {
+        qWarning() << "[ControllerManager][applyRequest] filePath is empty";
+        return false;
+    }
+
+    // 1) 컨트롤러 조회
     ControllerInfo info = getController(serialNumber);
     if (info.serialNumber.isEmpty()) {
         qWarning() << "[ControllerManager][applyRequest] Controller not found:" << serialNumber;
+        return false;
+    }
+
+    // 2) ApiClient 확보
+    ApiClient* client = getApiClient(serialNumber);
+    if (!client) {
+        qWarning() << "[ControllerManager][applyRequest] ApiClient not found for:" << serialNumber;
+        return false;
+    }
+
+    // 3) SFTP 업로드 (remoteDir는 '디렉터리'만 넘김)
+    const QString remoteDir = info.wsPath; // 예: "/home/samsung/workspace"
+    const QStringList localPaths{ filePath }; // ex) C:/backup/1234/123_2025-11-07_150404.tgz
+    if (!send(serialNumber, localPaths, remoteDir)) { // 선언은 dir-only (파일명 X)  :contentReference[oaicite:0]{index=0}
+        qWarning() << "[ControllerManager][applyRequest] SFTP send failed for" << serialNumber;
+        return false;
+    }
+
+    // 4) 서버에 압축 해제 요청
+    if (!client->postWorkspaceExtract(info.username, apiPassword)) {
+        qWarning() << "[ControllerManager][applyRequest] extract request failed for" << serialNumber;
         return false;
     }
 
@@ -565,17 +621,14 @@ bool ControllerManager::applyRequest(const QString &serialNumber,
         return false;
     }
 
-    QStringList localPaths;
-    localPaths << filePath;   // ex) C:/backup/1234/123_2025-11-07_150404
+    // QStringList localPaths;
+    // localPaths << filePath;   // ex) C:/backup/1234/123_2025-11-07_150404
 
-    // "/workspace"로 고정
-    QString remoteDir = "/workspace";
-
-    bool ok = send(serialNumber, localPaths, remoteDir);
-    if (!ok) {
-        qWarning() << "[ControllerManager][applyRequest] send failed for" << serialNumber;
-        return false;
-    }
+    // bool ok = send(serialNumber, localPaths, remoteDir);
+    // if (!ok) {
+    //     qWarning() << "[ControllerManager][applyRequest] send failed for" << serialNumber;
+    //     return false;
+    // }
 
     return true;
 }
@@ -591,18 +644,18 @@ bool ControllerManager::send(const QString     &serialNumber,
         return false;
     }
 
-    // 2. 임시 디렉토리에서 tar.gz 생성
+    // 2. 임시 디렉토리에서 tgz 생성
     QTemporaryDir tempDir;
     if (!tempDir.isValid()) {
         qWarning() << "Cannot create temporary directory";
         return false;
     }
 
-    QString tarGzPath = tempDir.path() + "/upload.tar.gz";
+    QString tarGzPath = tempDir.path() + "/upload.tgz";
 
-    qDebug() << "Creating tar.gz:" << tarGzPath;
+    qDebug() << "Creating tgz:" << tarGzPath;
     if (!FileCompressor::createTarGz(localPaths, tarGzPath)) {
-        qWarning() << "Failed to create tar.gz";
+        qWarning() << "Failed to create tgz";
         return false;
     }
 
@@ -614,7 +667,7 @@ bool ControllerManager::send(const QString     &serialNumber,
         return false;
     }
 
-    QString remotePath = remoteDir + "/workspace3.tar.gz";
+    QString remotePath = remoteDir + "/workspace.tgz";
     qDebug() << "Uploading to:" << remotePath;
 
     bool uploadSuccess = client.uploadFile(tarGzPath, remotePath);
@@ -629,9 +682,10 @@ bool ControllerManager::send(const QString     &serialNumber,
     return true;
 }
 
-bool ControllerManager::receive(const QString &serialNumber,
-                                const QString &remoteTarGz,
-                                const QString &localDestDir)
+bool ControllerManager::receive(const QString& serialNumber,
+                                const QString& remoteTarGz,
+                                const QString& parentDir,
+                                const QString& targetDirName)
 {
     // 1. 제어기 정보 가져오기
     ControllerInfo controller = getController(serialNumber);
@@ -642,38 +696,78 @@ bool ControllerManager::receive(const QString &serialNumber,
 
     // 2. SFTP 연결 및 다운로드
     SFTPClient client(controller.ip, controller.sftpPort, controller.username, controller.pswd);
-
     if (!client.connectToServer()) {
         qWarning() << "SFTP connection failed:" << controller.ip;
         return false;
     }
 
-    // 임시 파일로 다운로드
-    QTemporaryDir tempDir;
+    QTemporaryDir tempDir; // 세션 임시폴더
     if (!tempDir.isValid()) {
         qWarning() << "Cannot create temporary directory";
         client.disconnect();
         return false;
     }
 
-    QString localTarPath = tempDir.path() + "/download.tar.gz";
+    const QString localTarPath = tempDir.path() + "/download.tgz";
     qDebug() << "Downloading from:" << remoteTarGz << "to:" << localTarPath;
 
-    bool downloadSuccess = client.downloadFile(remoteTarGz, localTarPath);
+    const bool downloadSuccess = client.downloadFile(remoteTarGz, localTarPath);
     client.disconnect();
-
     if (!downloadSuccess) {
         qWarning() << "Download failed";
         return false;
     }
 
-    // 3. 압축 해제
-    qDebug() << "Extracting to:" << localDestDir;
-    if (!FileCompressor::extractTarGz(localTarPath, localDestDir)) {
-        qWarning() << "Failed to extract tar.gz";
+    // 3. 임시 추출
+    const QString tempExtractRoot = tempDir.path() + "/extract";
+    qDebug() << "Extracting to:" << tempExtractRoot;
+    if (!FileCompressor::extractTarGz(localTarPath, tempExtractRoot)) {
+        qWarning() << "Failed to extract tgz";
         return false;
     }
 
-    qDebug() << "Receive completed successfully";
+    // 4. 압축 내부 최상위가 'workspace'인지 확인
+    const QString srcWorkspace = QDir(tempExtractRoot).filePath("workspace");
+    if (!QDir(srcWorkspace).exists()) {
+        qWarning() << "Missing 'workspace' root in archive";
+        return false;
+    }
+
+    // 5. 최종 경로: C:\backup\<SN>\<SN>_YYYY-MM-DD_HHMMSS
+    if (!QDir().mkpath(parentDir)) {
+        qWarning() << "Cannot mkpath parentDir:" << parentDir;
+        return false;
+    }
+    const QString finalPath = QDir(parentDir).filePath(targetDirName);
+
+    // 동일 드라이브면 rename이 가장 안전/빠름
+    if (!QDir().rename(srcWorkspace, finalPath)) {
+        // rename 실패 시 간단 복사 fallback (최소 구현)
+        auto copyDirRecursive = [](const QString& src, const QString& dst, auto&& self) -> bool {
+            QDir s(src);
+            if (!s.exists()) return false;
+            if (!QDir().mkpath(dst)) return false;
+            const auto entries = s.entryInfoList(QDir::NoDotAndDotDot | QDir::AllEntries);
+            for (const QFileInfo& fi : entries) {
+                const QString from = fi.absoluteFilePath();
+                const QString to   = QDir(dst).filePath(fi.fileName());
+                if (fi.isDir()) {
+                    if (!self(from, to, self)) return false;
+                } else {
+                    if (QFile::exists(to)) QFile::remove(to);
+                    if (!QFile::copy(from, to)) return false;
+                }
+            }
+            return true;
+        };
+
+        if (!copyDirRecursive(srcWorkspace, finalPath, copyDirRecursive)) {
+            qWarning() << "Failed to place extracted content to final dest:" << finalPath;
+            // 실패 시 최종 폴더 생성되지 않거나 내용 없음 → 빈 폴더 남지 않음
+            return false;
+        }
+    }
+
+    qDebug() << "Receive completed successfully ->" << finalPath;
     return true;
 }
