@@ -4,6 +4,7 @@
 #include <fstream>
 #include <sstream>
 
+#include "../utils/ConfigUtils.h"
 #include "../utils/PathValidator.h"
 #include "../utils/logging/Logger.h"
 
@@ -13,7 +14,7 @@ Json::Value services::FileService::getFileInfo(const std::string &filePath)
 {
     Json::Value info;
 
-    if (!utils::isValidFile(filePath)) {
+    if (!fs::exists(filePath) || !fs::is_regular_file(filePath)) {
         return info;
     }
 
@@ -43,28 +44,33 @@ services::ServiceResult services::FileService::readFile(const std::string &fileP
     services::ServiceResult result;
     result.success = false;
 
+    // Validate relative path for security
     if (!utils::validatePath(filePath)) {
         result.errorMessage = "Invalid file path";
         utils::logging::warn("Invalid file path: " + filePath);
         return result;
     }
 
-    if (!utils::isValidFile(filePath)) {
+    // Combine with base directory after validation
+    std::string fullPath = utils::config::getBaseDir() + filePath;
+
+    // Check if file exists
+    if (!fs::exists(fullPath) || !fs::is_regular_file(fullPath)) {
         result.errorMessage = "File does not exist";
-        utils::logging::warn("File does not exist: " + filePath);
+        utils::logging::warn("File does not exist: " + fullPath);
         return result;
     }
 
     try {
-        std::ifstream     file(filePath, std::ios::binary);
+        std::ifstream     file(fullPath, std::ios::binary);
         std::stringstream buffer;
         buffer << file.rdbuf();
 
         result.data["content"] = buffer.str();
-        result.data["info"]    = getFileInfo(filePath);
+        result.data["info"]    = getFileInfo(fullPath);
         result.success         = true;
 
-        utils::logging::info("Successfully read file: " + filePath);
+        utils::logging::info("Successfully read file: " + fullPath);
 
     } catch (const std::exception &e) {
         result.errorMessage = "Failed to read file: " + std::string(e.what());
@@ -80,39 +86,44 @@ services::ServiceResult services::FileService::createFile(const std::string &fil
     services::ServiceResult result;
     result.success = false;
 
+    // Validate relative path for security
     if (!utils::validatePath(filePath)) {
         result.errorMessage = "Invalid file path";
         utils::logging::warn("Invalid file path: " + filePath);
         return result;
     }
 
-    if (utils::isValidFile(filePath)) {
+    // Combine with base directory after validation
+    std::string fullPath = utils::config::getBaseDir() + filePath;
+
+    // Check if file already exists
+    if (fs::exists(fullPath) && fs::is_regular_file(fullPath)) {
         result.errorMessage = "File already exists";
-        utils::logging::warn("File already exists: " + filePath);
+        utils::logging::warn("File already exists: " + fullPath);
         return result;
     }
 
     try {
         // Create parent directories if they don't exist
-        fs::path path(filePath);
+        fs::path path(fullPath);
         if (path.has_parent_path()) {
             fs::create_directories(path.parent_path());
         }
 
-        std::ofstream file(filePath, std::ios::binary);
+        std::ofstream file(fullPath, std::ios::binary);
         if (!file) {
             result.errorMessage = "Failed to create file";
-            utils::logging::error("Failed to create file: " + filePath);
+            utils::logging::error("Failed to create file: " + fullPath);
             return result;
         }
 
         file << content;
         file.close();
 
-        result.data["info"] = getFileInfo(filePath);
+        result.data["info"] = getFileInfo(fullPath);
         result.success      = true;
 
-        utils::logging::info("Successfully created file: " + filePath);
+        utils::logging::info("Successfully created file: " + fullPath);
 
     } catch (const std::exception &e) {
         result.errorMessage = "Failed to create file: " + std::string(e.what());
@@ -128,33 +139,38 @@ services::ServiceResult services::FileService::updateFile(const std::string &fil
     services::ServiceResult result;
     result.success = false;
 
+    // Validate relative path for security
     if (!utils::validatePath(filePath)) {
         result.errorMessage = "Invalid file path";
         utils::logging::warn("Invalid file path: " + filePath);
         return result;
     }
 
-    if (!utils::isValidFile(filePath)) {
+    // Combine with base directory after validation
+    std::string fullPath = utils::config::getBaseDir() + filePath;
+
+    // Check if file exists
+    if (!fs::exists(fullPath) || !fs::is_regular_file(fullPath)) {
         result.errorMessage = "File does not exist";
-        utils::logging::warn("File does not exist: " + filePath);
+        utils::logging::warn("File does not exist: " + fullPath);
         return result;
     }
 
     try {
-        std::ofstream file(filePath, std::ios::binary | std::ios::trunc);
+        std::ofstream file(fullPath, std::ios::binary | std::ios::trunc);
         if (!file) {
             result.errorMessage = "Failed to open file for writing";
-            utils::logging::error("Failed to open file: " + filePath);
+            utils::logging::error("Failed to open file: " + fullPath);
             return result;
         }
 
         file << content;
         file.close();
 
-        result.data["info"] = getFileInfo(filePath);
+        result.data["info"] = getFileInfo(fullPath);
         result.success      = true;
 
-        utils::logging::info("Successfully updated file: " + filePath);
+        utils::logging::info("Successfully updated file: " + fullPath);
 
     } catch (const std::exception &e) {
         result.errorMessage = "Failed to update file: " + std::string(e.what());
@@ -169,23 +185,28 @@ services::ServiceResult services::FileService::deleteFile(const std::string &fil
     services::ServiceResult result;
     result.success = false;
 
+    // Validate relative path for security
     if (!utils::validatePath(filePath)) {
         result.errorMessage = "Invalid file path";
         utils::logging::warn("Invalid file path: " + filePath);
         return result;
     }
 
-    if (!utils::isValidFile(filePath)) {
+    // Combine with base directory after validation
+    std::string fullPath = utils::config::getBaseDir() + filePath;
+
+    // Check if file exists
+    if (!fs::exists(fullPath) || !fs::is_regular_file(fullPath)) {
         result.errorMessage = "File does not exist";
-        utils::logging::warn("File does not exist: " + filePath);
+        utils::logging::warn("File does not exist: " + fullPath);
         return result;
     }
 
     try {
-        fs::remove(filePath);
+        fs::remove(fullPath);
         result.success = true;
 
-        utils::logging::info("Successfully deleted file: " + filePath);
+        utils::logging::info("Successfully deleted file: " + fullPath);
 
     } catch (const std::exception &e) {
         result.errorMessage = "Failed to delete file: " + std::string(e.what());
@@ -201,40 +222,48 @@ services::ServiceResult services::FileService::moveFile(const std::string &oldPa
     services::ServiceResult result;
     result.success = false;
 
+    // Validate relative paths for security
     if (!utils::validatePath(oldPath) || !utils::validatePath(newPath)) {
         result.errorMessage = "Invalid file path";
         utils::logging::warn("Invalid file path - old: " + oldPath + ", new: " + newPath);
         return result;
     }
 
-    if (!utils::isValidFile(oldPath)) {
+    // Combine with base directory after validation
+    std::string fullOldPath = utils::config::getBaseDir() + oldPath;
+    std::string fullNewPath = utils::config::getBaseDir() + newPath;
+
+    // Check if source file exists
+    if (!fs::exists(fullOldPath) || !fs::is_regular_file(fullOldPath)) {
         result.errorMessage = "Source file does not exist";
-        utils::logging::warn("Source file does not exist: " + oldPath);
+        utils::logging::warn("Source file does not exist: " + fullOldPath);
         return result;
     }
 
-    if (utils::isValidFile(newPath)) {
+    // Check if destination already exists
+    if (fs::exists(fullNewPath) && fs::is_regular_file(fullNewPath)) {
         result.errorMessage = "Destination file already exists";
-        utils::logging::warn("Destination file already exists: " + newPath);
+        utils::logging::warn("Destination file already exists: " + fullNewPath);
         return result;
     }
 
     try {
         // Create parent directories if they don't exist
-        fs::path path(newPath);
+        fs::path path(fullNewPath);
         if (path.has_parent_path()) {
             fs::create_directories(path.parent_path());
         }
 
         // Move/rename the file
-        fs::rename(oldPath, newPath);
+        fs::rename(fullOldPath, fullNewPath);
 
-        result.data["oldPath"] = oldPath;
-        result.data["newPath"] = newPath;
-        result.data["info"]    = getFileInfo(newPath);
+        result.data["oldPath"] = fullOldPath;
+        result.data["newPath"] = fullNewPath;
+        result.data["info"]    = getFileInfo(fullNewPath);
         result.success         = true;
 
-        utils::logging::info("Successfully moved file from: " + oldPath + " to: " + newPath);
+        utils::logging::info("Successfully moved file from: " + fullOldPath +
+                             " to: " + fullNewPath);
 
     } catch (const std::exception &e) {
         result.errorMessage = "Failed to move file: " + std::string(e.what());

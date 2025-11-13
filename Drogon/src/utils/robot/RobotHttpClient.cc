@@ -9,7 +9,7 @@ namespace fs = std::filesystem;
 void utils::RobotHttpClient::checkRunning(const std::string                             &ip,
                                           std::function<void(bool, const std::string &)> callback)
 {
-    auto client = drogon::HttpClient::newHttpClient("http://" + ip);
+    auto client = drogon::HttpClient::newHttpClient("https://" + ip);
     auto req    = drogon::HttpRequest::newHttpRequest();
     req->setPath(RUNNING_ENDPOINT);
     req->setMethod(drogon::Get);
@@ -58,7 +58,7 @@ void utils::RobotHttpClient::uploadWorkspace(
     multipartBody << "\r\n--" << boundary << "--\r\n";
 
     // Create HTTP request
-    auto client = drogon::HttpClient::newHttpClient("http://" + ip);
+    auto client = drogon::HttpClient::newHttpClient("https://" + ip);
     auto req    = drogon::HttpRequest::newHttpRequest();
     req->setPath(IMPORT_ENDPOINT);
     req->setMethod(drogon::Post);
@@ -94,7 +94,7 @@ void utils::RobotHttpClient::downloadWorkspace(
         const std::string                                            &ip,
         std::function<void(const std::string &, const std::string &)> callback)
 {
-    auto client = drogon::HttpClient::newHttpClient("http://" + ip);
+    auto client = drogon::HttpClient::newHttpClient("https://" + ip);
     auto req    = drogon::HttpRequest::newHttpRequest();
     req->setPath(EXPORT_ENDPOINT);
     req->setMethod(drogon::Get);

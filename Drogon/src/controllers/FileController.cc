@@ -11,7 +11,7 @@ using utils::config::getBaseDir;
 void api::v1::File::fileRead(const drogon::HttpRequestPtr                          &req,
                              std::function<void(const drogon::HttpResponsePtr &)> &&callback)
 {
-    auto path = getBaseDir() + req->getParameter("path");
+    auto path = req->getParameter("path");
 
     if (path.empty()) {
         return sendError(callback, drogon::k400BadRequest, "Missing 'path' query parameter");
@@ -31,7 +31,7 @@ void api::v1::File::fileRead(const drogon::HttpRequestPtr                       
 void api::v1::File::fileCreate(const drogon::HttpRequestPtr                          &req,
                                std::function<void(const drogon::HttpResponsePtr &)> &&callback)
 {
-    auto path = getBaseDir() + req->getParameter("path");
+    auto path = req->getParameter("path");
 
     if (path.empty()) {
         return sendError(callback, drogon::k400BadRequest, "Missing 'path' query parameter");
@@ -59,7 +59,7 @@ void api::v1::File::fileCreate(const drogon::HttpRequestPtr                     
 void api::v1::File::fileUpdate(const drogon::HttpRequestPtr                          &req,
                                std::function<void(const drogon::HttpResponsePtr &)> &&callback)
 {
-    auto path = getBaseDir() + req->getParameter("path");
+    auto path = req->getParameter("path");
 
     if (path.empty()) {
         return sendError(callback, drogon::k400BadRequest, "Missing 'path' query parameter");
@@ -78,12 +78,13 @@ void api::v1::File::fileUpdate(const drogon::HttpRequestPtr                     
                 callback, drogon::k400BadRequest, "Either 'content' or 'newPath' must be provided");
     }
 
-    std::string currentPath = path;
+    std::string             currentPath = path;
+    services::ServiceResult result;
 
     // Move file if newPath is provided
     if (hasNewPath) {
-        std::string newPath = getBaseDir() + (*json)["newPath"].asString();
-        auto        result  = services::FileService::moveFile(currentPath, newPath);
+        std::string newPath = (*json)["newPath"].asString();
+        result              = services::FileService::moveFile(currentPath, newPath);
 
         if (!result.success) {
             return sendError(
@@ -96,7 +97,7 @@ void api::v1::File::fileUpdate(const drogon::HttpRequestPtr                     
     // Update content if provided
     if (hasContent) {
         std::string content = (*json)["content"].asString();
-        auto        result  = services::FileService::updateFile(currentPath, content);
+        result              = services::FileService::updateFile(currentPath, content);
 
         if (!result.success) {
             return sendError(callback,
@@ -106,11 +107,10 @@ void api::v1::File::fileUpdate(const drogon::HttpRequestPtr                     
         }
     }
 
-    // Success response
-    auto        result = services::FileService::getFileInfo(currentPath);
+    // Success response - use file info from service result
     Json::Value data;
     data["path"] = currentPath;
-    data["info"] = result;
+    data["info"] = result.data["info"];
 
     sendSuccess(callback, drogon::k200OK, data, "File updated successfully");
     LOG_INFO << "File updated: " << path << (hasNewPath ? " -> " + currentPath : "");
@@ -119,7 +119,7 @@ void api::v1::File::fileUpdate(const drogon::HttpRequestPtr                     
 void api::v1::File::fileDelete(const drogon::HttpRequestPtr                          &req,
                                std::function<void(const drogon::HttpResponsePtr &)> &&callback)
 {
-    auto path = getBaseDir() + req->getParameter("path");
+    auto path = req->getParameter("path");
 
     if (path.empty()) {
         return sendError(callback, drogon::k400BadRequest, "Missing 'path' query parameter");
