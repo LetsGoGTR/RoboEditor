@@ -8,6 +8,7 @@
 #include <QString>
 
 #include "ApiClient.h"
+#include "PasswordManager.h"
 
 struct ControllerInfo
 {
@@ -17,6 +18,7 @@ struct ControllerInfo
     QString username;
     QString pswd;
     QString wsPath;
+    QString birth;
     bool    isConnected;
     bool    isRunning;
 
@@ -29,6 +31,7 @@ class ControllerManager : public QObject
 
       public:
         static ControllerManager *instance();
+        PasswordManager           pm;
 
         // 제어기 관리
         void registerController();
@@ -45,19 +48,25 @@ class ControllerManager : public QObject
         ApiClient            *getApiClient(const QString &serialNumber);
 
         // 파일 저장/로드
-        void saveToFile(const QString &filePath = "");
-        void loadFromFile(const QString &filePath = "");
+        void saveToFile(const QString &serialNumber = "");
+        void loadFromFile();
 
-        bool backupRequest(const QString &serialNumber,
-                           const QString &baseBackupDir);
-        bool applyRequest(const QString &serialNumber,
-                          const QString &filePath,
-                          const QString& apiPassword);
+        // 개별 제어기 저장/로드
+        bool saveController(const ControllerInfo &controller);
+        bool loadController(const QString &serialNumber);
+
+        // 전체 제어기 목록 관리
+        void saveControllerList();
+        void loadControllerList();
+
+        bool backupRequest(const QString &serialNumber, const QString &baseBackupDir);
+        bool applyRequest(
+                const QString &serialNumber, const QString &filePath, const QString &apiPassword);
 
         bool receive(const QString &serialNumber,
                      const QString &remoteTarGz,
-                     const QString& parentDir,        // C:\backup\<SN>
-                     const QString& targetDirName);
+                     const QString &parentDir,
+                     const QString &localDestDir);
         bool send(const QString     &serialNumber,
                   const QStringList &localPaths,
                   const QString     &remoteDir);
