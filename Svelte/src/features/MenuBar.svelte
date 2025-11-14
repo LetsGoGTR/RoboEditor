@@ -1,38 +1,16 @@
 <script lang="ts">
 	import { currentFile } from '@/stores/currentFile';
-	import { fileTree } from '@/stores/fileTree';
+	import { fileTree, insertFolderNode, refreshFileTree } from '@/stores/fileTree';
 	import { gotoPage } from '@/stores/currentPage';
 	import type { FileNode } from '@/types';
+	import { _createFolder } from '@apis/folder';
+	import { selectedDirectory } from '@/stores/selectedDirectory';
+	import { get } from 'svelte/store';
 
 	let dialog: HTMLDialogElement;
 
 	
 	async function handleCompare() {
-		const state = $currentFile;
-		const left = state.active?.file;
-
-		if (!left) {
-			dialog.showModal();
-			return;
-		}
-
-		// const rightHandle = await openFile();
-		if (!rightHandle) {
-			dialog.showModal();
-			return;
-		}
-
-		const file = await rightHandle.getFile();
-		const right: FileNode = {
-			id: crypto.randomUUID(),
-			name: file.name,
-			type: 'file',
-			path: file.name,
-			size: file.size,
-			lastModified: file.lastModified,
-			handle: rightHandle,
-			kind: 'file'
-		};
 
 		// ✅ diff 모드 진입
 		currentFile.openDiff(left, right);
@@ -44,21 +22,31 @@
 	function handleRegister() { gotoPage('register'); }
 
 	// create a new file
-	function handleNewFile() {
-		const newFile = createNewFileNode('untitled.yaml', 'workspace/');
-		currentFile.open(newFile);
-		gotoPage('edit');
-	}
+export async function handleNewFolder() {
+  const parent = get(selectedDirectory);
+  if (!parent) return alert('상위 폴더를 선택하세요.');
 
-	// create a new folder
-	export async function handleNewFolder() {
-		const handle = await createFolderWithDialog();
-		if (!handle) return;
+  const name = prompt('새 폴더 이름:');
+  if (!name?.trim()) return;
 
-		// 트리 갱신 (선택된 상위 폴더 기준)
-		const updated = await readDirectory(handle);
-		fileTree.set(updated);
-	}
+  const clean = name.trim();
+
+  // 경로 구성 시 trailing slash는 시스템 규칙에 맞게 유지
+  const newPath = `${parent.path}/${clean}/`;
+
+  // 1) 서버 폴더 생성
+  await _createFolder(newPath);
+
+  // 2) store 내부 트리 부분 갱신
+	if (!parent.path) return console.error('상위 폴더 경로 관련 오류가 발생하였습니다.');
+  insertFolderNode(parent.path, {
+    id: crypto.randomUUID(),
+    name: clean,
+    type: 'directory',
+    path: newPath,
+    children: []
+  });
+}
 
 	// 백업 폴더 불러오기
 	async function handleOpenBackup() {

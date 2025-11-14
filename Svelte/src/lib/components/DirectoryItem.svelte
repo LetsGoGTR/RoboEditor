@@ -10,7 +10,7 @@
   function sortedChildren(children: TreeNode[]) {
     return [...children].sort((a, b) => {
       if (a.type === b.type) return a.name.localeCompare(b.name);
-      return a.type === "folder" ? -1 : 1;
+      return a.type === "directory" ? -1 : 1;
     });
   }
 
@@ -25,9 +25,9 @@
 </script>
 
 <li class="tree-item" style={`--depth: ${depth}`}>
-  {#if node.type === "folder"}
+  {#if node.type === "directory"}
     <details class="folder" open={depth === 0}>
-      <summary>
+      <summary on:click={() => onselect?.(node)}>
         {#if mode === "select"}
           <input
             type="checkbox"

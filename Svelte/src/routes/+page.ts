@@ -6,7 +6,7 @@ export const ssr = false;
 
 export const load = (async () => {
 	const tree = await fetchFolderTreeRecursively('', _getFolder);
-	console.log(tree);
+	// console.log(tree);
 
 	// 필요하다면 즉시 store 업데이트
 	fileTree.set(tree);
