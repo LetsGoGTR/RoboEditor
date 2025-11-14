@@ -31,7 +31,9 @@ class ControllerManager : public QObject
 
       public:
         static ControllerManager *instance();
-        PasswordManager           pm;
+        PasswordManager          *passwordManager();
+      public slots:
+        void onMasterPasswordChanged();
 
         // 제어기 관리
         void registerController();
@@ -95,6 +97,7 @@ class ControllerManager : public QObject
         QString                    configFilePath_;
         QList<ControllerInfo>      controllers_;
         QMap<QString, ApiClient *> apiClients_;
+        PasswordManager           *pm_;
         mutable QMutex             mutex_;
 };
 

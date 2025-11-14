@@ -13,11 +13,14 @@
 
 #include "ControllerSetting.h"
 #include "FileCompressor.h"
+#include "PasswordManager.h"
 #include "SftpClient.h"
 
 static ControllerManager *getinstance = nullptr;
 
-ControllerManager::ControllerManager(QObject *parent) : QObject(parent)
+ControllerManager::ControllerManager(QObject *parent) :
+    QObject(parent),
+    pm_(new PasswordManager(nullptr))
 {
     loadFromFile();
 }
@@ -769,7 +772,7 @@ bool ControllerManager::saveController(const ControllerInfo &controller)
     obj["ip"]           = controller.ip;
     obj["sftpPort"]     = controller.sftpPort;
     obj["username"]     = controller.username;
-    obj["pswd"]         = pm.encrypt(controller.pswd);
+    obj["pswd"]         = pm_->encrypt(controller.pswd);
     obj["wsPath"]       = controller.wsPath;
     obj["createdAt"]    = controller.birth;
     obj["lastModified"] = QDateTime::currentDateTime().toString(Qt::ISODate);
@@ -820,14 +823,13 @@ bool ControllerManager::loadController(const QString &serialNumber)
     }
 
     QJsonObject obj = doc.object();
-
     // 6. ControllerInfo 생성
     ControllerInfo c;
     c.serialNumber = obj["serialNumber"].toString();
     c.ip           = obj["ip"].toString();
     c.sftpPort     = obj["sftpPort"].toInt();
     c.username     = obj["username"].toString();
-    c.pswd         = pm.decrypt(obj["pswd"].toString());
+    c.pswd         = pm_->decrypt(obj["pswd"].toString());
     c.birth        = obj["createdAt"].toString();
     c.wsPath       = obj["wsPath"].toString();
     c.isConnected  = false;  // 시작 시 연결 안됨
@@ -944,4 +946,13 @@ void ControllerManager::loadControllerList()
 
     qDebug() << "[loadControllerList] Loaded successfully:" << successCount
              << "Failed:" << failCount;
+}
+void ControllerManager::onMasterPasswordChanged()
+{
+    if (!pm_)
+        return;
+
+    pm_->loadPasswordFromConfig();
+
+    saveToFile();  // 모든 컨트롤러 정보 재저장
 }

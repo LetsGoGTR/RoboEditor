@@ -3,6 +3,7 @@
 #include <QApplication>
 #include <QLocale>
 
+#include "PasswordManager.h"
 #include "app/mainwindow.h"
 
 int main(int argc, char *argv[])
