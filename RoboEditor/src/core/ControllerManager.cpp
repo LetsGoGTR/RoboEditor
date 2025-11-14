@@ -603,10 +603,48 @@ bool ControllerManager::applyRequest(const QString &serialNumber,
         return false;
     }
 
-    // 4) 서버에 압축 해제 요청
+    // 2) /api/workspace/extract 결과 비동기 감시
+    QMetaObject::Connection okConn, failConn;
+    okConn = connect(
+            client,
+            &ApiClient::requestSucceeded,
+            this,
+            [=](const QString &endpoint, const QJsonObject &) {
+                if (endpoint != "/api/workspace/extract")
+                    return;
+                QObject::disconnect(okConn);
+                QObject::disconnect(failConn);
+
+                qDebug() << "[applyRequest] extract completed for" << serialNumber;
+                emit applyCompleted(serialNumber);
+            },
+            Qt::QueuedConnection);
+
+    failConn = connect(
+            client,
+            &ApiClient::requestFailed,
+            this,
+            [=](const QString &endpoint, const QString &err, const QString &) {
+                if (endpoint != "/api/workspace/extract")
+                    return;
+                QObject::disconnect(okConn);
+                QObject::disconnect(failConn);
+
+                qWarning() << "[applyRequest] extract failed:" << err;
+                emit applyFailed(serialNumber,
+                                 QStringLiteral("압축 해제 요청 실패: ") + err);
+            },
+            Qt::QueuedConnection);
+
+    // 3) 실제 extract 요청 전송
     if (!client->postWorkspaceExtract(info.username, apiPassword)) {
-        qWarning() << "[ControllerManager][applyRequest] extract request failed for"
+        QObject::disconnect(okConn);
+        QObject::disconnect(failConn);
+        qWarning() << "[ControllerManager][applyRequest] extract request send failed for"
                    << serialNumber;
+
+        emit applyFailed(serialNumber,
+                         QStringLiteral("압축 해제 요청 전송 실패"));
         return false;
     }
 
