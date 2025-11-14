@@ -532,11 +532,14 @@ bool ControllerManager::backupRequest(const QString &serialNumber, const QString
 
                 // receive는 snDir(부모 폴더) + targetDirName(원하는 최상위 폴더명)으로 호출
                 bool ok = receive(serialNumber, remoteTarGz, snDir, targetDirName);
-                if (!ok)
+                if (!ok) {
                     qWarning() << "[backupRequest] receive failed for" << serialNumber;
-                else
+                    emit backupFailed(serialNumber, QStringLiteral("SFTP 수신 실패"));
+                } else {
                     qDebug() << "[backupRequest] completed at"
                              << QDir(snDir).filePath(targetDirName);
+                    emit backupCompleted(serialNumber);
+                }
             },
             Qt::QueuedConnection);
 
@@ -550,6 +553,8 @@ bool ControllerManager::backupRequest(const QString &serialNumber, const QString
                 QObject::disconnect(okConn);
                 QObject::disconnect(failConn);
                 qWarning() << "[backupRequest] compress failed:" << err;
+
+                emit backupFailed(serialNumber, QStringLiteral("압축 요청 실패: ") + err);
             },
             Qt::QueuedConnection);
 
@@ -557,6 +562,8 @@ bool ControllerManager::backupRequest(const QString &serialNumber, const QString
         QObject::disconnect(okConn);
         QObject::disconnect(failConn);
         qWarning() << "[backupRequest] failed to send compress request";
+
+        emit backupFailed(serialNumber, QStringLiteral("압축 요청 전송 실패"));
         return false;
     }
     return true;
