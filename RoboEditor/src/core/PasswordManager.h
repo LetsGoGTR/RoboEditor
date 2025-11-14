@@ -22,22 +22,31 @@ class PasswordManager : public QDialog
         bool    isCorrect(const QString &input) const;
 
         //제어기 password
-        QString encrypt(QString pswd);
-        QString decrypt(QString pswd);
+        QByteArray deriveKey() const;
+        QString    encrypt(QString pswd);
+        QString    decrypt(const QString &pswd);
+
+        void setHashedPassword(const QString &hashed)
+        {
+            hashedPswd = hashed;
+        }
+
+        QString hashPassword(const QString &pwd) const;
+        void    loadPasswordFromConfig();
+        void    savePasswordToConfig(const QString &hashedPwd);
 
       private:
         Ui::PasswordInput *ui;
         QString            hashedPswd;
 
         //master key
-        QString hashPassword(const QString &pwd) const;
-        void    loadPasswordFromConfig();
-        void    savePasswordToConfig(const QString &hashedPwd);
 
         QString getConfigFilePath() const;
+      signals:
+        void masterPasswordChanged();
 
       public slots:
         void changePassword();
 };
-
+void testPasswordEncryption();
 #endif  // PASSWORDMANAGER_H
