@@ -5,13 +5,23 @@
 #include <vector>
 #include <json/json.h>
 
-class treediff {
+class DiffTree {
 public:
     // 생성자
-    treediff() = delete;
-    treediff(const treediff&) = delete;
-    treediff& operator=(const treediff&) = delete;
+    DiffTree() = delete;
+    DiffTree(const DiffTree&) = delete;
+    DiffTree& operator=(const DiffTree&) = delete;
 
+    // 4) 전체 파이프라인(1 → 2 → 3) 실행
+    static Json::Value Run(const std::filesystem::path& left, const std::filesystem::path& right);
+
+    // 추가 유틸 (인자 파싱 → Run 호출 → 출력/종료코드 처리)
+    static int RunCli(int argc, char** argv);
+
+    // 추가 유틸 (JSON을 CLI에 출력)
+    static void PrintJsonToCli(const Json::Value& json, bool pretty);
+
+private:
     // 비교 결과 구조체
     struct Change { char kind; std::string path; }; // 'A','D','M'
     struct Result {
@@ -32,26 +42,19 @@ public:
     // 3) 비교 결과 → JSON
     static Json::Value BuildJsonValue(const Result& r);
 
-    // 4) 전체 파이프라인(1 → 2 → 3) 실행
-    static Json::Value Run(const std::filesystem::path& left, const std::filesystem::path& right);
-
-    // 추가 유틸 (JSON을 CLI에 출력)
-    static void PrintJsonToCli(const Json::Value& json, bool pretty);
-
-    // 추가 유틸 (인자 파싱 → Run 호출 → 출력/종료코드 처리)
-    static int RunCli(int argc, char** argv);
-
     // 추가 유틸 (폴더 해시 값)
     static std::string HashSubtree(const std::filesystem::path& dir);
 
-private:
     // 내부 유틸 (파일 무시 설정)
     static bool IsSymlinkEntry(const std::filesystem::directory_entry& e);
     static bool IsIgnoredName(const std::string& name);
+
     // 내부 유틸 (리프 노드 해시 맵)
     static std::unordered_map<std::string, std::string>
     BuildLeafHashMap(const std::filesystem::path& root);
+
     static std::string ToHex(const unsigned char* h, size_t n);
+
     // 내부 유틸 (SHA256)
     struct SHA256 {
         uint32_t s[8]; uint64_t bitlen; uint8_t buf[64]; size_t blen;
@@ -77,4 +80,14 @@ private:
         void update(const void* in, size_t len);
         void final(uint8_t out[32]);
     };
+
+    static std::string ReadWholeFileUtf8(const std::filesystem::path& p);
+
+    // 파일의 해시 값 구하는 파이프라인 (분기)
+    static std::string ComputeFileFingerprint(const std::filesystem::path& p);
+
+    static bool IsArchivePath(const std::filesystem::path& p);
+
+    static void ExtractArchiveTo(const std::filesystem::path& src,
+                             const std::filesystem::path& out);
 };

@@ -1,7 +1,6 @@
 <script lang="ts">
   import ControllerList from '@features/ApplyControllerList.svelte';
   import { dummyController } from '@/testData';
-  import { openDirectory } from '@utils/FSA';
 	import type { TreeNode } from '@/types';
   import FileExplorer from '@features/FileExplorer.svelte';
   import ApplyDialog from '@features/dialogs.svelte';
@@ -40,7 +39,7 @@
   let applyDlg: any;
   async function handleConfirm() {
     try {
-      const tree = await openDirectory();
+      // const tree = await openDirectory();
       if (tree && tree.type === 'folder') {
         selectTree = tree;
       }
