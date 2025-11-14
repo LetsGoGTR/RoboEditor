@@ -20,6 +20,7 @@ class ProgressDialog : public QDialog {
     void setProgress(int percent);
     void setStatusText(const QString &text);
     void setFinishedMode(bool finished);
+    void reset();
 
   signals:
     void cancelRequested();
