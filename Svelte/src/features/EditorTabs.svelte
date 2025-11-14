@@ -8,7 +8,7 @@
   import type * as monaco from 'monaco-editor';
 
   // 🔥 서버 기반 파일 API
-  import { _getFile, _updateFile } from '@apis/file';
+  import { _createFile, _getFile, _updateFile } from '@apis/file';
   import { detectLanguage } from '@utils/fileAction';
 
   let container: HTMLDivElement | null = null;
@@ -45,7 +45,8 @@
 
     // 🔥 서버에서 파일 내용 요청
     const res = await _getFile(file.path ?? '');
-    const text = res?.content ?? '';
+    console.log(res);
+    const text = res.data.content ?? '';
 
     const language = detectLanguage(file.name);
     const model = monacoInstance.editor.createModel(text, language);
@@ -77,15 +78,82 @@
    * 파일 저장 (서버)
    * ------------------------------------------------------------ */
   async function save() {
-    const file = state.active?.file;
-    if (!editor || !file) return;
+    const active = $currentFile.active;
+    if (!editor || !active) return;
 
+    const file = active.file;
     const content = editor.getValue();
 
-    await _updateFile(file.path ?? '', { content });
+    let path = file.path;
 
-    // store 갱신
-    currentFile.setContent(content);
+    try {
+      /* ----------------------------------------------------------
+      * 1) 신규 파일 여부 확인
+      * -------------------------------------------------------- */
+      if (!path) {
+        console.warn('[save] path가 없어 신규 파일로 생성합니다:', file.name);
+
+        const resp = await _createFile(file.name, content);
+
+        // 실제 생성된 path 반환
+        const createdPath = resp?.path ?? file.name;
+
+        // Store에 path 반영
+        currentFile.update((s) => {
+          if (!s.active) return s;
+
+          // active.file.path 반영
+          s.active.file.path = createdPath;
+
+          // group 내의 동일 파일 갱신
+          const idx = s.group.findIndex((g) => g.file.id === s.active!.file.id);
+          if (idx !== -1) s.group[idx].file.path = createdPath;
+
+          return s;
+        });
+
+        currentFile.setContent(content);
+        return;
+      }
+
+      /* ----------------------------------------------------------
+      * 2) 기존 경로가 실제 존재하는지 확인
+      * (서버 파일 삭제/이동 등으로 인해 path만 남은 경우 대응)
+      * -------------------------------------------------------- */
+      let exists = true;
+      const check = await _getFile(path).catch(() => (exists = false));
+
+      if (!exists || !check?.data) {
+        console.warn('[save] 파일이 존재하지 않아 신규 생성으로 대체:', path);
+
+        const resp = await _createFile(path, content);
+        const createdPath = resp?.path ?? path;
+
+        // Store 업데이트
+        currentFile.update((s) => {
+          if (!s.active) return s;
+          s.active.file.path = createdPath;
+
+          const idx = s.group.findIndex((g) => g.file.id === s.active!.file.id);
+          if (idx !== -1) s.group[idx].file.path = createdPath;
+          return s;
+        });
+
+        currentFile.setContent(content);
+        return;
+      }
+
+      /* ----------------------------------------------------------
+      * 3) 정상적으로 파일이 존재 → update
+      * -------------------------------------------------------- */
+      await _updateFile(path, { content });
+
+      // store 동기화
+      currentFile.setContent(content);
+
+    } catch (err) {
+      console.error('[save] 파일 저장 중 오류 발생:', err);
+    }
   }
 
   /* ------------------------------------------------------------

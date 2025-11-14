@@ -52,48 +52,72 @@ export async function saveFile(file: FileNode, content: string): Promise<FileNod
 	}
 }
 
+const DEV_BASE_ROUTE = '/tmp/drogon-app/storage/';
+const REL_BASE_ROUTE = 'C:/backup/';
+
+/**
+ * 절대 경로에서 base prefix 제거 → 순수 상대 경로만 반환
+ */
+export function stripBaseRoute(fullPath: string): string {
+	if (!fullPath) return fullPath;
+
+	if (fullPath.startsWith(DEV_BASE_ROUTE)) {
+		return fullPath.substring(DEV_BASE_ROUTE.length);
+	}
+	if (fullPath.startsWith(REL_BASE_ROUTE)) {
+		return fullPath.substring(REL_BASE_ROUTE.length);
+	}
+	return fullPath; // prefix가 없으면 그대로
+}
+
 /**
  * 재귀 폴더 트리 로딩 (backend 응답: directories[], files[])
  */
 export async function fetchFolderTreeRecursively(
-	subPath: string,
-	fetchFn: (path: string) => Promise<any>
+  subPath: string,
+  fetchFn: (path: string) => Promise<any>
 ): Promise<FolderNode> {
-	const raw = await fetchFn(subPath);
+  const raw = await fetchFn(subPath);
 
-	// backend는 raw.data 안에 directories/files 제공
-	const dirs = raw.data?.directories ?? [];
-	const files = raw.data?.files ?? [];
+  const dirs = raw.data?.directories ?? [];
+  const files = raw.data?.files ?? [];
 
-	const folderNode: FolderNode = {
-		id: crypto.randomUUID(),
-		name: extractNameFromPath(subPath),
-		type: 'directory',
-		path: subPath,
-		children: []
-	};
+  // 🔥 base 제거된 path 사용
+  const cleanSubPath = stripBaseRoute(subPath);
 
-	/** 파일 추가 */
-	for (const f of files) {
-		folderNode.children.push({
-			id: crypto.randomUUID(),
-			name: f.name,
-			type: 'file',
-			path: f.path,
-			size: f.size ?? 0,
-			lastModified: f.lastModified ?? 0
-		});
-	}
+  const folderNode: FolderNode = {
+    id: crypto.randomUUID(),
+    name: extractNameFromPath(cleanSubPath),
+    type: 'directory',
+    path: cleanSubPath,
+    children: []
+  };
 
-	/** 디렉토리 재귀 */
-	for (const d of dirs) {
-		const newPath = subPath + `/${d.name}`; // drogon이 절대경로 반환
+  /** 파일 추가 */
+  for (const f of files) {
+    const cleanFilePath = stripBaseRoute(f.path);
 
-		const child = await fetchFolderTreeRecursively(newPath, fetchFn);
-		folderNode.children.push(child);
-	}
+    folderNode.children.push({
+      id: crypto.randomUUID(),
+      name: f.name,
+      type: 'file',
+      path: cleanFilePath,
+      size: f.size ?? 0,
+      lastModified: f.lastModified ?? 0
+    });
+  }
 
-	return folderNode;
+  /** 디렉토리 재귀 */
+  for (const d of dirs) {
+    // drogon이 절대경로 반환하므로 반드시 base 제거
+    const nextFull = subPath + `/${d.name}`;
+    const cleanNext = stripBaseRoute(nextFull);
+
+    const child = await fetchFolderTreeRecursively(cleanNext, fetchFn);
+    folderNode.children.push(child);
+  }
+
+  return folderNode;
 }
 
 function extractNameFromPath(path: string) {
