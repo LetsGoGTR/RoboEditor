@@ -12,7 +12,7 @@
 
   function toggleCheckRecursive(node: TreeNode, id: string, checked: boolean): boolean {
     if (node.id === id) node.checked = checked;
-    else if (node.type === "folder" && node.children)
+    else if (node.type === "directory" && node.children)
       for (const child of node.children)
         toggleCheckRecursive(child, id, checked);
     return node.checked ?? false;
