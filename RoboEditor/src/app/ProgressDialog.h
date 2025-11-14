@@ -15,12 +15,13 @@ class ProgressDialog : public QDialog
       public:
         explicit ProgressDialog(QWidget *parent = nullptr);
 
-        void setTotalCount(int total);
-        void setCurrentIndex(int index);
-        void setSerialNumber(const QString &sn);
-        void setProgress(int percent);
-        void setStatusText(const QString &text);
-        void setFinishedMode(bool finished);
+    void setTotalCount(int total);
+    void setCurrentIndex(int index);
+    void setSerialNumber(const QString &sn);
+    void setProgress(int percent);
+    void setStatusText(const QString &text);
+    void setFinishedMode(bool finished);
+    void reset();
 
       signals:
         void cancelRequested();
