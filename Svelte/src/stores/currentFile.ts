@@ -51,6 +51,7 @@ function createCurrentFileStore() {
 
 	return {
 		subscribe,
+		update,
 
 		/* --------------------------------------------------------
 		 * 1) 단일 파일 열기

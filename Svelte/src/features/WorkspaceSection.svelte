@@ -7,13 +7,16 @@
 	import { onDestroy } from 'svelte';
 	import { currentFile } from '@/stores/currentFile';
 	import { gotoPage } from '@/stores/currentPage';
+	import { selectedDirectory } from '@/stores/selectedDirectory';
 
 	let tree: TreeNode | null = $derived($fileTree);
 	let activeId: 'left' | 'right' = $state('left');
 
 	// 파일 클릭 시 store 저장 및 routing
 	function handleSelect(node: TreeNode) {
-		if (node.type === 'file') {
+		if (node.type === "directory") {
+    	selectedDirectory.set(node);
+		}	else if (node.type === 'file') {
 			currentFile.open(node as FileNode);
 			gotoPage('edit');
 		}
