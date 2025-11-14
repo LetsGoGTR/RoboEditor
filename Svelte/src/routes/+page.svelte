@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { currentPage } from "@/stores/workspaces";
+	import { currentPage } from "@/stores/currentPage";
 	import ApplyPage from "./ApplyPage.svelte";
 	import BackupPage from "./BackupPage.svelte";
 	import ComparePage from "./ComparePage.svelte";

@@ -1,120 +1,179 @@
 import { writable } from 'svelte/store';
 import type { FileNode } from '@/types';
 
-/** 단일 파일 편집 상태 */
+/* ============================================================
+ * 타입 정의
+ * ============================================================ */
+
+/** 단일 파일 편집 View */
 export interface FileView {
-	file: FileNode | null;
+	file: FileNode;
 	content: string | null;
 }
 
-/** Compare 모드 지원을 포함한 전체 상태 */
-export interface CurrentFileState {
-	active: FileView;              // 현재 활성 파일 (기본 editor)
-	right?: FileView | null;       // 비교용 파일 (Diff editor의 우측)
-	isDiffMode: boolean;           // Diff Editor 활성 여부
-	group: FileView[];             // 열린 탭 그룹 (EditorPage)
-	activeIndex: number | null;    // 현재 활성 탭 index
+/** 비교 모드(Diff) 상태 */
+export interface DiffView {
+	left: FileView;
+	right: FileView;
 }
 
+/** 전체 Editor 상태 */
+export interface CurrentFileState {
+	// Normal Editor Mode
+	group: FileView[]; // 열린 탭들
+	active: FileView | null; // 현재 활성 탭
+	activeIndex: number | null; // 활성 탭 index
+
+	// Diff Mode
+	diff: DiffView | null;
+
+	// Flags
+	isDiffMode: boolean;
+}
+
+/* ============================================================
+ * 초기 상태
+ * ============================================================ */
+const initialState: CurrentFileState = {
+	group: [],
+	active: null,
+	activeIndex: null,
+	diff: null,
+	isDiffMode: false
+};
+
+/* ============================================================
+ * Store
+ * ============================================================ */
+
 function createCurrentFileStore() {
-	const { subscribe, set, update } = writable<CurrentFileState>({
-		active: { file: null, content: null },
-		right: null,
-		isDiffMode: false,
-		group: [],
-		activeIndex: null
-	});
+	const { subscribe, set, update } = writable<CurrentFileState>(initialState);
 
 	return {
 		subscribe,
 
-		/** ✅ 단일 파일 열기 (EditorPage) */
+		/* --------------------------------------------------------
+		 * 1) 단일 파일 열기
+		 * ------------------------------------------------------ */
 		open(file: FileNode) {
 			update((s) => {
-				const existingIndex = s.group.findIndex((g) => g.file?.id === file.id);
+				// Diff 모드 → 종료
+				if (s.isDiffMode) s = { ...initialState };
+
+				// 이미 열린 탭인지 확인
+				const existingIndex = s.group.findIndex((g) => g.file.id === file.id);
+
+				// 이미 열린 탭이면 해당 탭 활성화
 				if (existingIndex !== -1) {
 					return {
 						...s,
 						activeIndex: existingIndex,
 						active: s.group[existingIndex],
-						isDiffMode: false
+						isDiffMode: false,
+						diff: null
 					};
 				}
 
+				// 새 탭 생성
 				const newView: FileView = { file, content: null };
-				return {
-					...s,
-					group: [...s.group, newView],
-					active: newView,
-					activeIndex: s.group.length,
-					isDiffMode: false
-				};
-			});
-		},
+				const newGroup = [...s.group, newView];
 
-		/** ✅ 파일 내용 갱신 */
-		setContent(content: string) {
-			update((s) => {
-				if (s.activeIndex === null) return s;
-				const updated = [...s.group];
-				const current = updated[s.activeIndex];
-				if (current) current.content = content;
-				return { ...s, group: updated, active: current };
-			});
-		},
-
-		/** ✅ 탭 전환 */
-		switchTab(index: number) {
-			update((s) => {
-				if (index < 0 || index >= s.group.length) return s;
-				return { ...s, activeIndex: index, active: s.group[index], isDiffMode: false };
-			});
-		},
-
-		/** ✅ 탭 닫기 */
-		closeTab(index: number) {
-			update((s) => {
-				if (index < 0 || index >= s.group.length) return s;
-				const newGroup = s.group.filter((_, i) => i !== index);
-				const newActiveIndex = Math.min(index, newGroup.length - 1);
 				return {
 					...s,
 					group: newGroup,
-					activeIndex: newGroup.length ? newActiveIndex : null,
-					active: newGroup[newActiveIndex] ?? { file: null, content: null }
+					active: newView,
+					activeIndex: newGroup.length - 1,
+					isDiffMode: false,
+					diff: null
 				};
 			});
 		},
 
-		/** ✅ Diff 비교 모드 진입 */
+		/* --------------------------------------------------------
+		 * 2) 파일 내용 갱신
+		 * ------------------------------------------------------ */
+		setContent(content: string) {
+			update((s) => {
+				if (s.isDiffMode || s.activeIndex === null || s.active === null) return s;
+
+				const updatedGroup = s.group.map((view, idx) =>
+					idx === s.activeIndex ? { ...view, content } : view
+				);
+
+				return {
+					...s,
+					group: updatedGroup,
+					active: updatedGroup[s.activeIndex]
+				};
+			});
+		},
+
+		/* --------------------------------------------------------
+		 * 3) 탭 전환
+		 * ------------------------------------------------------ */
+		switchTab(index: number) {
+			update((s) => {
+				if (s.isDiffMode) return s; // diff 상태에서는 탭 전환 불가
+				if (index < 0 || index >= s.group.length) return s;
+
+				return {
+					...s,
+					activeIndex: index,
+					active: s.group[index]
+				};
+			});
+		},
+
+		/* --------------------------------------------------------
+		 * 4) 탭 닫기
+		 * ------------------------------------------------------ */
+		closeTab(index: number) {
+			update((s) => {
+				if (s.isDiffMode) return s; // diff 상태에서는 탭 수정 불가
+				if (index < 0 || index >= s.group.length) return s;
+
+				const newGroup = s.group.filter((_, i) => i !== index);
+
+				// activeIndex 계산
+				const newActiveIndex = newGroup.length === 0 ? null : Math.min(index, newGroup.length - 1);
+
+				return {
+					...s,
+					group: newGroup,
+					activeIndex: newActiveIndex,
+					active: newActiveIndex !== null ? newGroup[newActiveIndex] : null
+				};
+			});
+		},
+
+		/* --------------------------------------------------------
+		 * 5) Diff 비교 모드 진입
+		 * ------------------------------------------------------ */
 		openDiff(left: FileNode, right: FileNode) {
+			const leftView: FileView = { file: left, content: null };
+			const rightView: FileView = { file: right, content: null };
+
 			set({
-				active: { file: left, content: null },
-				right: { file: right, content: null },
+				group: [],
+				active: null,
+				activeIndex: null,
 				isDiffMode: true,
-				group: [],
-				activeIndex: null
+				diff: { left: leftView, right: rightView }
 			});
 		},
 
-		/** ✅ Compare 모드 종료 */
+		/* --------------------------------------------------------
+		 * 6) Diff 모드 종료 → normal 모드로 복귀
+		 * ------------------------------------------------------ */
 		exitDiff() {
-			update((s) => ({
-				...s,
-				right: null,
-				isDiffMode: false
-			}));
+			set(initialState);
 		},
 
-		/** ✅ 전체 닫기 */
+		/* --------------------------------------------------------
+		 * 7) 전체 초기화
+		 * ------------------------------------------------------ */
 		reset() {
-			set({
-				active: { file: null, content: null },
-				right: null,
-				isDiffMode: false,
-				group: [],
-				activeIndex: null
-			});
+			set(initialState);
 		}
 	};
 }

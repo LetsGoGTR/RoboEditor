@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { onMount, tick } from "svelte";
+
   let container: HTMLDivElement | null = null;
 
   export let initialLeftRatio: number = 50;
@@ -38,6 +40,10 @@
     window.removeEventListener('pointermove', handlePointerMove);
     window.removeEventListener('pointerup', handlePointerUp);
   };
+
+  onMount(async () => {
+    await tick();
+});
 </script>
 
 <div bind:this={container} class="split-container">

@@ -6,7 +6,7 @@
 	import ControllerDir from './ControllerDir.svelte';
 	import { onDestroy } from 'svelte';
 	import { currentFile } from '@/stores/currentFile';
-	import { gotoPage } from '@/stores/workspaces';
+	import { gotoPage } from '@/stores/currentPage';
 
 	let tree: TreeNode | null = $derived($fileTree);
 	let activeId: 'left' | 'right' = $state('left');
