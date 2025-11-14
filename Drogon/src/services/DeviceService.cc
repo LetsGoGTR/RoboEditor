@@ -6,7 +6,9 @@
 #include <iomanip>
 #include <sstream>
 
+#include "../utils/ConfigUtils.h"
 #include "../utils/JsonFileUtils.h"
+#include "../utils/PathValidator.h"
 #include "../utils/TimeUtils.h"
 #include "../utils/logging/Logger.h"
 
@@ -52,18 +54,24 @@ services::DeviceMetadata services::DeviceService::loadMetadata(const std::string
     return utils::loadJsonFromFile<DeviceMetadata>(metadataPath);
 }
 
-services::ServiceResult services::DeviceService::createDevice(const std::string    &baseDir,
-                                                              const DeviceMetadata &metadata)
+services::ServiceResult services::DeviceService::createDevice(const DeviceMetadata &metadata)
 {
-    // Validation
+    // Validate device ID
     if (metadata.id.empty()) {
         return ServiceResult::createError("Device ID cannot be empty");
     }
 
-    std::string devicePath = baseDir + metadata.id;
+    // Validate path for security
+    if (!utils::validatePath(metadata.id)) {
+        utils::logging::warn("Invalid device ID: " + metadata.id);
+        return ServiceResult::createError("Invalid device ID: " + metadata.id);
+    }
+
+    std::string devicePath = utils::config::getBaseDir() + metadata.id;
 
     // Check if device already exists
-    if (fs::exists(devicePath)) {
+    if (fs::exists(devicePath) && fs::is_directory(devicePath)) {
+        utils::logging::warn("Device already exists: " + metadata.id);
         return ServiceResult::createError("Device already exists: " + metadata.id);
     }
 
@@ -81,6 +89,7 @@ services::ServiceResult services::DeviceService::createDevice(const std::string 
         std::string metadataPath = devicePath + "/" + metadataFilename_;
         if (!utils::saveJsonToFile(metadataPath, newMetadata)) {
             fs::remove_all(devicePath);
+            utils::logging::error("Failed to save device metadata: " + metadata.id);
             return ServiceResult::createError("Failed to save metadata");
         }
 
@@ -98,13 +107,19 @@ services::ServiceResult services::DeviceService::createDevice(const std::string 
     }
 }
 
-services::ServiceResult services::DeviceService::readDevice(const std::string &baseDir,
-                                                            const std::string &deviceId)
+services::ServiceResult services::DeviceService::readDevice(const std::string &deviceId)
 {
-    std::string devicePath = baseDir + deviceId;
+    // Validate path for security
+    if (!utils::validatePath(deviceId)) {
+        utils::logging::warn("Invalid device ID: " + deviceId);
+        return ServiceResult::createError("Invalid device ID: " + deviceId);
+    }
 
-    // Validation
+    std::string devicePath = utils::config::getBaseDir() + deviceId;
+
+    // Check if device exists
     if (!fs::exists(devicePath) || !fs::is_directory(devicePath)) {
+        utils::logging::warn("Device not found: " + deviceId);
         return ServiceResult::createError("Device not found: " + deviceId);
     }
 
@@ -121,14 +136,20 @@ services::ServiceResult services::DeviceService::readDevice(const std::string &b
     return result;
 }
 
-services::ServiceResult services::DeviceService::updateDevice(const std::string    &baseDir,
-                                                              const std::string    &deviceId,
+services::ServiceResult services::DeviceService::updateDevice(const std::string    &deviceId,
                                                               const DeviceMetadata &metadata)
 {
-    std::string devicePath = baseDir + deviceId;
+    // Validate path for security
+    if (!utils::validatePath(deviceId)) {
+        utils::logging::warn("Invalid device ID: " + deviceId);
+        return ServiceResult::createError("Invalid device ID: " + deviceId);
+    }
 
-    // Validation
+    std::string devicePath = utils::config::getBaseDir() + deviceId;
+
+    // Check if device exists
     if (!fs::exists(devicePath) || !fs::is_directory(devicePath)) {
+        utils::logging::warn("Device not found: " + deviceId);
         return ServiceResult::createError("Device not found: " + deviceId);
     }
 
@@ -148,6 +169,7 @@ services::ServiceResult services::DeviceService::updateDevice(const std::string 
         // Save metadata
         std::string metadataPath = devicePath + "/" + metadataFilename_;
         if (!utils::saveJsonToFile(metadataPath, updatedMetadata)) {
+            utils::logging::error("Failed to save device metadata: " + deviceId);
             return ServiceResult::createError("Failed to save metadata");
         }
 
@@ -163,13 +185,19 @@ services::ServiceResult services::DeviceService::updateDevice(const std::string 
     }
 }
 
-services::ServiceResult services::DeviceService::deleteDevice(const std::string &baseDir,
-                                                              const std::string &deviceId)
+services::ServiceResult services::DeviceService::deleteDevice(const std::string &deviceId)
 {
-    std::string devicePath = baseDir + deviceId;
+    // Validate path for security
+    if (!utils::validatePath(deviceId)) {
+        utils::logging::warn("Invalid device ID: " + deviceId);
+        return ServiceResult::createError("Invalid device ID: " + deviceId);
+    }
 
-    // Validation
+    std::string devicePath = utils::config::getBaseDir() + deviceId;
+
+    // Check if device exists
     if (!fs::exists(devicePath) || !fs::is_directory(devicePath)) {
+        utils::logging::warn("Device not found: " + deviceId);
         return ServiceResult::createError("Device not found: " + deviceId);
     }
 
@@ -192,8 +220,10 @@ services::ServiceResult services::DeviceService::deleteDevice(const std::string 
     }
 }
 
-services::ServiceResult services::DeviceService::listDevices(const std::string &baseDir)
+services::ServiceResult services::DeviceService::listDevices()
 {
+    std::string baseDir = utils::config::getBaseDir();
+
     if (!fs::exists(baseDir)) {
         try {
             fs::create_directories(baseDir);

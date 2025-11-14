@@ -11,6 +11,15 @@ export default defineConfig({
 			publicPath: 'monaco'
 		})
 	],
+	server: {
+		proxy: {
+			'/proxy': {
+				target: 'http://localhost:8889',
+				changeOrigin: true,
+				rewrite: (path) => path.replace(/^\/proxy/, '')
+			}
+		}
+	},
 	ssr: {
 		noExternal: ['monaco-editor'] // SSR 번들에서 monaco 제외
 	},
@@ -52,6 +61,7 @@ export default defineConfig({
 			'@components': path.resolve(__dirname, './src/lib/components'),
 			'@layouts': path.resolve(__dirname, './src/lib/layouts'),
 			'@features': path.resolve(__dirname, './src/features'),
+			'@apis': path.resolve(__dirname, '/src/apis'),
 			'@routes': path.resolve(__dirname, './src/routes'),
 			'@utils': path.resolve(__dirname, './src/utils'),
 			'@styles': path.resolve(__dirname, './src/styles')

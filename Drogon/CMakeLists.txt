@@ -33,6 +33,10 @@ find_package(LibArchive REQUIRED)
 find_package(yaml-cpp REQUIRED)
 find_package(jsoncpp REQUIRED)
 add_subdirectory(external/libbcrypt)
+
+# Find libssh2 using pkg-config
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(LIBSSH2 REQUIRED libssh2)
 target_link_libraries(
     ${PROJECT_NAME}
     PRIVATE
@@ -40,6 +44,7 @@ target_link_libraries(
     yaml-cpp
     LibArchive::LibArchive
     bcrypt
+    ${LIBSSH2_LIBRARIES}
 )
 
 # ##############################################################################
@@ -60,6 +65,8 @@ aux_source_directory(src/services SERVICE_SRC)
 aux_source_directory(src/utils UTILS_SRC)
 aux_source_directory(src/utils/diff UTILS_DIFF_SRC)
 aux_source_directory(src/utils/logging UTILS_LOGGING_SRC)
+aux_source_directory(src/utils/robot UTILS_ROBOT_SRC)
+aux_source_directory(src/utils/sftp UTILS_SFTP_SRC)
 
 drogon_create_views(${PROJECT_NAME} ${CMAKE_CURRENT_SOURCE_DIR}/views
                     ${CMAKE_CURRENT_BINARY_DIR})
@@ -77,7 +84,8 @@ target_include_directories(${PROJECT_NAME}
                            ${CMAKE_CURRENT_SOURCE_DIR}/src
                            ${CMAKE_CURRENT_SOURCE_DIR}/models
                            ${CMAKE_CURRENT_SOURCE_DIR}/external/libbcrypt/include
-                           ${LibArchive_INCLUDE_DIRS})
+                           ${LibArchive_INCLUDE_DIRS}
+                           ${LIBSSH2_INCLUDE_DIRS})
 target_sources(${PROJECT_NAME}
                PRIVATE
                ${SRC_DIR}
@@ -89,4 +97,47 @@ target_sources(${PROJECT_NAME}
                ${UTILS_SRC}
                ${UTILS_DIFF_SRC}
                ${UTILS_LOGGING_SRC}
+               ${UTILS_ROBOT_SRC}
+               ${UTILS_SFTP_SRC}
 )
+
+
+#[[
+find_package(GTest REQUIRED)
+find_package(Threads REQUIRED)
+
+add_executable(test_diff_v4
+    test/test_diff_v4.cpp
+    src/utils/diff/DiffPython.cc
+    src/utils/diff/DiffYaml.cc
+    src/utils/diff/DiffTree.cc
+)
+
+target_link_libraries(test_diff_v4
+    PRIVATE
+    GTest::gtest                    # ✅ gtest 심볼
+    GTest::gtest_main               # ✅ main 제공
+    Threads::Threads                # ✅ (리눅스) gtest가 pthread 의존
+    Drogon::Drogon
+    yaml-cpp
+    LibArchive::LibArchive
+    bcrypt
+)
+
+if (TARGET JsonCpp::JsonCpp)
+    target_link_libraries(test_diff_v4 PRIVATE JsonCpp::JsonCpp)
+elseif (DEFINED jsoncpp_LIBRARIES)
+    target_include_directories(test_diff_v4 PRIVATE ${jsoncpp_INCLUDE_DIRS})
+    target_link_libraries(test_diff_v4 PRIVATE ${jsoncpp_LIBRARIES})
+endif()
+
+target_include_directories(test_diff_v4
+    PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/models
+    ${CMAKE_CURRENT_SOURCE_DIR}/external/libbcrypt/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/utils/diff
+    ${LibArchive_INCLUDE_DIRS}
+)
+]]

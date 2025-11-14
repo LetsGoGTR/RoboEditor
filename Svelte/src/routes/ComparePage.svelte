@@ -3,8 +3,6 @@
   import { browser } from '$app/environment';
   import * as monaco from 'monaco-editor/esm/vs/editor/editor.api'; // ✅ 직접 API 로드
   import { currentFile } from '@/stores/currentFile';
-  import { readTextFile } from '@/utils/FSA';
-  import { detectLanguage } from '@/utils/fileAction';
   import type { FileNode } from '@/types';
   import HorizontalSplit from '@layouts/HorizontalSplit.svelte';
 
@@ -15,12 +13,7 @@
 
   /** 파일 내용을 읽고 모델 생성 */
   async function createModel(file: FileNode | null) {
-    if (!file) return monaco.editor.createModel('', 'plaintext');
-    let text = '';
-    if (file.handle) text = (await readTextFile(file.handle)) ?? '';
-    else if (file.file) text = await file.file.text();
-    const lang = detectLanguage(file.name);
-    return monaco.editor.createModel(text, lang);
+    
   }
 
   onMount(() => {

@@ -15,7 +15,8 @@ const config = {
 		alias: {
 			'@components/*': 'src/lib/components/*',
 			'@layouts/*': 'src/lib/layouts/*',
-			'@features/*':'src/features/*',
+			'@apis/*': 'src/apis/*',
+			'@features/*': 'src/features/*',
 			'@routes/*': 'src/routes/*',
 			'@styles/*': 'src/styles/*',
 			'@utils/*': 'src/utils/*',

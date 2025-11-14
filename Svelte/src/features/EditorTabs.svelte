@@ -3,47 +3,61 @@
   import { currentFile } from '@/stores/currentFile';
   import { onDestroy, onMount, tick } from 'svelte';
   import type { FileNode } from '@/types';
-  import { readTextFile } from '@utils/FSA';
-  import { detectLanguage, saveFileAndRefresh } from '@utils/fileAction';
+
   import { getMonaco } from '@utils/monaco';
   import type * as monaco from 'monaco-editor';
 
-  // --- 상태 ---
+  // 🔥 서버 기반 파일 API
+  import { _getFile, _updateFile } from '@apis/file';
+  import { detectLanguage } from '@utils/fileAction';
+
   let container: HTMLDivElement | null = null;
   let editor: monaco.editor.IStandaloneCodeEditor | null = null;
   let monacoInstance: typeof monaco | null = null;
+
   let state = $derived($currentFile);
 
-  // --- 초기화 ---
+  /* ------------------------------------------------------------
+   * 초기화
+   * ------------------------------------------------------------ */
   onMount(async () => {
     monacoInstance = await getMonaco();
-    const activeFile = state.active.file;
+
+  const activeFile = state.active?.file;
     if (activeFile) await loadFile(activeFile);
   });
 
-  // --- 안전한 초기화 보장 ---
+  /* ------------------------------------------------------------
+   * 안전한 초기화 (Tab 전환 시 호출)
+   * ------------------------------------------------------------ */
   async function tryInitEditor() {
-    await tick(); // DOM 렌더 보장
-    const file = state.active.file;
+    await tick();
+    const file = state.active?.file;
     if (!file || !container || !monacoInstance) return;
     await loadFile(file);
   }
 
-  // --- 파일 로드 ---
+  /* ------------------------------------------------------------
+   * 파일 로드 (서버 기반)
+   * ------------------------------------------------------------ */
   async function loadFile(file: FileNode) {
     if (!monacoInstance || !container) return;
 
-    const text =
-      file.handle ? (await readTextFile(file.handle)) ?? '' : (await file.file?.text()) ?? '';
+    // 🔥 서버에서 파일 내용 요청
+    const res = await _getFile(file.path ?? '');
+    const text = res?.content ?? '';
 
     const language = detectLanguage(file.name);
     const model = monacoInstance.editor.createModel(text, language);
 
+    // 기존 에디터가 있으면 model 교체
     if (editor) {
       const prev = editor.getModel();
       if (prev) prev.dispose();
       editor.setModel(model);
-    } else {
+    } 
+    // 처음 생성
+    else {
       editor = monacoInstance.editor.create(container, {
         model,
         theme: 'vs-white',
@@ -51,43 +65,53 @@
         minimap: { enabled: false }
       });
 
-      editor.addCommand(monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyCode.KeyS, save);
+      // Ctrl+S 단축키
+      editor.addCommand(
+        monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyCode.KeyS,
+        save
+      );
     }
   }
 
-  // --- 파일 저장 ---
+  /* ------------------------------------------------------------
+   * 파일 저장 (서버)
+   * ------------------------------------------------------------ */
   async function save() {
-    const file = state.active.file;
+    const file = state.active?.file;
     if (!editor || !file) return;
 
     const content = editor.getValue();
-    const updated = await saveFileAndRefresh(file, content);
 
+    await _updateFile(file.path ?? '', { content });
+
+    // store 갱신
     currentFile.setContent(content);
-    currentFile.open(updated);
   }
 
-  // --- 탭 전환 ---
+  /* ------------------------------------------------------------
+   * Tab 전환 / 닫기
+   * ------------------------------------------------------------ */
   function handleSwitch(index: number) {
     currentFile.switchTab(index);
   }
 
-  // --- 탭 닫기 ---
   function handleClose(index: number) {
     currentFile.closeTab(index);
   }
 
-  // --- 파일 변경 감시 ---
+  // 파일 변경 감지
   $effect(() => {
-    const file = $currentFile.active.file;
-    if (file && monacoInstance) tryInitEditor();
-    else if (!file && editor) {
+    const file = $currentFile.active?.file;
+
+    if (file && monacoInstance) {
+      tryInitEditor();
+    } else if (!file && editor) {
       editor.dispose();
       editor = null;
     }
   });
 
-  // --- 컴포넌트 종료 ---
+  // 컴포넌트 제거
   onDestroy(() => {
     if (editor) {
       editor.dispose();
@@ -96,7 +120,6 @@
   });
 </script>
 
-<!-- Wrapping 구조 -->
 <div class="editor-tabs-root">
   <GroupTabs
     tabs={state.group
