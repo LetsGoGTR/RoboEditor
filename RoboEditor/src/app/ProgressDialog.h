@@ -9,10 +9,11 @@ class QProgressBar;
 class QPushButton;
 class QTimer;
 
-class ProgressDialog : public QDialog {
+class ProgressDialog : public QDialog
+{
     Q_OBJECT
-  public:
-    explicit ProgressDialog(QWidget *parent = nullptr);
+      public:
+        explicit ProgressDialog(QWidget *parent = nullptr);
 
     void setTotalCount(int total);
     void setCurrentIndex(int index);
@@ -22,24 +23,24 @@ class ProgressDialog : public QDialog {
     void setFinishedMode(bool finished);
     void reset();
 
-  signals:
-    void cancelRequested();
+      signals:
+        void cancelRequested();
 
-  private slots:
-    void updateElapsedTime();
+      private slots:
+        void updateElapsedTime();
 
-  private:
-    QLabel *serialLabel_;
-    QLabel *countLabel_;
-    QLabel *timeLabel_;
-    QLabel *statusLabel_;
-    QProgressBar *progressBar_;
-    QPushButton *cancelBtn_;
+      private:
+        QLabel       *serialLabel_;
+        QLabel       *countLabel_;
+        QLabel       *timeLabel_;
+        QLabel       *statusLabel_;
+        QProgressBar *progressBar_;
+        QPushButton  *cancelBtn_;
 
-    QElapsedTimer elapsed_;
-    QTimer *timer_;
-    int totalCount_ = 0;
-    int currentIndex_ = 0;
+        QElapsedTimer elapsed_;
+        QTimer       *timer_;
+        int           totalCount_   = 0;
+        int           currentIndex_ = 0;
 };
 
 #endif  // PROGRESSDIALOG_H

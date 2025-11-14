@@ -7,11 +7,15 @@
 #include <QVBoxLayout>
 
 #include "ControllerManager.h"
-#include "ui_BackupPage.h"
 #include "ProgressDialog.h"
-#include "ControllerManager.h"
+#include "ui_BackupPage.h"
 
-BackupPage::BackupPage(QWidget *parent) : QWidget(parent), ui(new Ui::BackupPage), totalBackupRequests_(0), completedBackupRequests_(0), failedBackupRequests_(0)
+BackupPage::BackupPage(QWidget *parent) :
+    QWidget(parent),
+    ui(new Ui::BackupPage),
+    totalBackupRequests_(0),
+    completedBackupRequests_(0),
+    failedBackupRequests_(0)
 {
     ui->setupUi(this);
     ui->ConfirmBtn->setEnabled(false);
@@ -33,11 +37,8 @@ BackupPage::BackupPage(QWidget *parent) : QWidget(parent), ui(new Ui::BackupPage
 
     // ControllerManager의 백업 완료/실패 시그널을 받도록 연결
     ControllerManager *manager = ControllerManager::instance();
-    connect(manager, &ControllerManager::backupCompleted,
-            this, &BackupPage::onBackupCompleted);
-    connect(manager, &ControllerManager::backupFailed,
-            this, &BackupPage::onBackupFailed);
-
+    connect(manager, &ControllerManager::backupCompleted, this, &BackupPage::onBackupCompleted);
+    connect(manager, &ControllerManager::backupFailed, this, &BackupPage::onBackupFailed);
 }
 
 BackupPage::~BackupPage() = default;
@@ -57,9 +58,9 @@ void BackupPage::confirmSelection()
     }
 
     // 백업 카운터 초기화
-    totalBackupRequests_ = selectedControllerList.size();
+    totalBackupRequests_     = selectedControllerList.size();
     completedBackupRequests_ = 0;
-    failedBackupRequests_ = 0;
+    failedBackupRequests_    = 0;
 
     qDebug() << "Backup to:" << selectedBackupDir;
 
@@ -91,7 +92,8 @@ void BackupPage::confirmSelection()
     backupProgressDialog_->show();
 
     // Disable controls during backup
-    if (ui->ConfirmBtn) ui->ConfirmBtn->setEnabled(false);
+    if (ui->ConfirmBtn)
+        ui->ConfirmBtn->setEnabled(false);
 
     // 각 선택된 제어기에 대해 SFTP 기반 백업 요청
     int idx = 0;
@@ -123,8 +125,6 @@ void BackupPage::confirmSelection()
             onBackupFailed(serialNumber, tr("백업 요청을 시작하지 못했습니다."));
         }
     }
-
-
 }
 
 void BackupPage::importAnySpace()
@@ -159,8 +159,8 @@ void BackupPage::onBackupCompleted(const QString &serialNumber)
         return;
 
     completedBackupRequests_++;
-    qDebug() << "[BackupPage] Backup completed:" << serialNumber
-             << "(" << completedBackupRequests_ << "/" << totalBackupRequests_ << ")";
+    qDebug() << "[BackupPage] Backup completed:" << serialNumber << "(" << completedBackupRequests_
+             << "/" << totalBackupRequests_ << ")";
 
     int doneCount = completedBackupRequests_ + failedBackupRequests_;
 
@@ -173,7 +173,6 @@ void BackupPage::onBackupCompleted(const QString &serialNumber)
     if (doneCount >= totalBackupRequests_) {
         // ProgressDialog 닫고 정리
         if (backupProgressDialog_) {
-
             backupProgressDialog_->setFinishedMode(true);
 
             if (failedBackupRequests_ == 0) {
@@ -189,7 +188,8 @@ void BackupPage::onBackupCompleted(const QString &serialNumber)
         }
 
         // 버튼 다시 활성화
-        if (ui->ConfirmBtn) ui->ConfirmBtn->setEnabled(true);
+        if (ui->ConfirmBtn)
+            ui->ConfirmBtn->setEnabled(true);
     }
 }
 
@@ -213,7 +213,6 @@ void BackupPage::onBackupFailed(const QString &serialNumber, const QString &erro
 
     // 모든 백업 처리 완료 시
     if (doneCount >= totalBackupRequests_) {
-
         backupProgressDialog_->setFinishedMode(true);
 
         // ProgressDialog 닫고 정리
@@ -222,10 +221,10 @@ void BackupPage::onBackupFailed(const QString &serialNumber, const QString &erro
                     QString("백업이 완료되었습니다.\n성공: %1대, 실패: %2대")
                             .arg(completedBackupRequests_)
                             .arg(failedBackupRequests_));
-
         }
 
         // 버튼 다시 활성화
-        if (ui->ConfirmBtn) ui->ConfirmBtn->setEnabled(true);
+        if (ui->ConfirmBtn)
+            ui->ConfirmBtn->setEnabled(true);
     }
 }
