@@ -1,28 +1,46 @@
 #include "FileTransferService.h"
 
+#include <algorithm>
 #include <ctime>
 #include <drogon/HttpClient.h>
+#include <drogon/utils/Utilities.h>
 #include <filesystem>
 #include <iomanip>
 #include <sstream>
 
+#include "../services/DeviceService.h"
+#include "../services/WorkspaceService.h"
+#include "../utils/TimeUtils.h"
 #include "../utils/logging/Logger.h"
 
 namespace fs = std::filesystem;
 
-services::ServiceResult FileTransferService::backupFromRemote(const SFTPConfig  &sftpConfig,
-                                                               const std::string &user,
-                                                               const std::string &remotePath,
-                                                               const std::string &localPath,
-                                                               const std::string &api)
+services::ServiceResult FileTransferService::backupFromRemote(const std::string &deviceId,
+                                                              const std::string &password,
+                                                              const std::string &remotePath)
 {
-    std::string downloadPath;
-
     try {
-        utils::logging::info("원격 백업 다운로드 시작: user=" + user + ", remote=" + remotePath);
+        utils::logging::info("원격 백업 다운로드 시작: deviceId=" + deviceId +
+                             ", remote=" + remotePath);
 
-        // 1. 먼저 원격 서버의 workspace compress API 호출
-        std::string apiUrl = api.empty() ? ("https://" + sftpConfig.host) : api;
+        // 1. Device 정보 조회
+        auto deviceResult = services::DeviceService::readDevice(deviceId);
+        if (!deviceResult.success) {
+            return services::ServiceResult::createError("Device not found: " + deviceId);
+        }
+
+        // 2. Device metadata에서 SFTP 및 API 정보 추출
+        std::string api          = deviceResult.data["api"].asString();
+        std::string sftpHost     = deviceResult.data["sftpHost"].asString();
+        int         sftpPort     = deviceResult.data["sftpPort"].asInt();
+        std::string sftpPassword = deviceResult.data["sftpPassword"].asString();
+        std::string sftpUser     = deviceResult.data["sftpUser"].asString();
+
+        utils::logging::info("Device info: api=" + api + ", sftpHost=" + sftpHost +
+                             ", sftpUser=" + sftpUser);
+
+        // 3. 원격 서버의 workspace compress API 호출
+        std::string apiUrl = api.empty() ? ("https://" + sftpHost) : api;
         utils::logging::info("원격 서버 압축 API 호출: " + apiUrl + "/api/workspace/compress");
 
         auto client = drogon::HttpClient::newHttpClient(apiUrl);
@@ -31,165 +49,128 @@ services::ServiceResult FileTransferService::backupFromRemote(const SFTPConfig  
         req->setPath("/api/workspace/compress");
 
         Json::Value body;
-        body["user"] = user;
+        body["user"] = sftpUser;
         req->setBody(body.toStyledString());
         req->setContentTypeCode(drogon::CT_APPLICATION_JSON);
 
         std::promise<bool> compressPromise;
         auto               compressFuture = compressPromise.get_future();
 
-        client->sendRequest(req, [&compressPromise](drogon::ReqResult                result,
-                                                     const drogon::HttpResponsePtr &response) {
-            if (result != drogon::ReqResult::Ok) {
-                utils::logging::error("원격 압축 API 호출 실패: 네트워크 오류");
-                compressPromise.set_value(false);
-                return;
-            }
+        client->sendRequest(req,
+                            [&compressPromise](drogon::ReqResult              result,
+                                               const drogon::HttpResponsePtr &response) {
+                                if (result != drogon::ReqResult::Ok) {
+                                    utils::logging::error("원격 압축 API 호출 실패: 네트워크 오류");
+                                    compressPromise.set_value(false);
+                                    return;
+                                }
 
-            if (response->getStatusCode() != drogon::k200OK) {
-                std::string errorMsg = "원격 압축 API 실패: HTTP " +
-                                       std::to_string(response->getStatusCode());
+                                if (response->getStatusCode() != drogon::k200OK) {
+                                    std::string errorMsg =
+                                            "원격 압축 API 실패: HTTP " +
+                                            std::to_string(response->getStatusCode());
 
-                // 응답 본문에서 에러 메시지 추출
-                auto jsonResponse = response->getJsonObject();
-                if (jsonResponse && jsonResponse->isMember("error")) {
-                    errorMsg += " - " + (*jsonResponse)["error"].asString();
-                } else {
-                    // JSON이 아니면 body 텍스트 출력
-                    auto body = response->getBody();
-                    if (!body.empty() && body.size() < 200) {
-                        errorMsg += " - " + std::string(body);
-                    }
-                }
+                                    auto jsonResponse = response->getJsonObject();
+                                    if (jsonResponse && jsonResponse->isMember("error")) {
+                                        errorMsg += " - " + (*jsonResponse)["error"].asString();
+                                    } else {
+                                        auto body = response->getBody();
+                                        if (!body.empty() && body.size() < 200) {
+                                            errorMsg += " - " + std::string(body);
+                                        }
+                                    }
 
-                utils::logging::error(errorMsg);
-                compressPromise.set_value(false);
-                return;
-            }
+                                    utils::logging::error(errorMsg);
+                                    compressPromise.set_value(false);
+                                    return;
+                                }
 
-            auto jsonResponse = response->getJsonObject();
-            if (!jsonResponse || !jsonResponse->isMember("success")) {
-                utils::logging::error("원격 압축 API 응답 형식 오류");
-                compressPromise.set_value(false);
-                return;
-            }
+                                auto jsonResponse = response->getJsonObject();
+                                if (!jsonResponse || !jsonResponse->isMember("success")) {
+                                    utils::logging::error("원격 압축 API 응답 형식 오류");
+                                    compressPromise.set_value(false);
+                                    return;
+                                }
 
-            bool success = (*jsonResponse)["success"].asBool();
-            if (success) {
-                utils::logging::info("원격 서버 압축 성공");
-            } else {
-                utils::logging::error("원격 서버 압축 실패");
-            }
-            compressPromise.set_value(success);
-        });
+                                bool success = (*jsonResponse)["success"].asBool();
+                                if (success) {
+                                    utils::logging::info("원격 서버 압축 성공");
+                                } else {
+                                    utils::logging::error("원격 서버 압축 실패");
+                                }
+                                compressPromise.set_value(success);
+                            });
 
         bool compressSuccess = compressFuture.get();
         if (!compressSuccess) {
             return services::ServiceResult::createError("원격 서버 압축 실패");
         }
 
-        // 2. SFTP 연결
+        // 4. SFTP 연결
+        SFTPConfig sftpConfig(sftpHost, sftpPort, sftpUser, sftpPassword);
         SFTPClient sftpClient(sftpConfig);
         if (!sftpClient.connect()) {
-            return services::ServiceResult::createError("SFTP 연결 실패: " + sftpClient.getLastError());
+            return services::ServiceResult::createError("SFTP 연결 실패: " +
+                                                        sftpClient.getLastError());
         }
 
-        // 3. 원격 파일 경로 구성
-        std::string fullRemotePath;
-        if (remotePath.find('/') == std::string::npos) {
-            // remotePath가 단순 이름이면 /home/{user}/ 경로 추가
-            // "workspace" -> "/home/{user}/workspace.tgz"
-            if (remotePath == "workspace") {
-                fullRemotePath = "/home/" + user + "/workspace.tgz";
-            } else if (remotePath.find('.') == std::string::npos) {
-                // 확장자가 없으면 .tgz 추가
-                fullRemotePath = "/home/" + user + "/" + remotePath + ".tgz";
-            } else {
-                fullRemotePath = "/home/" + user + "/" + remotePath;
-            }
-        } else {
-            // 이미 경로가 포함되어 있으면 그대로 사용
-            fullRemotePath = remotePath;
-        }
-
+        // 5. 원격 파일 경로 구성
+        std::string fullRemotePath = "/home/" + sftpUser + "/" + remotePath;
         utils::logging::info("원격 파일 전체 경로: " + fullRemotePath);
 
-        // 4. 다운로드 경로 결정
-        if (localPath.empty()) {
-            // localPath가 없으면 임시 파일로 다운로드
-            auto               now = std::time(nullptr);
-            auto               tm  = *std::localtime(&now);
-            std::ostringstream oss;
-            oss << std::put_time(&tm, "%Y%m%d_%H%M%S");
-            downloadPath = "/tmp/backup_" + oss.str() + ".tgz";
-        } else {
-            // localPath가 디렉토리인지 확인
-            bool isDirectory = false;
-            if (localPath.back() == '/') {
-                // '/'로 끝나면 디렉토리
-                isDirectory = true;
-            } else if (fs::exists(localPath) && fs::is_directory(localPath)) {
-                // 이미 존재하는 디렉토리
-                isDirectory = true;
-            } else if (localPath.find('.') == std::string::npos ||
-                       localPath.find('.') < localPath.find_last_of('/')) {
-                // 확장자가 없거나, 마지막 '/' 이후에 '.'이 없으면 디렉토리로 간주
-                isDirectory = true;
-            }
-
-            if (isDirectory) {
-                // 디렉토리이면 파일명 추가
-                downloadPath = localPath;
-                if (downloadPath.back() != '/') {
-                    downloadPath += "/";
-                }
-                downloadPath += "workspace.tgz";
-            } else {
-                downloadPath = localPath;
-            }
+        // 6. 임시 디렉토리에 다운로드
+        std::string tempDir = "/tmp/backup_";
+        if (!fs::exists(tempDir)) {
+            fs::create_directories(tempDir);
         }
 
-        // 5. localPath의 디렉토리가 존재하는지 확인하고 생성
-        if (!localPath.empty()) {
-            fs::path dirPath = fs::path(downloadPath).parent_path();
-            if (!dirPath.empty() && !fs::exists(dirPath)) {
-                try {
-                    fs::create_directories(dirPath);
-                    utils::logging::info("로컬 디렉토리 생성: " + dirPath.string());
-                } catch (const std::exception &e) {
-                    return services::ServiceResult::createError(
-                            "로컬 디렉토리 생성 실패: " + std::string(e.what()));
-                }
-            }
-        }
+        std::string tempFile = tempDir + drogon::utils::getUuid() + ".tar.gz";
 
-        // 6. SFTP로 파일 다운로드
-        utils::logging::info("파일 다운로드 시작: " + fullRemotePath + " -> " + downloadPath);
-        if (!sftpClient.downloadFile(fullRemotePath, downloadPath)) {
+        // 7. SFTP로 파일 다운로드
+        utils::logging::info("파일 다운로드 시작: " + fullRemotePath + " -> " + tempFile);
+        if (!sftpClient.downloadFile(fullRemotePath, tempFile)) {
             return services::ServiceResult::createError("파일 다운로드 실패: " +
                                                         sftpClient.getLastError());
         }
 
-        utils::logging::info("파일 다운로드 성공: " + downloadPath);
+        utils::logging::info("파일 다운로드 성공: " + tempFile);
 
-        // 7. 다운로드한 파일이 존재하는지 확인
-        if (!fs::exists(downloadPath) || !fs::is_regular_file(downloadPath)) {
+        // 8. 다운로드한 파일이 존재하는지 확인
+        if (!fs::exists(tempFile) || !fs::is_regular_file(tempFile)) {
             return services::ServiceResult::createError("다운로드한 파일이 존재하지 않음: " +
-                                                        downloadPath);
+                                                        tempFile);
         }
 
-        services::ServiceResult result;
-        result.success                = true;
-        result.data["downloadPath"]   = downloadPath;
-        result.data["remotePath"]     = fullRemotePath;
-        result.data["status"]         = "downloaded";
+        // 9. workspace 메타데이터 생성
+        std::string workspaceUuid = drogon::utils::getUuid();
+        std::string timestamp     = utils::getCurrentTimestamp();
+        std::string timestampStr  = timestamp.substr(0, 19);  // YYYY-MM-DDTHH:MM:SS
+        std::replace(timestampStr.begin(), timestampStr.end(), 'T', '_');
+        std::replace(timestampStr.begin(), timestampStr.end(), ':', '-');
+        std::string workspaceName = deviceId + "_" + timestampStr;
 
-        if (!localPath.empty()) {
-            result.data["localPath"] = localPath;
+        services::WorkspaceMetadata metadata;
+        metadata.uuid        = workspaceUuid;
+        metadata.target      = deviceId;
+        metadata.name        = workspaceName;
+        metadata.description = "backup from " + deviceId;
+        metadata.createdAt   = timestamp;
+        metadata.updatedAt   = timestamp;
+
+        // 10. workspace로 import
+        auto importResult =
+                services::WorkspaceService::importWorkspace(tempFile, metadata, deviceId);
+
+        // 11. 임시 파일 삭제
+        fs::remove(tempFile);
+
+        if (!importResult.success) {
+            return services::ServiceResult::createError("Failed to import workspace: " +
+                                                        importResult.errorMessage);
         }
 
-        utils::logging::info("원격 백업 다운로드 완료");
-        return result;
+        utils::logging::info("원격 백업 완료: " + deviceId + " (Workspace: " + workspaceUuid + ")");
+        return importResult;
 
     } catch (const std::exception &e) {
         utils::logging::error("원격 백업 다운로드 중 오류: " + std::string(e.what()));
@@ -198,43 +179,86 @@ services::ServiceResult FileTransferService::backupFromRemote(const SFTPConfig  
     }
 }
 
-services::ServiceResult FileTransferService::applyWorkspace(const std::string &uploadedFilePath,
-                                                            const std::string &user,
-                                                            const std::string &password,
-                                                            const std::string &sftpPassword,
-                                                            const std::string &sftpHost,
-                                                            int                sftpPort,
-                                                            const std::string &api)
+services::ServiceResult FileTransferService::applyWorkspace(const std::string &workspaceId,
+                                                            const std::string &password)
 {
     try {
-        utils::logging::info("워크스페이스 복원 시작 (HTTP 업로드): user=" + user +
-                             ", file=" + uploadedFilePath);
+        utils::logging::info("워크스페이스 적용 시작: workspaceId=" + workspaceId);
 
-        // 업로드된 파일이 존재하는지 확인
-        if (!fs::exists(uploadedFilePath) || !fs::is_regular_file(uploadedFilePath)) {
-            return services::ServiceResult::createError("업로드된 파일이 존재하지 않음: " +
-                                                        uploadedFilePath);
+        // 1. Workspace 정보 조회
+        auto workspaceResult = services::WorkspaceService::readWorkspace(workspaceId, "");
+        if (!workspaceResult.success) {
+            return services::ServiceResult::createError("Workspace not found: " + workspaceId);
         }
 
-        // SFTP로 원격 서버에 파일 업로드
-        SFTPConfig sftpConfig(sftpHost, sftpPort, user, sftpPassword);
+        // 2. Workspace의 target (deviceId) 추출
+        std::string deviceId = workspaceResult.data["target"].asString();
+        if (deviceId.empty()) {
+            return services::ServiceResult::createError("Workspace has no target device");
+        }
+
+        utils::logging::info("Workspace target device: " + deviceId);
+
+        // 3. Device 정보 조회
+        auto deviceResult = services::DeviceService::readDevice(deviceId);
+        if (!deviceResult.success) {
+            return services::ServiceResult::createError("Device not found: " + deviceId);
+        }
+
+        // 4. Device metadata에서 SFTP 및 API 정보 추출
+        std::string api          = deviceResult.data["api"].asString();
+        std::string sftpHost     = deviceResult.data["sftpHost"].asString();
+        int         sftpPort     = deviceResult.data["sftpPort"].asInt();
+        std::string sftpPassword = deviceResult.data["sftpPassword"].asString();
+        std::string sftpUser     = deviceResult.data["sftpUser"].asString();
+
+        utils::logging::info("Device info: api=" + api + ", sftpHost=" + sftpHost +
+                             ", sftpUser=" + sftpUser);
+
+        // 5. 임시 디렉토리에 workspace export
+        std::string tempDir = "/tmp/apply_";
+        if (!fs::exists(tempDir)) {
+            fs::create_directories(tempDir);
+        }
+
+        std::string tempFile = tempDir + drogon::utils::getUuid() + ".tar.gz";
+
+        // 6. Workspace export
+        auto exportResult =
+                services::WorkspaceService::exportWorkspace(workspaceId, tempFile, deviceId);
+
+        if (!exportResult.success) {
+            fs::remove(tempFile);
+            return services::ServiceResult::createError("Failed to export workspace: " +
+                                                        exportResult.errorMessage);
+        }
+
+        // 7. SFTP로 원격 서버에 파일 업로드
+        SFTPConfig sftpConfig(sftpHost, sftpPort, sftpUser, sftpPassword);
         SFTPClient sftpClient(sftpConfig);
 
         if (!sftpClient.connect()) {
-            return services::ServiceResult::createError("SFTP 연결 실패: " + sftpClient.getLastError());
+            fs::remove(tempFile);
+            return services::ServiceResult::createError("SFTP 연결 실패: " +
+                                                        sftpClient.getLastError());
         }
 
-        std::string remotePath = "/home/" + user + "/workspace.tgz";
-        utils::logging::info("SFTP 파일 업로드 시작: " + uploadedFilePath + " -> " + remotePath);
+        std::string remotePath = "/home/" + sftpUser + "/workspace.tgz";
+        utils::logging::info("SFTP 파일 업로드 시작: " + tempFile + " -> " + remotePath);
 
-        if (!sftpClient.uploadFile(uploadedFilePath, remotePath)) {
-            return services::ServiceResult::createError("SFTP 파일 업로드 실패: " + sftpClient.getLastError());
+        if (!sftpClient.uploadFile(tempFile, remotePath)) {
+            fs::remove(tempFile);
+            return services::ServiceResult::createError("SFTP 파일 업로드 실패: " +
+                                                        sftpClient.getLastError());
         }
 
         utils::logging::info("SFTP 파일 업로드 성공");
 
-        // Workspace Extract API 호출하여 압축 해제
-        auto [success, errorMsg] = extractWorkspace(user, password, api);
+        // 8. 임시 파일 삭제
+        fs::remove(tempFile);
+
+        // 9. Workspace Extract API 호출하여 압축 해제
+        auto [success, errorMsg] = extractWorkspace(sftpUser, password, api);
         if (!success) {
             return services::ServiceResult::createError(errorMsg);
         }
@@ -242,22 +266,25 @@ services::ServiceResult FileTransferService::applyWorkspace(const std::string &u
         utils::logging::info("워크스페이스 압축 해제 성공");
 
         services::ServiceResult result;
-        result.success        = true;
-        result.data["status"] = "success";
+        result.success             = true;
+        result.data["status"]      = "success";
+        result.data["workspaceId"] = workspaceId;
+        result.data["target"]      = deviceId;
 
-        utils::logging::info("워크스페이스 복원 완료");
+        utils::logging::info("워크스페이스 적용 완료: " + deviceId + " (Workspace: " + workspaceId +
+                             ")");
         return result;
 
     } catch (const std::exception &e) {
-        utils::logging::error("워크스페이스 복원 중 오류: " + std::string(e.what()));
-        return services::ServiceResult::createError("워크스페이스 복원 실패: " +
+        utils::logging::error("워크스페이스 적용 중 오류: " + std::string(e.what()));
+        return services::ServiceResult::createError("워크스페이스 적용 실패: " +
                                                     std::string(e.what()));
     }
 }
 
 std::pair<bool, std::string> FileTransferService::extractWorkspace(const std::string &user,
-                                                                    const std::string &password,
-                                                                    const std::string &api)
+                                                                   const std::string &password,
+                                                                   const std::string &api)
 {
     try {
         utils::logging::info("Workspace 압축 해제 API 호출 준비: user=" + user);
@@ -277,49 +304,50 @@ std::pair<bool, std::string> FileTransferService::extractWorkspace(const std::st
         std::promise<std::pair<bool, std::string>> promise;
         auto                                       future = promise.get_future();
 
-        client->sendRequest(req, [&promise](drogon::ReqResult                result,
-                                            const drogon::HttpResponsePtr &response) {
-            if (result != drogon::ReqResult::Ok) {
-                std::string error = "Workspace 압축 해제 API 호출 실패: 네트워크 오류";
-                utils::logging::error(error);
-                promise.set_value({false, error});
-                return;
-            }
+        client->sendRequest(
+                req, [&promise](drogon::ReqResult result, const drogon::HttpResponsePtr &response) {
+                    if (result != drogon::ReqResult::Ok) {
+                        std::string error = "Workspace 압축 해제 API 호출 실패: 네트워크 오류";
+                        utils::logging::error(error);
+                        promise.set_value({false, error});
+                        return;
+                    }
 
-            int statusCode = response->getStatusCode();
-            if (statusCode != drogon::k200OK) {
-                std::string error;
-                if (statusCode == drogon::k401Unauthorized) {
-                    error = "인증 실패: 비밀번호가 올바르지 않습니다";
-                } else {
-                    error = "Workspace 압축 해제 API 실패: HTTP " + std::to_string(statusCode);
-                }
-                utils::logging::error(error);
-                promise.set_value({false, error});
-                return;
-            }
+                    int statusCode = response->getStatusCode();
+                    if (statusCode != drogon::k200OK) {
+                        std::string error;
+                        if (statusCode == drogon::k401Unauthorized) {
+                            error = "인증 실패: 비밀번호가 올바르지 않습니다";
+                        } else {
+                            error = "Workspace 압축 해제 API 실패: HTTP " +
+                                    std::to_string(statusCode);
+                        }
+                        utils::logging::error(error);
+                        promise.set_value({false, error});
+                        return;
+                    }
 
-            auto jsonResponse = response->getJsonObject();
-            if (!jsonResponse || !jsonResponse->isMember("success")) {
-                std::string error = "Workspace 압축 해제 API 응답 형식 오류";
-                utils::logging::error(error);
-                promise.set_value({false, error});
-                return;
-            }
+                    auto jsonResponse = response->getJsonObject();
+                    if (!jsonResponse || !jsonResponse->isMember("success")) {
+                        std::string error = "Workspace 압축 해제 API 응답 형식 오류";
+                        utils::logging::error(error);
+                        promise.set_value({false, error});
+                        return;
+                    }
 
-            bool success = (*jsonResponse)["success"].asBool();
-            if (success) {
-                utils::logging::info("Workspace 압축 해제 성공");
-                promise.set_value({true, ""});
-            } else {
-                std::string error = "Workspace 압축 해제 실패";
-                if (jsonResponse->isMember("error")) {
-                    error = (*jsonResponse)["error"].asString();
-                }
-                utils::logging::error(error);
-                promise.set_value({false, error});
-            }
-        });
+                    bool success = (*jsonResponse)["success"].asBool();
+                    if (success) {
+                        utils::logging::info("Workspace 압축 해제 성공");
+                        promise.set_value({true, ""});
+                    } else {
+                        std::string error = "Workspace 압축 해제 실패";
+                        if (jsonResponse->isMember("error")) {
+                            error = (*jsonResponse)["error"].asString();
+                        }
+                        utils::logging::error(error);
+                        promise.set_value({false, error});
+                    }
+                });
 
         return future.get();
 

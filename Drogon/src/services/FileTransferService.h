@@ -10,25 +10,17 @@
 class FileTransferService
 {
   public:
-    // 원격에서 백업 다운로드 (SFTP)
-    services::ServiceResult backupFromRemote(const SFTPConfig  &sftpConfig,
-                                             const std::string &user,
-                                             const std::string &remotePath,
-                                             const std::string &localPath,
-                                             const std::string &api = "");
+    // 원격에서 백업 다운로드
+    services::ServiceResult backupFromRemote(const std::string &deviceId,
+                                             const std::string &password,
+                                             const std::string &remotePath);
 
-    // 워크스페이스 복원 (HTTP 업로드)
-    services::ServiceResult applyWorkspace(const std::string &uploadedFilePath,
-                                           const std::string &user,
-                                           const std::string &password,
-                                           const std::string &sftpPassword,
-                                           const std::string &sftpHost,
-                                           int                sftpPort,
-                                           const std::string &api);
+    // 워크스페이스 적용
+    services::ServiceResult applyWorkspace(const std::string &workspaceId,
+                                           const std::string &password);
 
   private:
     // Workspace API 호출 메서드
-    std::pair<bool, std::string> extractWorkspace(const std::string &user,
-                                                   const std::string &password,
-                                                   const std::string &api);
+    std::pair<bool, std::string>
+    extractWorkspace(const std::string &user, const std::string &password, const std::string &api);
 };
