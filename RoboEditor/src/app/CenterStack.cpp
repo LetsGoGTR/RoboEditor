@@ -318,10 +318,11 @@ void CenterStack::updateControllerList()
         QStandardItem *item = new QStandardItem(c.serialNumber);
         item->setEditable(false);
         item->setData(QString("C:/backup/%1").arg(c.serialNumber), Qt::UserRole + 1);
-        item->setToolTip(QString("IP: %1\nSFTP: %2\nAPI: %3\nUser: %4\nWorkspace: %5")
+        item->setToolTip(QString("IP: %1\nSFTP: %2\nUser: %3\nWorkspace: %4")
                                  .arg(c.ip)
                                  .arg(c.sftpPort)
-                                 .arg(c.username));
+                                 .arg(c.username)
+                                 .arg(c.wsPath));
 
         QColor iconColor;
         if (!c.isConnected) {
