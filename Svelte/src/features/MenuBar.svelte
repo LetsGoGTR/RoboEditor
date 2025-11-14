@@ -1,10 +1,8 @@
 <script lang="ts">
 	import { currentFile } from '@/stores/currentFile';
 	import { fileTree } from '@/stores/fileTree';
-	import { gotoPage } from '@/stores/workspaces';
+	import { gotoPage } from '@/stores/currentPage';
 	import type { FileNode } from '@/types';
-	import { createNewFileNode } from '@/utils/fileAction';
-	import { createFolderWithDialog, openDirectory, openFile, readDirectory } from '@/utils/FSA';
 
 	let dialog: HTMLDialogElement;
 
@@ -18,8 +16,7 @@
 			return;
 		}
 
-		// ✅ FSA: 사용자에게 비교 대상(right) 파일 선택 요청
-		const rightHandle = await openFile();
+		// const rightHandle = await openFile();
 		if (!rightHandle) {
 			dialog.showModal();
 			return;

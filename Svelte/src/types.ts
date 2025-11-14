@@ -15,53 +15,107 @@ export interface TabItem {
 	path?: string | null;
 }
 
-// Business Items
-// File System Types for FSA API + Fallback
-export type NodeType = 'folder' | 'file';
+/* ============================================================
+ * Business Items
+ * ============================================================ */
 
-interface BaseNode {
+/* ============================================================
+ * 1. 기본 타입 정의
+ * ============================================================ */
+
+export type NodeType = 'directory' | 'file';
+
+/** 모든 노드가 공통으로 가지는 속성 */
+export interface BaseNode {
 	id: string;
 	name: string;
 	type: NodeType;
-	path: string | null; // "src/routes/main.svelte", 새 파일인 경우 null
-	parentId?: string | null; // 상위 폴더 참조
-	checked?: boolean; // 선택용 (UI 상태)
+	path: string | null; // 루트 기준 상대 경로
+	parentId?: string | null; // 상위 폴더 id
+	checked?: boolean; // UI 선택 용도
 }
 
-export interface FolderNode extends BaseNode {
-	type: 'folder';
-	children: TreeNode[];
-	handle?: FileSystemDirectoryHandle; // ✅ FSA 전용 핸들 (디렉토리)
-	kind?: 'directory'; // FSA 호환 속성 (선택)
-}
+/* ============================================================
+ * 2. 파일(Files)
+ * ============================================================ */
 
 export interface FileNode extends BaseNode {
 	type: 'file';
-	size?: number;
-	lastModified?: number; // epoch ms (File.lastModified)
-	contentRef?: string; // IndexedDB나 Blob URL 참조 시 사용
-	handle?: FileSystemFileHandle; // ✅ FSA 전용 핸들 (파일)
-	file?: File; // fallback 모드에서 직접 참조
-	kind?: 'file'; // FSA 호환 속성 (선택)
+	size?: number; // byte
+	lastModified?: number; // epoch ms
+}
+
+export interface FileDetail extends FileNode {
+	content: string;
+}
+
+/* ============================================================
+ * 3. 폴더(Folders)
+ * ============================================================ */
+
+export interface FolderNode extends BaseNode {
+	type: 'directory';
+	children: TreeNode[]; // 재귀 구조
 }
 
 export type TreeNode = FolderNode | FileNode;
 
-// Controller Types
-export interface Controller extends FolderNode {
-	serialNumber: string;
-	state: 'idle' | 'active' | 'error' | 'disconnected';
-	ipAddress: string;
-	sftpPort: number;
-	// apiPort: number;
-	workspaces: FolderNode[]; // 1-depth 폴더 목록
+/* ============================================================
+ * 4. 워크스페이스(Workspace) — Drogon Workspace API 기반
+ * ============================================================ */
+
+export interface WorkspaceMeta {
+	id: string;
+	name: string;
+	target?: string | null;
+	description?: string | null;
+	createdAt: string;
+	updatedAt: string;
 }
+
+export interface Workspace extends FolderNode {
+	workspaceMeta: WorkspaceMeta;
+}
+
+/* ============================================================
+ * 5. 컨트롤러(Controller) — Device API + 트리 구조 통합
+ * ============================================================ */
+
+export type ControllerState = 'idle' | 'active' | 'error' | 'disconnected';
+
+export interface ControllerMeta {
+	id: string; // device-id
+	name: string;
+	serialNumber: string;
+	description?: string | null;
+
+	ipAddress?: string;
+	sftpPort?: number;
+
+	state: ControllerState;
+}
+
+/**
+ * Controller는 폴더처럼 트리 구조를 가지며(FolderNode),
+ * 그 안에 controllerMeta와 workspaces가 추가됩니다.
+ */
+export interface Controller extends FolderNode {
+	controllerMeta: ControllerMeta;
+	workspaces: Workspace[];
+}
+
+/* ============================================================
+ * 6. 백업 루트(BackupRoot)
+ * ============================================================ */
 
 export interface BackupRoot extends FolderNode {
 	controllers: Controller[];
 }
 
-// Differences Checks Types
+/* ============================================================
+ * 7. Diff 타입 — Monaco Diff 및 Drogon Diff API 기반
+ * ============================================================ */
+
 export type DiffState = 'ADDED' | 'REMOVED' | 'CHANGED';
 export type DiffFilter = 'ALL' | DiffState;
 
@@ -71,4 +125,9 @@ export interface DiffItem {
 	leftValue: string;
 	rightValue: string;
 	state: DiffState;
+}
+
+export interface WorkspaceDiffResult {
+	success: boolean;
+	diff: DiffItem[];
 }

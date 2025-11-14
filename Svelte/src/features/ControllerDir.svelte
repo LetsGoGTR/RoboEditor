@@ -1,15 +1,13 @@
 <script lang="ts">
-	import { openDirectory } from '@/utils/FSA';
 	import type { FolderNode } from '@/types';
   import { fileTree } from '@/stores/fileTree';
 
 	let backupTree: FolderNode | null = null;
-	let errorMsg = '';
 
 	/** config/controllers.json 파일 존재 여부 확인 */
 	function hasConfigControllers(folder: FolderNode): boolean {
 		const configFolder = folder.children?.find(
-			(child) => child.type === 'folder' && child.name === 'config'
+			(child) => child.type === 'directory' && child.name === 'config'
 		);
 
 		if (!configFolder) return false;
@@ -19,24 +17,6 @@
 		);
 
 		return !!controllersFile;
-	}
-
-	async function handleOpenBackup() {
-		errorMsg = '';
-		const tree = await openDirectory();
-
-		if (!tree || tree.type !== 'folder') {
-			alert('폴더를 열 수 없습니다.');
-			return;
-		}
-
-		if (hasConfigControllers(tree)) {
-			backupTree = tree;
-			console.log('Valid backup folder loaded:', tree.name);
-		} else {
-			alert('유효한 백업 폴더가 아닙니다.');
-			backupTree = null;
-		}
 	}
 
 	function handleWorkspaceSelect(ws: FolderNode) {
@@ -49,7 +29,7 @@
 	{#if backupTree}
 		<ul class="controller-list" role="list">
 			{#each backupTree.children as controller (controller.id)}
-				{#if controller.type === 'folder'}
+				{#if controller.type === 'directory'}
 					<li>
 						<details>
 							<summary class="controller-btn">
@@ -58,7 +38,7 @@
 
 							<ul class="workspace-list" role="list">
 								{#each controller.children as ws (ws.id)}
-									{#if ws.type === 'folder'}
+									{#if ws.type === 'directory'}
 										<li>
 											<button
 												type="button"
@@ -78,9 +58,6 @@
 		</ul>
 	{:else}
     <p class="notice">아직 백업 폴더를 열지 않았습니다.</p>
-		<button on:click={handleOpenBackup} class="open-btn">
-			📁 Open Backup Folder
-		</button>
 	{/if}
 </div>
 

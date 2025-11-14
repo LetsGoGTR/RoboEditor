@@ -1,10 +1,9 @@
 import { writable } from 'svelte/store';
-import type { TreeNode } from '@/types';
-import { openDirectory } from '@/utils/FSA';
+import type { FolderNode } from '@/types';
 
-export const fileTree = writable<TreeNode | null>(null);
+export const fileTree = writable<FolderNode | null>(null);
 
-export async function loadDirectoryToStore() {
-	const result = await openDirectory();
-	if (result) fileTree.set(result);
+// 선택적으로 reset 기능
+export function resetFileTree() {
+	fileTree.set(null);
 }
