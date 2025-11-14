@@ -28,9 +28,6 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 
     wire();
 
-    // 이전 세션의 설정 복원
-    //loadSettings();
-
     statusBar()->showMessage("UI Ready");
 }
 
@@ -155,49 +152,5 @@ void MainWindow::wire()
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
-    saveSettings();
     QMainWindow::closeEvent(event);
-}
-
-void MainWindow::saveSettings()
-{
-    // config 폴더 경로 설정
-    QString configDir = "C:/backup/config";
-    QDir    dir;
-    if (!dir.exists(configDir)) {
-        dir.mkpath(configDir);
-    }
-
-}
-
-void MainWindow::loadSettings()
-{
-    QString configFile = "C:/backup/config/settings.ini";
-
-    // 설정 파일이 없으면 복원하지 않음
-    if (!QFile::exists(configFile)) {
-        return;
-    }
-
-    QSettings settings(configFile, QSettings::IniFormat);
-
-    // 윈도우 크기와 위치 복원
-    if (settings.contains("MainWindow/geometry")) {
-        restoreGeometry(settings.value("MainWindow/geometry").toByteArray());
-    }
-
-    // 독 위젯과 툴바 상태 복원
-    if (settings.contains("MainWindow/windowState")) {
-        restoreState(settings.value("MainWindow/windowState").toByteArray());
-    }
-
-    // CenterStack의 Splitter 상태 복원
-    if (center_ && settings.contains("CenterStack/splitterState")) {
-        center_->restoreSplitterState(settings.value("CenterStack/splitterState").toByteArray());
-    }
-
-    // ModifyPage의 Splitter 상태 복원은 ComparePage 생성 시에만 수행
-    // (ComparePage가 없을 때 복원하면 ComparePage 생성 시 충돌 발생)
-    // ModifyPage의 기본 splitter 상태는 ComparePage 없을 때의 상태이므로
-    // ComparePage가 열릴 때 자동으로 복원됨
 }

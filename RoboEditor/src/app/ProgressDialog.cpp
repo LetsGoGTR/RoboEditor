@@ -1,12 +1,13 @@
 #include "ProgressDialog.h"
-#include <QVBoxLayout>
+
+#include <QTimer>
+
 #include <QLabel>
 #include <QProgressBar>
 #include <QPushButton>
-#include <QTimer>
+#include <QVBoxLayout>
 
-ProgressDialog::ProgressDialog(QWidget *parent)
-    : QDialog(parent)
+ProgressDialog::ProgressDialog(QWidget *parent) : QDialog(parent)
 {
     setWindowTitle("진행 중...");
     resize(400, 180);
@@ -30,12 +31,10 @@ ProgressDialog::ProgressDialog(QWidget *parent)
     layout->addWidget(statusLabel_);
     layout->addWidget(cancelBtn_);
 
-    connect(cancelBtn_, &QPushButton::clicked,
-            this, &ProgressDialog::cancelRequested);
+    connect(cancelBtn_, &QPushButton::clicked, this, &ProgressDialog::cancelRequested);
 
     timer_ = new QTimer(this);
-    connect(timer_, &QTimer::timeout,
-            this, &ProgressDialog::updateElapsedTime);
+    connect(timer_, &QTimer::timeout, this, &ProgressDialog::updateElapsedTime);
     timer_->start(1000);
     elapsed_.start();
 }
@@ -82,12 +81,13 @@ void ProgressDialog::setFinishedMode(bool finished)
         cancelBtn_->setText("닫기");
         setWindowTitle("백업 완료");
 
-        if (timer_) timer_->stop();
-    }
-    else {
+        if (timer_)
+            timer_->stop();
+    } else {
         // 진행 모드
         cancelBtn_->setText("취소");
         setWindowTitle("진행 중...");
-        if (timer_) timer_->start(1000);
+        if (timer_)
+            timer_->start(1000);
     }
 }
