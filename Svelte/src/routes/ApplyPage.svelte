@@ -3,7 +3,7 @@
   import { dummyController } from '@/testData';
 	import type { TreeNode } from '@/types';
   import FileExplorer from '@features/FileExplorer.svelte';
-  import ApplyDialog from '@features/dialogs.svelte';
+  import ApplyDialog from '@features/ApplyDialog.svelte';
   
   let selected = $state<string[]>([]);
   let showBackupOnly = $state(false);

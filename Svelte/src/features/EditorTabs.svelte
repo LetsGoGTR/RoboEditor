@@ -9,7 +9,7 @@
 
   // 🔥 서버 기반 파일 API
   import { _createFile, _getFile, _updateFile } from '@apis/file';
-  import { detectLanguage } from '@utils/fileAction';
+  import { detectLanguage } from '@utils/nodeAction';
 
   let container: HTMLDivElement | null = null;
   let editor: monaco.editor.IStandaloneCodeEditor | null = null;
@@ -43,22 +43,25 @@
   async function loadFile(file: FileNode) {
     if (!monacoInstance || !container) return;
 
-    // 🔥 서버에서 파일 내용 요청
-    const res = await _getFile(file.path ?? '');
-    console.log(res);
-    const text = res.data.content ?? '';
+    let text = '';
+
+    // 신규 파일: 서버 로딩 금지
+    if (!file.path) {
+      text = '';
+    } else {
+      // 기존 파일: 서버에서 내용 가져오기
+      const res = await _getFile(file.path);
+      text = res?.data?.content ?? '';
+    }
 
     const language = detectLanguage(file.name);
     const model = monacoInstance.editor.createModel(text, language);
 
-    // 기존 에디터가 있으면 model 교체
     if (editor) {
       const prev = editor.getModel();
       if (prev) prev.dispose();
       editor.setModel(model);
-    } 
-    // 처음 생성
-    else {
+    } else {
       editor = monacoInstance.editor.create(container, {
         model,
         theme: 'vs-white',
@@ -66,7 +69,6 @@
         minimap: { enabled: false }
       });
 
-      // Ctrl+S 단축키
       editor.addCommand(
         monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyCode.KeyS,
         save

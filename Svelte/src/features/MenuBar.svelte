@@ -1,59 +1,95 @@
 <script lang="ts">
 	import { currentFile } from '@/stores/currentFile';
-	import { fileTree, insertFolderNode, refreshFileTree } from '@/stores/fileTree';
+	import {  fileTree, insertFileNode, insertFolderNode } from '@/stores/fileTree';
 	import { gotoPage } from '@/stores/currentPage';
-	import type { FileNode } from '@/types';
 	import { _createFolder } from '@apis/folder';
 	import { selectedDirectory } from '@/stores/selectedDirectory';
 	import { get } from 'svelte/store';
+	import type { FileNode, FolderNode } from '@/types';
+	import SaveDialog from './NewFileDialog.svelte';
+	import { _createFile } from '@apis/file';
 
 	let dialog: HTMLDialogElement;
+	let showNewFile = $state(false);
+	let root = $derived(fileTree);
 
-	
-	async function handleCompare() {
+	// async function handleCompare() {
 
-		// ✅ diff 모드 진입
-		currentFile.openDiff(left, right);
-		gotoPage('compare');
-	}
+	// 	// ✅ diff 모드 진입
+	// 	currentFile.openDiff(left, right);
+	// 	gotoPage('compare');
+	// }
 
 	function handleApply() { gotoPage('apply'); }
 	function handleBackup() { gotoPage('backup'); }
 	function handleRegister() { gotoPage('register'); }
 
-	// create a new file
-export async function handleNewFolder() {
-  const parent = get(selectedDirectory);
-  if (!parent) return alert('상위 폴더를 선택하세요.');
+	function handleNewFile() {
+    if (!root) return alert("워크스페이스가 없습니다.");
+    showNewFile = true;
+  }
 
-  const name = prompt('새 폴더 이름:');
-  if (!name?.trim()) return;
+	async function createNewFile(payload: { name: string; folder: FolderNode }) {
+    const { name, folder } = payload;
 
-  const clean = name.trim();
+    const newPath = `${folder.path}/${name}`;
 
-  // 경로 구성 시 trailing slash는 시스템 규칙에 맞게 유지
-  const newPath = `${parent.path}/${clean}/`;
+		const resp = await _createFile(newPath, ""); // 초기 content는 빈 문자열
+		if (!resp?.success) {
+			return alert("파일 생성 중 오류가 발생했습니다.");
+		}
 
-  // 1) 서버 폴더 생성
-  await _createFolder(newPath);
+    // 신규 파일 노드 생성
+    const newFile: FileNode = {
+      id: crypto.randomUUID(),
+      name,
+      type: "file",
+      path: newPath,
+      size: 0,
+      lastModified: Date.now(),
+    };
 
-  // 2) store 내부 트리 부분 갱신
-	if (!parent.path) return console.error('상위 폴더 경로 관련 오류가 발생하였습니다.');
-  insertFolderNode(parent.path, {
-    id: crypto.randomUUID(),
-    name: clean,
-    type: 'directory',
-    path: newPath,
-    children: []
-  });
+		// 3) fileTree 트리에 삽입
+		if (folder.path) insertFileNode(folder.path, newFile);
+
+    // Editor 탭 열기
+    currentFile.open(newFile);
+    gotoPage("edit");
+  }
+
+	// create a new folder
+	export async function handleNewFolder() {
+		const parent = get(selectedDirectory);
+		if (!parent) return alert('상위 폴더를 선택하세요.');
+
+		const name = prompt('새 폴더 이름:');
+		if (!name?.trim()) return;
+
+		const clean = name.trim();
+
+		// 경로 구성 시 trailing slash는 시스템 규칙에 맞게 유지
+		const newPath = `${parent.path}/${clean}/`;
+
+		// 1) 서버 폴더 생성
+		await _createFolder(newPath);
+
+		// 2) store 내부 트리 부분 갱신
+		if (!parent.path) return console.error('상위 폴더 경로 관련 오류가 발생하였습니다.');
+		insertFolderNode(parent.path, {
+			id: crypto.randomUUID(),
+			name: clean,
+			type: 'directory',
+			path: newPath,
+			children: []
+		});
 }
 
 	// 백업 폴더 불러오기
-	async function handleOpenBackup() {
-		const tree = await openDirectory();
-		if (tree && tree.type === 'folder') fileTree.set(tree);
-		console.log('workspace selected:', fileTree);
-	}
+	// async function handleOpenBackup() {
+	// 	const tree = await openDirectory();
+	// 	if (tree && tree.type === 'folder') fileTree.set(tree);
+	// 	console.log('workspace selected:', fileTree);
+	// }
 </script>
 
 <!-- 비교 대상 폴더 없음 -->
@@ -72,7 +108,7 @@ export async function handleNewFolder() {
 				<li><button onclick={handleNewFolder}>새 폴더</button></li>
 				<li><hr /></li>
 				<li><button onclick={handleNewFolder}>파일 열기</button></li>
-				<li><button onclick={handleOpenBackup}>백업 폴더 열기</button></li>
+				<li><button >백업 폴더 열기</button></li>
 				<li><hr /></li>
 				<li><button>저장</button></li>
 				<li><button>다른 이름으로 저장</button></li>
@@ -81,7 +117,7 @@ export async function handleNewFolder() {
 		<li>
 			<span>도구</span>
 			<ul class="dropdown">
-				<li><button onclick={handleCompare}>비교</button></li>
+				<li><button >비교</button></li>
 			</ul>
 		</li>
 		<li>
@@ -95,6 +131,13 @@ export async function handleNewFolder() {
 		<li><span>설정</span></li>
 	</ul>
 </div>
+
+<SaveDialog
+  bind:open={showNewFile}
+  root={$fileTree}
+  onConfirm={createNewFile}
+  onCancel={() => (showNewFile = false)}
+/>
 
 <style>
 	/* dialog styles */

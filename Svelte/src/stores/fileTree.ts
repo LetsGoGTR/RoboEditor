@@ -1,5 +1,5 @@
 import { writable } from 'svelte/store';
-import type { FolderNode } from '@/types';
+import type { FileNode, FolderNode } from '@/types';
 
 export const fileTree = writable<FolderNode | null>(null);
 
@@ -11,6 +11,30 @@ export function setFileTree(tree: FolderNode) {
 /** 전체 초기화 */
 export function resetFileTree() {
 	fileTree.set(null);
+}
+
+/* 특정 경로에 File 삽입 */
+export function insertFileNode(parentPath: string, newFile: FileNode) {
+  fileTree.update((root) => {
+    if (!root) return root;
+
+    function dfs(node: FolderNode): boolean {
+      if (node.path === parentPath) {
+        node.children = [...node.children, newFile];
+        return true;
+      }
+
+      for (const child of node.children) {
+        if (child.type === "directory") {
+          if (dfs(child)) return true;
+        }
+      }
+      return false;
+    }
+
+    dfs(root);
+    return root;
+  });
 }
 
 /** 특정 경로에 새 FolderNode 삽입 (부분 갱신) */
