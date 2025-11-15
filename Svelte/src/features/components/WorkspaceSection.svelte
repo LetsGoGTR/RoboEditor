@@ -8,8 +8,10 @@
 	import { currentFile } from '@/stores/currentFile';
 	import { gotoPage } from '@/stores/currentPage';
 	import { selectedDirectory } from '@/stores/selectedDirectory';
+	import { get } from 'svelte/store';
 
-	let tree: TreeNode | null = $derived($fileTree);
+	let tree = $derived(get(fileTree));
+
 	let activeId: 'left' | 'right' = $state('left');
 
 	// 파일 클릭 시 store 저장 및 routing
@@ -24,14 +26,16 @@
 
 	// workspace 감지
 	const unsubscribe = fileTree.subscribe((value) => {
+		tree = value;
 		if (value) activeId = 'right';
 	});
-	onDestroy(unsubscribe);
 
 	// 수동 클릭 대응
 	function handleTabChange(id: 'left' | 'right') {
 		activeId = id;
 	}
+
+	onDestroy(unsubscribe);
 </script>
 
 <TabLayout

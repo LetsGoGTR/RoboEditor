@@ -1,16 +1,18 @@
 <script lang="ts">
-	import { currentFile } from '@/stores/currentFile';
-	import {  fileTree, insertFileNode, insertFolderNode } from '@/stores/fileTree';
+	import {  fileTree, insertFolderNode } from '@/stores/fileTree';
 	import { gotoPage } from '@/stores/currentPage';
 	import { _createFolder } from '@apis/folder';
 	import { selectedDirectory } from '@/stores/selectedDirectory';
 	import { get } from 'svelte/store';
-	import type { FileNode, FolderNode } from '@/types';
 	import SaveDialog from './NewFileDialog.svelte';
 	import { _createFile } from '@apis/file';
+	import { handleCreateFile, handleDeleteFile, handleDeleteFolder } from '@handlers/handlers/nodeActions';
+	import DeleteDialog from './DeleteDialog.svelte';
+	import type { TreeNode } from '@/types';
 
 	let dialog: HTMLDialogElement;
 	let showNewFile = $state(false);
+	let showDelete = $state(false);
 	let root = $derived(fileTree);
 
 	// async function handleCompare() {
@@ -23,38 +25,18 @@
 	function handleApply() { gotoPage('apply'); }
 	function handleBackup() { gotoPage('backup'); }
 	function handleRegister() { gotoPage('register'); }
-
 	function handleNewFile() {
     if (!root) return alert("워크스페이스가 없습니다.");
     showNewFile = true;
   }
 
-	async function createNewFile(payload: { name: string; folder: FolderNode }) {
-    const { name, folder } = payload;
+	function handleDelete() {
+    showDelete = true;
+  }
 
-    const newPath = `${folder.path}/${name}`;
-
-		const resp = await _createFile(newPath, ""); // 초기 content는 빈 문자열
-		if (!resp?.success) {
-			return alert("파일 생성 중 오류가 발생했습니다.");
-		}
-
-    // 신규 파일 노드 생성
-    const newFile: FileNode = {
-      id: crypto.randomUUID(),
-      name,
-      type: "file",
-      path: newPath,
-      size: 0,
-      lastModified: Date.now(),
-    };
-
-		// 3) fileTree 트리에 삽입
-		if (folder.path) insertFileNode(folder.path, newFile);
-
-    // Editor 탭 열기
-    currentFile.open(newFile);
-    gotoPage("edit");
+	function confirmDelete(node: TreeNode) {
+    if (node.type === "file") handleDeleteFile(node);
+    else if (node.type === "directory") handleDeleteFolder(node);
   }
 
 	// create a new folder
@@ -82,7 +64,7 @@
 			path: newPath,
 			children: []
 		});
-}
+	}
 
 	// 백업 폴더 불러오기
 	// async function handleOpenBackup() {
@@ -110,6 +92,8 @@
 				<li><button onclick={handleNewFolder}>파일 열기</button></li>
 				<li><button >백업 폴더 열기</button></li>
 				<li><hr /></li>
+				<li><button onclick={handleDelete}>파일 또는 폴더 삭제</button></li>
+				<li><hr /></li>
 				<li><button>저장</button></li>
 				<li><button>다른 이름으로 저장</button></li>
 			</ul>
@@ -135,8 +119,15 @@
 <SaveDialog
   bind:open={showNewFile}
   root={$fileTree}
-  onConfirm={createNewFile}
+  onConfirm={handleCreateFile}
   onCancel={() => (showNewFile = false)}
+/>
+
+<DeleteDialog
+  bind:open={showDelete}
+  root={$fileTree}
+  onConfirm={confirmDelete}
+  onCancel={() => (showDelete = false)}
 />
 
 <style>
@@ -198,12 +189,22 @@
 		position: relative;
 	}
 
-	ul > li > span,
-	ul > li > button {
+	ul > li > span {
 		font-size: 16px;
 		cursor: pointer;
 		display: block;
 		padding: 10px 20px;
+		color: #fff;
+		text-decoration: none;
+		background: none;
+		border: none;
+	}
+
+	ul > li > button {
+		font-size: 14px;
+		cursor: pointer;
+		display: block;
+		padding: 6px 12px;
 		color: #fff;
 		text-decoration: none;
 		background: none;
@@ -220,7 +221,7 @@
 	}
 
 	ul > li > hr {
-		margin: 2px 0;
+		margin: 1px 0;
 		padding: 0;
 	}
 

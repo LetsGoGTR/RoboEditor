@@ -15,26 +15,26 @@ export function resetFileTree() {
 
 /* 특정 경로에 File 삽입 */
 export function insertFileNode(parentPath: string, newFile: FileNode) {
-  fileTree.update((root) => {
-    if (!root) return root;
+	fileTree.update((root) => {
+		if (!root) return root;
 
-    function dfs(node: FolderNode): boolean {
-      if (node.path === parentPath) {
-        node.children = [...node.children, newFile];
-        return true;
-      }
+		function dfs(node: FolderNode): boolean {
+			if (node.path === parentPath) {
+				node.children = [...node.children, newFile];
+				return true;
+			}
 
-      for (const child of node.children) {
-        if (child.type === "directory") {
-          if (dfs(child)) return true;
-        }
-      }
-      return false;
-    }
+			for (const child of node.children) {
+				if (child.type === 'directory') {
+					if (dfs(child)) return true;
+				}
+			}
+			return false;
+		}
 
-    dfs(root);
-    return root;
-  });
+		dfs(root);
+		return root;
+	});
 }
 
 /** 특정 경로에 새 FolderNode 삽입 (부분 갱신) */
@@ -58,6 +58,56 @@ export function insertFolderNode(parentPath: string, newNode: FolderNode) {
 
 		dfs(root);
 		return root;
+	});
+}
+
+/** 트리에서 파일 노드를 제거 */
+export function removeFileNode(targetPath: string) {
+	fileTree.update((root) => {
+		if (!root) return root;
+
+		function dfs(folder: FolderNode): FolderNode {
+			folder.children = folder.children.filter((child) => {
+				if (child.type === 'file') {
+					return child.path !== targetPath; // 삭제
+				}
+				if (child.type === 'directory') {
+					dfs(child); // 재귀 탐색
+				}
+				return true;
+			});
+
+			return folder;
+		}
+
+		return dfs(root);
+	});
+}
+
+/** 폴더 및 하위 전체 제거 */
+export function removeFolderNode(targetPath: string) {
+	fileTree.update((root) => {
+		if (!root) return root;
+
+		function dfs(folder: FolderNode): FolderNode {
+			folder.children = folder.children.filter((child) => {
+				// 폴더 삭제 대상
+				if (child.type === 'directory' && child.path === targetPath) {
+					return false;
+				}
+
+				// 재귀 탐색
+				if (child.type === 'directory') {
+					dfs(child);
+				}
+
+				return true;
+			});
+
+			return folder;
+		}
+
+		return dfs(root);
 	});
 }
 
