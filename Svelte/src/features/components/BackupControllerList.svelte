@@ -29,13 +29,13 @@
     <div class="controller-row">
       <input
         type="checkbox"
-        checked={selectedIds.has(c.serialNumber)}
-        disabled={!isSelectable(c.state)}
-        onchange={() => toggleSelection(c.serialNumber)}
+        checked={selectedIds.has(c.controllerMeta.serialNumber)}
+        disabled={!isSelectable(c.controllerMeta.state)}
+        onchange={() => toggleSelection(c.controllerMeta.serialNumber)}
       />
       <ControllerItem
         controller={c}
-        selected={isSelected(c.serialNumber)}
+        selected={isSelected(c.controllerMeta.serialNumber)}
       />
     </div>
   {/each}

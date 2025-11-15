@@ -1,8 +1,4 @@
-import type { FolderNode,  } from '@/types';
-
-/**====================================
- *  1. 공통 Utils
- * ====================================  */
+import type { FolderNode } from '@/types';
 
 const DEV_BASE_ROUTE = '/tmp/drogon-app/storage/';
 const REL_BASE_ROUTE = 'C:/backup/';
@@ -31,10 +27,10 @@ export function detectLanguage(name: string): string {
 			return 'yaml';
 		case 'json':
 			return 'json';
-    case 'py':
-    case 'pts':
-    case 'srl':
-      return 'python';
+		case 'py':
+		case 'pts':
+		case 'srl':
+			return 'python';
 		case 'ts':
 			return 'typescript';
 		case 'js':
@@ -56,48 +52,48 @@ function extractNameFromPath(path: string) {
  * 재귀 폴더 트리 로딩 (backend 응답: directories[], files[])
  */
 export async function fetchFolderTreeRecursively(
-  subPath: string,
-  fetchFn: (path: string) => Promise<any>
+	subPath: string,
+	fetchFn: (path: string) => Promise<any>
 ): Promise<FolderNode> {
-  const raw = await fetchFn(subPath);
+	const raw = await fetchFn(subPath);
 
-  const dirs = raw.data?.directories ?? [];
-  const files = raw.data?.files ?? [];
+	const dirs = raw.data?.directories ?? [];
+	const files = raw.data?.files ?? [];
 
-  // 🔥 base 제거된 path 사용
-  const cleanSubPath = stripBaseRoute(subPath);
+	// 🔥 base 제거된 path 사용
+	const cleanSubPath = stripBaseRoute(subPath);
 
-  const folderNode: FolderNode = {
-    id: crypto.randomUUID(),
-    name: extractNameFromPath(cleanSubPath),
-    type: 'directory',
-    path: cleanSubPath,
-    children: []
-  };
+	const folderNode: FolderNode = {
+		id: crypto.randomUUID(),
+		name: extractNameFromPath(cleanSubPath),
+		type: 'directory',
+		path: cleanSubPath,
+		children: []
+	};
 
-  /** 파일 추가 */
-  for (const f of files) {
-    const cleanFilePath = stripBaseRoute(f.path);
+	/** 파일 추가 */
+	for (const f of files) {
+		const cleanFilePath = stripBaseRoute(f.path);
 
-    folderNode.children.push({
-      id: crypto.randomUUID(),
-      name: f.name,
-      type: 'file',
-      path: cleanFilePath,
-      size: f.size ?? 0,
-      lastModified: f.lastModified ?? 0
-    });
-  }
+		folderNode.children.push({
+			id: crypto.randomUUID(),
+			name: f.name,
+			type: 'file',
+			path: cleanFilePath,
+			size: f.size ?? 0,
+			lastModified: f.lastModified ?? 0
+		});
+	}
 
-  /** 디렉토리 재귀 */
-  for (const d of dirs) {
-    // drogon이 절대경로 반환하므로 반드시 base 제거
-    const nextFull = subPath + `/${d.name}`;
-    const cleanNext = stripBaseRoute(nextFull);
+	/** 디렉토리 재귀 */
+	for (const d of dirs) {
+		// drogon이 절대경로 반환하므로 반드시 base 제거
+		const nextFull = subPath + `/${d.name}`;
+		const cleanNext = stripBaseRoute(nextFull);
 
-    const child = await fetchFolderTreeRecursively(cleanNext, fetchFn);
-    folderNode.children.push(child);
-  }
+		const child = await fetchFolderTreeRecursively(cleanNext, fetchFn);
+		folderNode.children.push(child);
+	}
 
-  return folderNode;
+	return folderNode;
 }
