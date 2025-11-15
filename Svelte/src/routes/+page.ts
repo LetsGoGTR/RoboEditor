@@ -1,4 +1,4 @@
-import { fetchFolderTreeRecursively } from '@utils/fileAction';
+import { fetchFolderTreeRecursively } from '@utils/nodeAction';
 import type { PageLoad } from './$types';
 import { fileTree } from '@/stores/fileTree';
 import { _getFolder } from '@apis/folder';

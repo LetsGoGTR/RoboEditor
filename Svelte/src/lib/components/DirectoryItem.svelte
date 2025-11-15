@@ -79,6 +79,16 @@ summary, .file {
   padding: 2px 4px;
   border-radius: 4px;
 }
+summary:hover,
+.file:hover {
+  background-color: rgba(0, 0, 0, 0.07);
+}
+
+summary:active,
+.file:active {
+  background-color: rgba(0, 0, 0, 0.12);
+}
+
 .icon {
   width: 1.2rem;
   text-align: center;

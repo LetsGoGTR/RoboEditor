@@ -1,56 +1,8 @@
-import type { FolderNode, FileNode } from '@/types';
-import { _updateFile } from '@apis/file';
+import type { FolderNode,  } from '@/types';
 
-// 확장자 별 언어 감지
-export function detectLanguage(name: string): string {
-	const ext = name.split('.').pop()?.toLowerCase() ?? '';
-	switch (ext) {
-		case 'yaml':
-		case 'yml':
-			return 'yaml';
-		case 'json':
-			return 'json';
-		case 'ts':
-			return 'typescript';
-		case 'js':
-			return 'javascript';
-		case 'cpp':
-		case 'h':
-			return 'cpp';
-		default:
-			return 'plaintext';
-	}
-}
-
-/**
- * 서버 기반 파일 저장 함수
- * - file.path 기준으로 서버가 파일 생성 or 수정
- */
-export async function saveFile(file: FileNode, content: string): Promise<FileNode> {
-	if (!file || !file.path) {
-		throw new Error('FileNode 또는 파일 경로가 올바르지 않습니다.');
-	}
-
-	try {
-		// 🔥 서버에 업데이트 요청
-		const res = await _updateFile(file.path, { content });
-
-		// 서버 응답으로 최신 메타데이터 갱신
-		const updated: FileNode = {
-			...file,
-			lastModified: Date.now(),
-			size: content.length,
-			// 서버가 반환한 값 우선 적용
-			...res
-		};
-
-		console.info(`💾 저장 완료: ${updated.path}`);
-		return updated;
-	} catch (err) {
-		console.error('❌ 파일 저장 중 오류:', err);
-		throw err;
-	}
-}
+/**====================================
+ *  1. 공통 Utils
+ * ====================================  */
 
 const DEV_BASE_ROUTE = '/tmp/drogon-app/storage/';
 const REL_BASE_ROUTE = 'C:/backup/';
@@ -68,6 +20,36 @@ export function stripBaseRoute(fullPath: string): string {
 		return fullPath.substring(REL_BASE_ROUTE.length);
 	}
 	return fullPath; // prefix가 없으면 그대로
+}
+
+// 확장자 별 언어 감지
+export function detectLanguage(name: string): string {
+	const ext = name.split('.').pop()?.toLowerCase() ?? '';
+	switch (ext) {
+		case 'yaml':
+		case 'yml':
+			return 'yaml';
+		case 'json':
+			return 'json';
+    case 'py':
+    case 'pts':
+    case 'srl':
+      return 'python';
+		case 'ts':
+			return 'typescript';
+		case 'js':
+			return 'javascript';
+		case 'cpp':
+		case 'h':
+			return 'cpp';
+		default:
+			return 'plaintext';
+	}
+}
+
+function extractNameFromPath(path: string) {
+	if (!path || path === '/') return '/';
+	return path.split('/').filter(Boolean).pop() ?? path;
 }
 
 /**
@@ -118,9 +100,4 @@ export async function fetchFolderTreeRecursively(
   }
 
   return folderNode;
-}
-
-function extractNameFromPath(path: string) {
-	if (!path || path === '/') return '/';
-	return path.split('/').filter(Boolean).pop() ?? path;
 }

@@ -30,7 +30,7 @@ export interface BaseNode {
 	id: string;
 	name: string;
 	type: NodeType;
-	path: string | null; // 루트 기준 상대 경로
+	path: string | null; // 절대 경로
 	parentId?: string | null; // 상위 폴더 id
 	checked?: boolean; // UI 선택 용도
 }
