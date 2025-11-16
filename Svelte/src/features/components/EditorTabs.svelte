@@ -8,7 +8,7 @@
   import type * as monaco from 'monaco-editor';
 	import { detectLanguage } from '@utils/nodeAction';
 	import { _getFile } from '@apis/file';
-	import { handleSaveFile } from '@handlers/handlers/nodeActions';
+	import { handleSaveFile } from '@handlers/nodeActions';
 
   let container: HTMLDivElement | null = null;
   let editor: monaco.editor.IStandaloneCodeEditor | null = null;
