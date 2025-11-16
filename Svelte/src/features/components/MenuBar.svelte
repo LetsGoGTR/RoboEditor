@@ -4,23 +4,18 @@
 	import { _createFolder } from '@apis/folder';
 	import { selectedDirectory } from '@/stores/selectedDirectory';
 	import { get } from 'svelte/store';
-	import SaveDialog from './NewFileDialog.svelte';
 	import { _createFile } from '@apis/file';
 	import { handleCreateFile, handleDeleteFile, handleDeleteFolder } from '@handlers/nodeActions';
-	import DeleteDialog from './DeleteDialog.svelte';
 	import type { TreeNode } from '@/types';
+	import NewFileDialog from './dialogs/NewFileDialog.svelte';
+	import DeleteDialog from './dialogs/DeleteDialog.svelte';
 
-	let dialog: HTMLDialogElement;
+	let warningDialog: HTMLDialogElement;
 	let showNewFile = $state(false);
 	let showDelete = $state(false);
+	let showCompareFile = $state(false);
+	let showCompareFolder = $state(false);
 	let root = $derived(fileTree);
-
-	// async function handleCompare() {
-
-	// 	// ✅ diff 모드 진입
-	// 	currentFile.openDiff(left, right);
-	// 	gotoPage('compare');
-	// }
 
 	function handleApply() { gotoPage('apply'); }
 	function handleBackup() { gotoPage('backup'); }
@@ -38,6 +33,15 @@
     if (node.type === "file") handleDeleteFile(node);
     else if (node.type === "directory") handleDeleteFolder(node);
   }
+
+	function handleCompareFiles() {
+		if (!root) warningDialog
+		showCompareFile = true;
+	}
+
+	function handleCompareFolders() {
+		showCompareFolder = true;
+	}
 
 	// create a new folder
 	export async function handleNewFolder() {
@@ -65,24 +69,11 @@
 			children: []
 		});
 	}
-
-	// 백업 폴더 불러오기
-	// async function handleOpenBackup() {
-	// 	const tree = await openDirectory();
-	// 	if (tree && tree.type === 'folder') fileTree.set(tree);
-	// 	console.log('workspace selected:', fileTree);
-	// }
 </script>
-
-<!-- 비교 대상 폴더 없음 -->
-<dialog bind:this={dialog}>
-	<h3>경고</h3>
-	<p>비교할 대상이 선택되지 않았습니다. 먼저 항목을 선택하세요.</p>
-	<button class="confirm-btn" onclick={() => dialog.close()}>확인</button>
-</dialog>
 
 <div class="full-width" role="menubar">
 	<ul class="menu">
+		<!-- 파일 탭 -->
 		<li>
 			<span>파일</span>
 			<ul class="dropdown">
@@ -98,12 +89,15 @@
 				<li><button>다른 이름으로 저장</button></li>
 			</ul>
 		</li>
+		<!-- 도구 탭 -->
 		<li>
 			<span>도구</span>
 			<ul class="dropdown">
-				<li><button >비교</button></li>
+				<li><button onclick={handleCompareFiles}>파일 비교</button></li>
+				<li><button onclick={handleCompareFolders}>폴더 비교</button></li>
 			</ul>
 		</li>
+		<!-- 제어기 탭 -->
 		<li>
 			<span>제어기</span>
 			<ul class="dropdown">
@@ -116,7 +110,14 @@
 	</ul>
 </div>
 
-<SaveDialog
+<!-- 비교 대상 폴더 없음 -->
+<dialog bind:this={warningDialog}>
+	<h3>경고</h3>
+	<p>비교할 대상이 선택되지 않았습니다. 먼저 항목을 선택하세요.</p>
+	<button class="confirm-btn" onclick={() => warningDialog.close()}>확인</button>
+</dialog>
+
+<NewFileDialog
   bind:open={showNewFile}
   root={$fileTree}
   onConfirm={handleCreateFile}

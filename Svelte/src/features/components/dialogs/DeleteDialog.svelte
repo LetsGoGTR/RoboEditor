@@ -1,6 +1,6 @@
 <script lang="ts">
   import DirTree from "@components/DirectoryTree.svelte";
-  import type { FolderNode, TreeNode, FileNode } from "@/types";
+  import type { FolderNode, TreeNode } from "@/types";
 
   let {
     open = $bindable(false),
