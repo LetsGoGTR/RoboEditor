@@ -17,7 +17,7 @@ const config = {
 			'@layouts/*': 'src/lib/layouts/*',
 			'@apis/*': 'src/apis/*',
 			'@features/*': 'src/features/components/*',
-			'@handlers/*': 'src/features/*',
+			'@handlers/*': 'src/features/handlers/*',
 			'@routes/*': 'src/routes/*',
 			'@styles/*': 'src/styles/*',
 			'@utils/*': 'src/utils/*',

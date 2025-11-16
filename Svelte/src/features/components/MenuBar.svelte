@@ -6,7 +6,7 @@
 	import { get } from 'svelte/store';
 	import SaveDialog from './NewFileDialog.svelte';
 	import { _createFile } from '@apis/file';
-	import { handleCreateFile, handleDeleteFile, handleDeleteFolder } from '@handlers/handlers/nodeActions';
+	import { handleCreateFile, handleDeleteFile, handleDeleteFolder } from '@handlers/nodeActions';
 	import DeleteDialog from './DeleteDialog.svelte';
 	import type { TreeNode } from '@/types';
 

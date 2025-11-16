@@ -140,16 +140,8 @@ export async function handleDeleteFile(file: FileNode) {
 		// 2) fileTree store에서 제거
 		removeFileNode(file.path);
 
-		// 3) 현재 열려있는 파일이 삭제 대상이면 탭 닫기
-		const state = get(currentFile);
-		const active = state.active?.file;
-
-		if (active && active.id === file.id && state.activeIndex) {
-			// 탭 닫기
-			currentFile.closeTab(state.activeIndex);
-		}
-
-		alert(`'${file.name}' 파일이 삭제되었습니다.`);
+		// 3) 열린 탭 제거
+		currentFile.closeByFilePath(file.path);
 	} catch (err) {
 		console.error('[delete] 파일 삭제 오류:', err);
 		alert('파일 삭제 중 문제가 발생했습니다.');
@@ -167,6 +159,9 @@ export async function handleDeleteFolder(folder: FolderNode) {
 		return;
 	}
 
+	const confirmDelete = confirm(`폴더 '${folder.name}' 및 하위 내용들을 삭제하시겠습니까?`);
+	if (!confirmDelete) return;
+
 	try {
 		// 1) 서버 삭제 요청 (재귀)
 		const resp = await _deleteFolder(folder.path);
@@ -175,19 +170,11 @@ export async function handleDeleteFolder(folder: FolderNode) {
 			return;
 		}
 
-		// 2) fileTree에서 폴더 제거
+		// 2) 트리에서 제거
 		removeFolderNode(folder.path);
 
-		// 3) 열린 탭 중 해당 폴더 내부 파일은 모두 닫기
-		const state = get(currentFile);
-		const folderPath = folder.path;
-
-		const openTabs = state.group.filter((g) => g.file.path?.startsWith(folderPath));
-
-		openTabs.forEach((g) => {
-			const idx = state.group.findIndex((x) => x.file.id === g.file.id);
-			if (idx !== -1) currentFile.closeTab(idx);
-		});
+		// 3) 폴더 내부 모든 탭 제거
+		currentFile.closeByFolderPath(folder.path);
 	} catch (err) {
 		console.error('[delete-folder] 폴더 삭제 오류:', err);
 		alert('폴더 삭제 중 문제가 발생했습니다.');
