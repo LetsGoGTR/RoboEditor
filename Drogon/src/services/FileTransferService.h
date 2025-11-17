@@ -17,6 +17,7 @@ class FileTransferService
 
     // 워크스페이스 적용
     services::ServiceResult applyWorkspace(const std::string &workspaceId,
+                                           const std::string &deviceId,
                                            const std::string &password);
 
   private:

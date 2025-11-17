@@ -557,9 +557,6 @@ void api::v1::Repo::workspaceUpdate(const drogon::HttpRequestPtr                
         services::WorkspaceMetadata metadata;
         metadata.name        = json->isMember("name") ? (*json)["name"].asString()
                                                       : existingResult.data["metadata"]["name"].asString();
-        metadata.target      = json->isMember("target")
-                                       ? (*json)["target"].asString()
-                                       : existingResult.data["metadata"]["target"].asString();
         metadata.description = json->isMember("description")
                                        ? (*json)["description"].asString()
                                        : existingResult.data["metadata"]["description"].asString();
@@ -634,15 +631,15 @@ void api::v1::Repo::workspaceImport(const drogon::HttpRequestPtr                
         return sendError(callback, drogon::k400BadRequest, "Unsupported file format");
 
     // Build metadata
-    std::string workspaceName = req->getParameter("name");
+    std::string workspaceName = fileUpload.getParameter<std::string>("name");
     if (workspaceName.empty())
         workspaceName = fs::path(filename).stem().string();
 
     services::WorkspaceMetadata metadata;
     metadata.uuid        = drogon::utils::getUuid();
-    metadata.target      = req->getParameter("target");
+    metadata.target      = fileUpload.getParameter<std::string>("target");
     metadata.name        = workspaceName;
-    metadata.description = req->getParameter("description");
+    metadata.description = fileUpload.getParameter<std::string>("description");
     metadata.createdAt   = utils::getCurrentTimestamp();
     metadata.updatedAt   = metadata.createdAt;
 
