@@ -1,12 +1,14 @@
+const FILE_API_PATH = '/proxy/api/v1/file';
+
 export const _getFile = async (path: string) => {
 	const params = new URLSearchParams({ path });
-	const res = await fetch(`/proxy/api/v1/file?${params}`);
+	const res = await fetch(`${FILE_API_PATH}?${params}`);
 	return res.json();
 };
 
 export const _createFile = async (path: string, content: string) => {
 	const params = new URLSearchParams({ path });
-	const res = await fetch(`/proxy/api/v1/file?${params}`, {
+	const res = await fetch(`${FILE_API_PATH}?${params}`, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify({ content })
@@ -19,7 +21,7 @@ export const _updateFile = async (
 	payload: { content?: string; newPath?: string }
 ) => {
 	const params = new URLSearchParams({ path });
-	const res = await fetch(`/proxy/api/v1/file?${params}`, {
+	const res = await fetch(`${FILE_API_PATH}?${params}`, {
 		method: 'PUT',
 		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify(payload)
@@ -29,7 +31,7 @@ export const _updateFile = async (
 
 export const _deleteFile = async (path: string) => {
 	const params = new URLSearchParams({ path });
-	const res = await fetch(`/proxy/api/v1/file?${params}`, {
+	const res = await fetch(`${FILE_API_PATH}?${params}`, {
 		method: 'DELETE'
 	});
 	return res.json();

@@ -3,7 +3,9 @@
   import { dummyController } from '@/testData';
 	import type { TreeNode } from '@/types';
   import FileExplorer from '@features/FileExplorer.svelte';
-  import ApplyDialog from '@features/dialogs.svelte';
+  import ApplyDialog from '@features/dialogs/ApplyDialog.svelte';
+	import { get } from 'svelte/store';
+	import { fileTree } from '@/stores/fileTree';
   
   let selected = $state<string[]>([]);
   let showBackupOnly = $state(false);
@@ -39,7 +41,6 @@
   let applyDlg: any;
   async function handleConfirm() {
     try {
-      // const tree = await openDirectory();
       if (tree && tree.type === 'folder') {
         selectTree = tree;
       }

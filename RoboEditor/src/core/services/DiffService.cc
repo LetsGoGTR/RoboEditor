@@ -6,14 +6,25 @@
 
 #include "../utils/diff/DiffPython.h"
 #include "../utils/diff/DiffText.h"
+#include "../utils/diff/DiffTree.h"
 #include "../utils/diff/DiffYaml.h"
-#include "../utils/diff/treediff.h"
 #include "../utils/logging/Logger.h"
 
 namespace fs = std::filesystem;
 
-const std::vector<std::string> services::DiffService::supportedFormats_ = {
-        ".yaml", ".yml", ".srl", ".py", ".txt", ".log", ".cfg", ".conf", ".ini", ".md", ".json", ".sbp", ".pts"};
+const std::vector<std::string> services::DiffService::supportedFormats_ = {".yaml",
+                                                                           ".yml",
+                                                                           ".srl",
+                                                                           ".py",
+                                                                           ".txt",
+                                                                           ".log",
+                                                                           ".cfg",
+                                                                           ".conf",
+                                                                           ".ini",
+                                                                           ".md",
+                                                                           ".json",
+                                                                           ".sbp",
+                                                                           ".pts"};
 
 std::string services::DiffService::detectFileType(const std::string &fileName)
 {
@@ -21,7 +32,6 @@ std::string services::DiffService::detectFileType(const std::string &fileName)
 
     // Convert to lowercase for case-insensitive comparison
     std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-
 
     if (ext == ".yaml" || ext == ".yml" || ext == ".pts") {
         return "yaml";
@@ -119,9 +129,9 @@ services::ServiceResult services::DiffService::diffDirectories(const std::string
 
     Json::Value j;
     try {
-        j = treediff::Run(rootA, rootB);
+        j = DiffTree::Run(rootA, rootB);
     } catch (const std::exception &e) {
-        result.errorMessage = std::string("treediff failed: ") + e.what();
+        result.errorMessage = std::string("DiffTree failed: ") + e.what();
         return result;
     }
 

@@ -55,20 +55,26 @@ void api::v1::Device::create(const drogon::HttpRequestPtr                       
     if (!json)
         return sendError(callback, drogon::k400BadRequest, "Invalid JSON body");
 
-    if (!json->isMember("id") || !json->isMember("name"))
-        return sendError(callback, drogon::k400BadRequest, "Missing required fields: id, name");
+    if (!json->isMember("serialNumber") || !json->isMember("name"))
+        return sendError(
+                callback, drogon::k400BadRequest, "Missing required fields: serialNumber, name");
 
-    std::string deviceId = (*json)["id"].asString();
-    if (deviceId.empty())
-        return sendError(callback, drogon::k400BadRequest, "Device ID cannot be empty");
+    std::string serialNumber = (*json)["serialNumber"].asString();
+    if (serialNumber.empty())
+        return sendError(callback, drogon::k400BadRequest, "Device serialNumber cannot be empty");
 
     try {
         services::DeviceMetadata metadata;
-        metadata.id   = deviceId;
-        metadata.name = (*json)["name"].asString();
+        metadata.serialNumber = serialNumber;
+        metadata.name         = (*json)["name"].asString();
         metadata.description =
                 json->isMember("description") ? (*json)["description"].asString() : "";
-        metadata.ip = json->isMember("ip") ? (*json)["ip"].asString() : "";
+        metadata.api      = json->isMember("api") ? (*json)["api"].asString() : "";
+        metadata.sftpHost = json->isMember("sftpHost") ? (*json)["sftpHost"].asString() : "";
+        metadata.sftpPort = json->isMember("sftpPort") ? (*json)["sftpPort"].asInt() : 22;
+        metadata.sftpPassword =
+                json->isMember("sftpPassword") ? (*json)["sftpPassword"].asString() : "";
+        metadata.sftpUser = json->isMember("sftpUser") ? (*json)["sftpUser"].asString() : "";
 
         auto result = services::DeviceService::createDevice(metadata);
 
@@ -87,7 +93,8 @@ void api::v1::Device::create(const drogon::HttpRequestPtr                       
         resp->setStatusCode(drogon::k201Created);
         callback(resp);
 
-        LOG_INFO << "Created device: " << metadata.name << " (ID: " << metadata.id << ")";
+        LOG_INFO << "Created device: " << metadata.name
+                 << " (serialNumber: " << metadata.serialNumber << ")";
 
     } catch (const std::exception &e) {
         LOG_ERROR << "Create exception: " << e.what();
@@ -139,13 +146,22 @@ void api::v1::Device::update(const drogon::HttpRequestPtr                       
 
         // Prepare updated metadata, keeping existing values if not provided
         services::DeviceMetadata metadata;
-        metadata.name        = json->isMember("name") ? (*json)["name"].asString()
-                                                      : existingResult.data["name"].asString();
-        metadata.description = json->isMember("description")
-                                       ? (*json)["description"].asString()
-                                       : existingResult.data["description"].asString();
-        metadata.ip          = json->isMember("ip") ? (*json)["ip"].asString()
-                                                    : existingResult.data["ip"].asString();
+        metadata.name         = json->isMember("name") ? (*json)["name"].asString()
+                                                       : existingResult.data["name"].asString();
+        metadata.description  = json->isMember("description")
+                                        ? (*json)["description"].asString()
+                                        : existingResult.data["description"].asString();
+        metadata.api          = json->isMember("api") ? (*json)["api"].asString()
+                                                      : existingResult.data["api"].asString();
+        metadata.sftpHost     = json->isMember("sftpHost") ? (*json)["sftpHost"].asString()
+                                                           : existingResult.data["sftpHost"].asString();
+        metadata.sftpPort     = json->isMember("sftpPort") ? (*json)["sftpPort"].asInt()
+                                                           : existingResult.data["sftpPort"].asInt();
+        metadata.sftpPassword = json->isMember("sftpPassword")
+                                        ? (*json)["sftpPassword"].asString()
+                                        : existingResult.data["sftpPassword"].asString();
+        metadata.sftpUser     = json->isMember("sftpUser") ? (*json)["sftpUser"].asString()
+                                                           : existingResult.data["sftpUser"].asString();
 
         auto result = services::DeviceService::updateDevice(deviceId, metadata);
 
@@ -361,7 +377,7 @@ void api::v1::Device::backup(const drogon::HttpRequestPtr                       
 
                                 // Create workspace metadata
                                 services::WorkspaceMetadata metadata;
-                                metadata.id          = workspaceId;
+                                metadata.uuid        = workspaceId;
                                 metadata.target      = deviceId;
                                 metadata.name        = workspaceName;
                                 metadata.description = "backup from " + deviceId;

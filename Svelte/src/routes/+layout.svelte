@@ -1,8 +1,14 @@
 <script lang="ts">
+	import { browser } from '$app/environment';
   import Header from '@features/Header.svelte';
   import MenuBar from '@features/MenuBar.svelte';
   import WorkspaceSection from '@features/WorkspaceSection.svelte';
   import HorizontalSplit from '@layouts/HorizontalSplit.svelte';
+	import { setupMonacoWorkers } from '@utils/monaco-worker';
+
+  if (browser) {
+    setupMonacoWorkers();
+  }
 </script>
 
 <svelte:head>

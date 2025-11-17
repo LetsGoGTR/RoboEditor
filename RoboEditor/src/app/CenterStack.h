@@ -19,7 +19,7 @@ class QMainWindow;
 class ComparePage;
 class BackupPage;
 class ModifyPage;
-
+class WorkspaceContextMenuController;
 class CenterStack : public QWidget
 {
     Q_OBJECT
@@ -97,6 +97,8 @@ class CenterStack : public QWidget
         // 경로
         QString workspacePath_;
         QString backupRootPath_;
+
+        WorkspaceContextMenuController *workspaceMenuController_ = nullptr;
 
         //타이머
         QTimer *m_pollingTimer;

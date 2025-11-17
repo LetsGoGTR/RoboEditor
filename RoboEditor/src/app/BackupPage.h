@@ -11,6 +11,8 @@ namespace Ui
     class BackupPage;
 }
 
+class ProgressDialog;
+
 class BackupPage : public QWidget
 {
     Q_OBJECT
@@ -34,6 +36,8 @@ class BackupPage : public QWidget
         int totalBackupRequests_;
         int completedBackupRequests_;
         int failedBackupRequests_;
+
+        ProgressDialog *backupProgressDialog_ = nullptr;
 
       signals:
         void uiBackupClicked(const QString &target);
