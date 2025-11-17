@@ -22,8 +22,6 @@ class ComparePage : public QWidget
         void setLeftEditor(CodeEditor * leftEditor);
         void clearHighlights();
 
-        QByteArray saveSplitterState() const;
-        void       restoreSplitterState(const QByteArray &state);
         void       performDiff(const QString &leftPath, const QString &rightPath);
         void       performFolderDiff(const QString &leftPath, const QString &rightPath);
         void       applyTheme(bool dark);

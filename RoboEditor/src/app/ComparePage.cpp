@@ -48,19 +48,6 @@ ComparePage::~ComparePage()
     cleanupTempFolders();
 }
 
-QByteArray ComparePage::saveSplitterState() const
-{
-    if (rightSplit_)
-        return rightSplit_->saveState();
-    return QByteArray();
-}
-
-void ComparePage::restoreSplitterState(const QByteArray &state)
-{
-    if (rightSplit_ && !state.isEmpty())
-        rightSplit_->restoreState(state);
-}
-
 QWidget *ComparePage::buildDock()
 {
     auto w = new QWidget(this);
