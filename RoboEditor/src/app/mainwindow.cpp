@@ -172,6 +172,20 @@ void MainWindow::applyStyleSheet()
         qWarning() << " Failed to load stylesheet:" << stylePath;
     }
 }
+void MainWindow::toggleTheme()
+{
+    dark = !dark;
+
+    QString stylePath = dark ? ":/styles/dark.qss" : ":/styles/light.qss";
+
+    QFile f(stylePath);
+    if (f.open(QFile::ReadOnly)) {
+        QString css = QString::fromUtf8(f.readAll());
+        qApp->setStyleSheet(css);
+        qDebug() << "User toggled theme:" << (dark ? "Dark" : "Light");
+    }
+}
+
 void MainWindow::closeEvent(QCloseEvent *event)
 {
     QMainWindow::closeEvent(event);
