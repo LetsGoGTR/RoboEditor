@@ -1,17 +1,31 @@
 <script lang="ts">
+	import { fileTree } from "@/stores/fileTree";
+	import type { FolderNode, TreeNode } from "@/types";
+	import DirectoryTree from "@components/DirectoryTree.svelte";
+
+  let selectedFolder = $state<FolderNode | null>(null);
+
+  function handleSelect(node: TreeNode) {
+    if (node.type === "directory") selectedFolder = node;
+  }
 </script>
 
 <form>
   <h2>제어기 정보 등록</h2>
 
   <div class="form-row">
-    <label for="serial">Serial Number</label>
-    <input type="text" id="serial" name="serial" placeholder="e.g. CTR-00123456" />
+    <label for="ip">IP</label>
+    <input type="text" id="ip" name="ip" placeholder="ex. 192.168.0.10" />
   </div>
 
   <div class="form-row">
-    <label for="ip">IP</label>
-    <input type="text" id="ip" name="ip" placeholder="192.168.0.10" />
+    <label for="sftp-port">SFTP Port</label>
+    <input type="number" id="sftp-port" name="sftp-port" min="1" max="65535" value="8889" />
+  </div>
+
+  <div class="form-row">
+    <label for="serial">Serial Number</label>
+    <input type="text" id="serial" name="serial" />
   </div>
 
   <div class="form-row">
@@ -23,15 +37,23 @@
     <label for="password">Password</label>
     <input type="password" id="password" name="password" />
   </div>
-
-  <!-- ✅ Port 가로 일렬 정렬 (정확한 baseline 정렬) -->
-  <div class="form-row port-row">
-    <label for="sftp-port">SFTP Port</label>
-    <input type="number" id="sftp-port" name="sftp-port" min="1" max="65535" value="22" />
-
-    <label for="api-port" class="api-label">API Port</label>
-    <input type="number" id="api-port" name="api-port" min="1" max="65535" value="80" />
-  </div>
+    <div class="form-row">
+      <label for="folder-path">폴더 경로</label>
+      <input
+        id="folder-path"
+        type="text"
+        class="path-input"
+        readonly
+        value={selectedFolder ? selectedFolder.path : ""}
+      />
+      
+    </div>
+    <div class="folder-section">
+      {#if $fileTree}
+        <DirectoryTree root={$fileTree} mode="view" onselect={handleSelect} />
+      {/if}
+    </div>
+    
 
   <div class="button-row">
     <button type="submit">OK</button>
@@ -64,6 +86,17 @@
     gap: 0.5rem;
   }
 
+  .folder-section {
+    border: solid 1px #ccc;
+    border-radius: 0.3rem;
+
+    min-height: 200px;
+    max-height: 200px;
+    overflow-y: auto;
+    padding: 0.5rem;
+    background: #fafafa;
+  }
+
   label {
     flex: 0 0 110px; /* 라벨 고정 폭 */
     font-size: 0.9rem;
@@ -79,18 +112,6 @@
     border: 1px solid #ccc;
     border-radius: 0.3rem;
     font-size: 0.9rem;
-  }
-
-  /* ✅ Port 라벨과 입력칸 정렬 보정 */
-  .port-row {
-    display: grid;
-    grid-template-columns: 110px 1fr 90px 1fr;
-    align-items: center;
-    column-gap: 0.5rem;
-  }
-
-  .api-label {
-    text-align: right;
   }
 
   .button-row {
