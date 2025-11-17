@@ -180,22 +180,24 @@ services::ServiceResult FileTransferService::backupFromRemote(const std::string 
 }
 
 services::ServiceResult FileTransferService::applyWorkspace(const std::string &workspaceId,
+                                                            const std::string &deviceId,
                                                             const std::string &password)
 {
     try {
-        utils::logging::info("워크스페이스 적용 시작: workspaceId=" + workspaceId);
+        utils::logging::info("워크스페이스 적용 시작: workspaceId=" + workspaceId +
+                             ", deviceId=" + deviceId);
 
         // 1. Workspace 정보 조회
-        auto workspaceResult = services::WorkspaceService::readWorkspace(workspaceId, "");
+        auto workspaceResult = services::WorkspaceService::readWorkspace(workspaceId, deviceId);
         if (!workspaceResult.success) {
             return services::ServiceResult::createError("Workspace not found: " + workspaceId);
         }
 
-        // 2. Workspace의 target (deviceId) 추출
-        std::string deviceId = workspaceResult.data["target"].asString();
-        if (deviceId.empty()) {
-            return services::ServiceResult::createError("Workspace has no target device");
-        }
+        // // 2. Workspace의 target (deviceId) 추출
+        // std::string deviceId = workspaceResult.data["target"].asString();
+        // if (deviceId.empty()) {
+        //     return services::ServiceResult::createError("Workspace has no target device");
+        // }
 
         utils::logging::info("Workspace target device: " + deviceId);
 

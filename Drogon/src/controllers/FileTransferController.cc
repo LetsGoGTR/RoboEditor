@@ -34,6 +34,16 @@ void FT::apply(const HttpRequestPtr &req, std::function<void(const HttpResponseP
         return;
     }
 
+    if (!jsonBody->isMember("deviceId") || (*jsonBody)["deviceId"].asString().empty()) {
+        Json::Value error;
+        error["success"] = false;
+        error["error"]   = "Missing required field: deviceId";
+        auto resp        = HttpResponse::newHttpJsonResponse(error);
+        resp->setStatusCode(k400BadRequest);
+        callback(resp);
+        return;
+    }
+
     if (!jsonBody->isMember("password") || (*jsonBody)["password"].asString().empty()) {
         Json::Value error;
         error["success"] = false;
@@ -45,11 +55,12 @@ void FT::apply(const HttpRequestPtr &req, std::function<void(const HttpResponseP
     }
 
     std::string workspaceId = (*jsonBody)["workspaceId"].asString();
+    std::string deviceId    = (*jsonBody)["deviceId"].asString();
     std::string password    = (*jsonBody)["password"].asString();
 
-    auto task = [workspaceId, password, callback]() {
+    auto task = [workspaceId, deviceId, password, callback]() {
         FileTransferService service;
-        auto                result = service.applyWorkspace(workspaceId, password);
+        auto                result = service.applyWorkspace(workspaceId, deviceId, password);
 
         Json::Value response;
         response["success"] = result.success;

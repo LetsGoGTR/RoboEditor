@@ -11,11 +11,12 @@ using utils::config::getBaseDir;
 void api::v1::File::fileRead(const drogon::HttpRequestPtr                          &req,
                              std::function<void(const drogon::HttpResponsePtr &)> &&callback)
 {
-    auto path = req->getParameter("path");
-
-    if (path.empty()) {
-        return sendError(callback, drogon::k400BadRequest, "Missing 'path' query parameter");
+    auto json = req->getJsonObject();
+    if (!json || !json->isMember("path")) {
+        return sendError(callback, drogon::k400BadRequest, "Missing 'path' field in request body");
     }
+
+    std::string path = (*json)["path"].asString();
 
     auto result = services::FileService::readFile(path);
 
@@ -31,18 +32,13 @@ void api::v1::File::fileRead(const drogon::HttpRequestPtr                       
 void api::v1::File::fileCreate(const drogon::HttpRequestPtr                          &req,
                                std::function<void(const drogon::HttpResponsePtr &)> &&callback)
 {
-    auto path = req->getParameter("path");
-
-    if (path.empty()) {
-        return sendError(callback, drogon::k400BadRequest, "Missing 'path' query parameter");
-    }
-
     auto json = req->getJsonObject();
-    if (!json || !json->isMember("content")) {
+    if (!json || !json->isMember("path") || !json->isMember("content")) {
         return sendError(
-                callback, drogon::k400BadRequest, "Missing 'content' field in request body");
+                callback, drogon::k400BadRequest, "Missing 'path' or 'content' field in request body");
     }
 
+    std::string path    = (*json)["path"].asString();
     std::string content = (*json)["content"].asString();
 
     auto result = services::FileService::createFile(path, content);
@@ -59,16 +55,12 @@ void api::v1::File::fileCreate(const drogon::HttpRequestPtr                     
 void api::v1::File::fileUpdate(const drogon::HttpRequestPtr                          &req,
                                std::function<void(const drogon::HttpResponsePtr &)> &&callback)
 {
-    auto path = req->getParameter("path");
-
-    if (path.empty()) {
-        return sendError(callback, drogon::k400BadRequest, "Missing 'path' query parameter");
-    }
-
     auto json = req->getJsonObject();
-    if (!json) {
-        return sendError(callback, drogon::k400BadRequest, "Invalid JSON body");
+    if (!json || !json->isMember("path")) {
+        return sendError(callback, drogon::k400BadRequest, "Missing 'path' field in request body");
     }
+
+    std::string path = (*json)["path"].asString();
 
     bool hasContent = json->isMember("content");
     bool hasNewPath = json->isMember("newPath");
@@ -119,11 +111,12 @@ void api::v1::File::fileUpdate(const drogon::HttpRequestPtr                     
 void api::v1::File::fileDelete(const drogon::HttpRequestPtr                          &req,
                                std::function<void(const drogon::HttpResponsePtr &)> &&callback)
 {
-    auto path = req->getParameter("path");
-
-    if (path.empty()) {
-        return sendError(callback, drogon::k400BadRequest, "Missing 'path' query parameter");
+    auto json = req->getJsonObject();
+    if (!json || !json->isMember("path")) {
+        return sendError(callback, drogon::k400BadRequest, "Missing 'path' field in request body");
     }
+
+    std::string path = (*json)["path"].asString();
 
     auto result = services::FileService::deleteFile(path);
 

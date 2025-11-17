@@ -7,3 +7,9 @@
 [submodule "RoboEditor/external/libbcrypt"]
 	path = RoboEditor/external/libbcrypt
 	url = https://github.com/trusch/libbcrypt.git
+[submodule "Drogon/external/tree-sitter"]
+	path = Drogon/external/tree-sitter
+	url = https://github.com/tree-sitter/tree-sitter
+[submodule "Drogon/external/tree-sitter-python"]
+	path = Drogon/external/tree-sitter-python
+	url = https://github.com/tree-sitter/tree-sitter-python
