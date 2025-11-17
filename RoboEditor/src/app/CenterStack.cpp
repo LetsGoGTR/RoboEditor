@@ -13,6 +13,7 @@
 #include <QPainter>
 #include <QPixmap>
 #include <QStackedWidget>
+#include <QStyleHints>
 #include <QVBoxLayout>
 
 #include "ApplyPage.h"
@@ -335,16 +336,29 @@ void CenterStack::updateControllerList()
                                  .arg(c.sftpPort)
                                  .arg(c.username)
                                  .arg(c.wsPath));
+        bool isDark = (qApp->styleHints()->colorScheme() == Qt::ColorScheme::Dark);
 
-        QColor iconColor;
-        if (!c.isConnected) {
-            iconColor = Qt::gray;
-            item->setForeground(QBrush(Qt::gray));
+        if (!isDark) {
+            QColor iconColor;
+            if (!c.isConnected) {
+                iconColor = Qt::gray;
+                item->setForeground(QBrush(Qt::gray));
+            } else {
+                iconColor = c.isRunning ? Qt::red : Qt::green;
+                item->setForeground(QBrush(Qt::black));
+            }
+            item->setIcon(makeCircleIcon(iconColor, 10));
         } else {
-            iconColor = c.isRunning ? Qt::red : Qt::green;
-            item->setForeground(QBrush(Qt::black));
+            QColor iconColor;
+            if (!c.isConnected) {
+                iconColor = Qt::gray;
+                item->setForeground(QBrush(Qt::gray));
+            } else {
+                iconColor = c.isRunning ? Qt::red : Qt::green;
+                item->setForeground(QBrush(Qt::white));
+            }
+            item->setIcon(makeCircleIcon(iconColor, 10));
         }
-        item->setIcon(makeCircleIcon(iconColor, 10));
 
         controllerModel_->appendRow(item);
     }

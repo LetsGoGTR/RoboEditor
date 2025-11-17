@@ -30,6 +30,8 @@
 
 ComparePage::ComparePage(QWidget *parent) : QWidget(parent)
 {
+    this->setObjectName("ComparePageRoot");
+
     leftDiffHighlighter_  = new core::DiffHighlighter(this);
     rightDiffHighlighter_ = new core::DiffHighlighter(this);
 
@@ -118,106 +120,34 @@ QWidget *ComparePage::buildDock()
 // 버튼 UI와 DiffTablePanel을 함께 생성하는 함수
 QWidget *ComparePage::buildRightPanel()
 {
-    // 컨테이너 위젯 생성
     QWidget     *container = new QWidget(this);
     QVBoxLayout *layout    = new QVBoxLayout(container);
-    layout->setContentsMargins(0, 0, 0, 0);  // 여백 최소화
+    layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
 
-    // 1. 상단 버튼 영역 (User Code 복원)
     auto topBar = new QWidget(container);
     topBar->setStyleSheet("QWidget { background-color: transparent; border: none; }");
 
-    // FlowLayout 사용 (없으면 QHBoxLayout으로 대체 가능)
     auto topLayout = new FlowLayout(topBar, 8, 6, 6);
 
-    // 버튼 스타일
-    QString buttonStyle = "QPushButton { "
-                          "  background-color: #f0f0f0; "
-                          "  color: #000000;"
-                          "  border: 1px solid #b0b0b0; "
-                          "  border-radius: 3px; "
-                          "  padding: 4px 8px; "
-                          "  font-size: 9pt; "
-                          "} "
-                          "QPushButton:hover { "
-                          "  background-color: #e0e0e0; "
-                          "  border: 1px solid #909090; "
-                          "} "
-                          "QPushButton:pressed { "
-                          "  background-color: #d0d0d0; "
-                          "}";
-
-    // (1) 파일 비교 버튼
     auto btnSelectFile = new QPushButton(tr("Compare Files"), topBar);
     btnSelectFile->setFixedSize(100, 26);
-    btnSelectFile->setStyleSheet(buttonStyle);
     topLayout->addWidget(btnSelectFile);
 
     connect(btnSelectFile, &QPushButton::clicked, this, [this]() {
-        QString leftPath = QFileDialog::getOpenFileName(
-                this, tr("Select left file (compare)"), "C:/backup", tr("All Files (*.*)"));
-        if (leftPath.isEmpty())
-            return;
 
-        QString rightPath = QFileDialog::getOpenFileName(
-                this, tr("Select right file (base)"), "C:/backup", tr("All Files (*.*)"));
-        if (rightPath.isEmpty())
-            return;
-
-        performDiff(leftPath, rightPath);
     });
 
-    // (2) 폴더 비교 버튼
     auto btnSelectFolder = new QPushButton(tr("Compare Folders"), topBar);
     btnSelectFolder->setFixedSize(120, 26);
-    btnSelectFolder->setStyleSheet(buttonStyle);
     topLayout->addWidget(btnSelectFolder);
 
-    connect(btnSelectFolder, &QPushButton::clicked, this, [this]() {
-        QFileDialog dialog(this, tr("Select folder or archive (compare)"), "C:/backup");
-        dialog.setFileMode(QFileDialog::Directory);
-        dialog.setOption(QFileDialog::ShowDirsOnly, false);
-        dialog.setOption(QFileDialog::DontUseNativeDialog, true);
-        dialog.setNameFilter(tr("Folders and Archives (*.zip *.tar *.tar.gz *.tgz)"));
-
-        QListView *listView = dialog.findChild<QListView *>("listView");
-        if (listView)
-            listView->setSelectionMode(QAbstractItemView::SingleSelection);
-
-        QString leftPath;
-        if (dialog.exec() == QDialog::Accepted) {
-            QStringList paths = dialog.selectedFiles();
-            if (!paths.isEmpty())
-                leftPath = paths.first();
-        }
-        if (leftPath.isEmpty())
-            return;
-
-        QFileDialog dialog2(this, tr("Select folder or archive (base)"), "C:/backup");
-        dialog2.setFileMode(QFileDialog::Directory);
-        dialog2.setOption(QFileDialog::ShowDirsOnly, false);
-        dialog2.setOption(QFileDialog::DontUseNativeDialog, true);
-        dialog2.setNameFilter(tr("Folders and Archives (*.zip *.tar *.tar.gz *.tgz)"));
-
-        QString rightPath;
-        if (dialog2.exec() == QDialog::Accepted) {
-            QStringList paths = dialog2.selectedFiles();
-            if (!paths.isEmpty())
-                rightPath = paths.first();
-        }
-        if (rightPath.isEmpty())
-            return;
-
-        performFolderDiff(leftPath, rightPath);
-    });
+    connect(btnSelectFolder, &QPushButton::clicked, this, [this]() {});
 
     layout->addWidget(topBar);
 
-    // 2. DiffTablePanel 생성 및 추가
     if (!diffPanel_) {
         diffPanel_ = new DiffTablePanel(this);
-        // 시그널 연결
         connect(diffPanel_,
                 &DiffTablePanel::fileDoubleClicked,
                 this,
@@ -292,7 +222,6 @@ QString ComparePage::formatPathForCompare(const QString &fullPath) const
     displayPath.replace('\\', " > ");
     return displayPath;
 }
-
 void ComparePage::setTargetPath(const QString &path)
 {
     if (path.isEmpty() || !compareTabWidget_)
@@ -317,17 +246,13 @@ void ComparePage::setTargetPath(const QString &path)
 
     QLabel *pathLabel = new QLabel(tabPage);
     pathLabel->setObjectName("pathLabel");
-    pathLabel->setStyleSheet("QLabel { padding: 4px 8px; background-color: #f0f0f0; border-bottom: "
-                             "1px solid #d0d0d0; font-size: 9pt; color: #666; }");
     pathLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
     pathLabel->setText(formatPathForCompare(absolutePath));
     pageLayout->addWidget(pathLabel);
 
     auto *newTextEdit = new CodeEditor(tabPage);
-
     newTextEdit->setReadOnly(true);
     newTextEdit->setAccept(true);
-    newTextEdit->setStyleSheet("QPlainTextEdit { background-color: white; border: none; }");
 
     if (rightDiffHighlighter_) {
         newTextEdit->setDiffHighlighter(rightDiffHighlighter_);
@@ -427,10 +352,6 @@ void ComparePage::recalcDiff(const QString &leftText, const QString &leftPath)
         return;
     }
 
-    LogManager::append(QString("File diff started: %1 vs %2")
-                               .arg(formatPathForCompare(effectiveLeftPath))
-                               .arg(formatPathForCompare(targetPath_)));
-
     // 1. 파일 타입 감지
     auto lType = FileTypeHelper::detect(effectiveLeftPath);
     auto rType = FileTypeHelper::detect(targetPath_);
@@ -479,9 +400,6 @@ void ComparePage::recalcDiff(const QString &leftText, const QString &leftPath)
 
     // 3. 에러 처리 (라인 번호 복구)
     if (!result.success) {
-        LogManager::append(
-                QString("Diff error: %1").arg(QString::fromStdString(result.errorMessage)));
-
         QList<DiffRow> errRows;
         bool           handled = false;
 
@@ -497,9 +415,6 @@ void ComparePage::recalcDiff(const QString &leftText, const QString &leftPath)
                 errorLine   = e.mark.line + 1;
                 errorFound  = true;
                 errorDetail = QString::fromStdString(e.msg);
-
-                LogManager::append(
-                        QString("YAML parse error at line %1: %2").arg(errorLine).arg(errorDetail));
             }
 
             // 우측 파싱 시도
@@ -665,10 +580,6 @@ QList<DiffRow> ComparePage::parseDiffResult(const Json::Value &result, const QSt
 
 void ComparePage::performDiff(const QString &leftPath, const QString &rightPath)
 {
-    LogManager::append(QString("Performing file comparison: %1 vs %2")
-                               .arg(formatPathForCompare(leftPath))
-                               .arg(formatPathForCompare(rightPath)));
-
     QFile leftFile(leftPath);
     if (!leftFile.open(QIODevice::ReadOnly | QIODevice::Text))
         return;
@@ -680,10 +591,6 @@ void ComparePage::performDiff(const QString &leftPath, const QString &rightPath)
 
 void ComparePage::performFolderDiff(const QString &leftPath, const QString &rightPath)
 {
-    LogManager::append(QString("Performing folder comparison: %1 vs %2")
-                               .arg(formatPathForCompare(leftPath))
-                               .arg(formatPathForCompare(rightPath)));
-
     QString lPath = leftPath;
     QString rPath = rightPath;
 
@@ -701,38 +608,9 @@ void ComparePage::performFolderDiff(const QString &leftPath, const QString &righ
     auto result = services::DiffService::diffDirectories(rPath.toStdString(), lPath.toStdString());
 
     if (!result.success) {
-        LogManager::append(
-                QString("Folder diff error: %1").arg(QString::fromStdString(result.errorMessage)));
         QMessageBox::critical(this, "Error", QString::fromStdString(result.errorMessage));
         return;
     }
-
-    int totalFiles    = 0;
-    int addedFiles    = 0;
-    int removedFiles  = 0;
-    int modifiedFiles = 0;
-
-    if (result.data.isMember("changes") && result.data["changes"].isArray()) {
-        totalFiles = result.data["changes"].size();
-        for (const auto &change : result.data["changes"]) {
-            if (change.isMember("type")) {
-                std::string type = change["type"].asString();
-                if (type == "added")
-                    addedFiles++;
-                else if (type == "removed")
-                    removedFiles++;
-                else if (type == "modified")
-                    modifiedFiles++;
-            }
-        }
-    }
-
-    LogManager::append(
-            QString("Folder diff completed: %1 files analyzed (%2 added, %3 removed, %4 modified)")
-                    .arg(totalFiles)
-                    .arg(addedFiles)
-                    .arg(removedFiles)
-                    .arg(modifiedFiles));
 
     if (diffPanel_) {
         diffPanel_->setupFolderDiffMode(result.data, lPath, rPath);

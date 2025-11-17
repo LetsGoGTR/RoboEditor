@@ -1,20 +1,25 @@
 #include "DiffTablePanel.h"
 
+#include <QDebug>
+#include <QDir>
+#include <QFileInfo>
 #include <QHBoxLayout>
 #include <QHeaderView>
-#include <QFileInfo>
-#include <QDir>
-#include <QDebug>
 
-DiffTablePanel::DiffTablePanel(QWidget *parent)
-    : QWidget(parent)
+#include "mainwindow.h"
+
+DiffTablePanel::DiffTablePanel(QWidget *parent) : QWidget(parent)
 {
+    // ✅ 초기 테마 설정
+    isDarkMode_ = MainWindow::dark;
+    colors_     = isDarkMode_ ? DiffColors::forDarkMode() : DiffColors::forLightMode();
+
     mainLayout_ = new QVBoxLayout(this);
     mainLayout_->setContentsMargins(8, 8, 8, 8);
     mainLayout_->setSpacing(6);
 
     // 상단 바
-    topBar_ = new QWidget(this);
+    topBar_         = new QWidget(this);
     auto *topLayout = new QHBoxLayout(topBar_);
     topLayout->setContentsMargins(0, 0, 0, 0);
     topLayout->setSpacing(8);
@@ -29,13 +34,17 @@ DiffTablePanel::DiffTablePanel(QWidget *parent)
 
     filterCombo_ = new QComboBox(this);
     filterCombo_->addItems({tr("All"), tr("Changed"), tr("Added"), tr("Removed")});
-    connect(filterCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged),
-            this, &DiffTablePanel::onFilterChanged);
+    connect(filterCombo_,
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this,
+            &DiffTablePanel::onFilterChanged);
     topLayout->addWidget(filterCombo_);
 
     showOnlyChangedCheck_ = new QCheckBox(tr("Changed only"), this);
-    connect(showOnlyChangedCheck_, &QCheckBox::toggled,
-            this, &DiffTablePanel::onShowOnlyChangedToggled);
+    connect(showOnlyChangedCheck_,
+            &QCheckBox::toggled,
+            this,
+            &DiffTablePanel::onShowOnlyChangedToggled);
     topLayout->addWidget(showOnlyChangedCheck_);
 
     mainLayout_->addWidget(topBar_);
@@ -49,16 +58,87 @@ DiffTablePanel::DiffTablePanel(QWidget *parent)
     table_->setShowGrid(true);
     table_->verticalHeader()->setVisible(false);
 
-    connect(table_, &QTableWidget::cellDoubleClicked,
-            this, &DiffTablePanel::onTableCellActivated);
+    connect(table_, &QTableWidget::cellDoubleClicked, this, &DiffTablePanel::onTableCellActivated);
 
     mainLayout_->addWidget(table_);
 }
 
-void DiffTablePanel::setupFileDiffMode(const QString &fileType, const QString &leftHeader, const QString &rightHeader)
+// ✅ 테마 적용 함수 구현
+void DiffTablePanel::applyTheme(bool isDark)
+{
+    isDarkMode_ = isDark;
+    colors_     = isDark ? DiffColors::forDarkMode() : DiffColors::forLightMode();
+
+    // 테이블 재구성 (색상 업데이트)
+    rebuildTable();
+
+    // 폴더 트리 색상 업데이트
+    if (isFolderMode_ && leftFolderTree_ && rightFolderTree_) {
+        updateTreeColors(leftFolderTree_);
+        updateTreeColors(rightFolderTree_);
+    }
+}
+
+// ✅ 트리 색상 업데이트 헬퍼 함수
+void DiffTablePanel::updateTreeColors(QTreeWidget *tree)
+{
+    if (!tree)
+        return;
+
+    QTreeWidgetItemIterator it(tree);
+    while (*it) {
+        QTreeWidgetItem *item = *it;
+
+        // 파일 아이템만 처리 (자식이 없는 경우)
+        if (item->childCount() == 0) {
+            QString statusText = item->text(1);
+            QColor  bgColor;
+
+            if (statusText == "Added") {
+                bgColor = colors_.added;
+            } else if (statusText == "Removed") {
+                bgColor = colors_.removed;
+            } else if (statusText == "Modified") {
+                bgColor = colors_.changed;
+            } else {
+                bgColor = colors_.normal;
+            }
+
+            // 배경색 적용
+            for (int c = 0; c < 3; c++) {
+                item->setBackground(c, bgColor);
+            }
+
+            // ✅ 텍스트 색상도 업데이트 (Type 컬럼)
+            QString typeText = item->text(2);
+            QColor  textColor;
+
+            if (typeText.contains("ADDED")) {
+                textColor = isDarkMode_ ? QColor(74, 222, 128) : QColor(22, 163, 74);
+            } else if (typeText.contains("REMOVED")) {
+                textColor = isDarkMode_ ? QColor(248, 113, 113) : QColor(220, 38, 38);
+            } else if (typeText.contains("CHANGED")) {
+                textColor = isDarkMode_ ? QColor(234, 179, 8) : QColor(184, 134, 11);
+            }
+
+            if (!textColor.isValid()) {
+                textColor = isDarkMode_ ? Qt::white : Qt::black;
+            }
+
+            item->setForeground(2, QBrush(textColor));
+        }
+
+        ++it;
+    }
+}
+
+void DiffTablePanel::setupFileDiffMode(const QString &fileType,
+                                       const QString &leftHeader,
+                                       const QString &rightHeader)
 {
     isFolderMode_ = false;
-    if (folderSplit_) folderSplit_->hide();
+    if (folderSplit_)
+        folderSplit_->hide();
     table_->show();
 
     filterCombo_->setVisible(true);
@@ -89,7 +169,9 @@ void DiffTablePanel::setDiffRows(const QList<DiffRow> &rows)
     rebuildTable();
 }
 
-void DiffTablePanel::setupFolderDiffMode(const Json::Value &result, const QString &leftRootPath, const QString &rightRootPath)
+void DiffTablePanel::setupFolderDiffMode(const Json::Value &result,
+                                         const QString     &leftRootPath,
+                                         const QString     &rightRootPath)
 {
     isFolderMode_ = true;
     table_->hide();
@@ -101,7 +183,7 @@ void DiffTablePanel::setupFolderDiffMode(const Json::Value &result, const QStrin
     if (!folderSplit_) {
         folderSplit_ = new QSplitter(Qt::Horizontal, this);
 
-        leftFolderTree_ = new QTreeWidget(folderSplit_);
+        leftFolderTree_  = new QTreeWidget(folderSplit_);
         rightFolderTree_ = new QTreeWidget(folderSplit_);
 
         leftFolderTree_->setAlternatingRowColors(true);
@@ -109,8 +191,14 @@ void DiffTablePanel::setupFolderDiffMode(const Json::Value &result, const QStrin
         leftFolderTree_->setFrameShape(QFrame::NoFrame);
         rightFolderTree_->setFrameShape(QFrame::NoFrame);
 
-        connect(leftFolderTree_, &QTreeWidget::itemDoubleClicked, this, &DiffTablePanel::onTreeItemDoubleClicked);
-        connect(rightFolderTree_, &QTreeWidget::itemDoubleClicked, this, &DiffTablePanel::onTreeItemDoubleClicked);
+        connect(leftFolderTree_,
+                &QTreeWidget::itemDoubleClicked,
+                this,
+                &DiffTablePanel::onTreeItemDoubleClicked);
+        connect(rightFolderTree_,
+                &QTreeWidget::itemDoubleClicked,
+                this,
+                &DiffTablePanel::onTreeItemDoubleClicked);
 
         mainLayout_->insertWidget(1, folderSplit_);
         mainLayout_->setStretchFactor(folderSplit_, 1);
@@ -122,35 +210,39 @@ void DiffTablePanel::setupFolderDiffMode(const Json::Value &result, const QStrin
     // 헤더 설정
     QString lName = QFileInfo(leftRootPath).fileName();
     QString rName = QFileInfo(rightRootPath).fileName();
-    if (lName.isEmpty()) lName = leftRootPath;
-    if (rName.isEmpty()) rName = rightRootPath;
+    if (lName.isEmpty())
+        lName = leftRootPath;
+    if (rName.isEmpty())
+        rName = rightRootPath;
 
     leftFolderTree_->setHeaderLabels({lName, tr("Status"), tr("Type")});
     rightFolderTree_->setHeaderLabels({rName, tr("Status"), tr("Type")});
 
     // 통계 파싱
-    const Json::Value &stats = result["statistics"];
-    int added    = stats["added"].asInt();
-    int removed  = stats["removed"].asInt();
-    int modified = stats["modified"].asInt();
-    int total    = stats["totalChanges"].asInt();
+    const Json::Value &stats    = result["statistics"];
+    int                added    = stats["added"].asInt();
+    int                removed  = stats["removed"].asInt();
+    int                modified = stats["modified"].asInt();
+    int                total    = stats["totalChanges"].asInt();
 
     if (statLabel_) {
         statLabel_->setText(QString("Folder Changes: %1 (+%2 -%3 ~%4)")
-                                    .arg(total).arg(added).arg(removed).arg(modified));
+                                    .arg(total)
+                                    .arg(added)
+                                    .arg(removed)
+                                    .arg(modified));
     }
 
     // 트리 아이템 생성 로직
-    const Json::Value &changes = result["changes"];
+    const Json::Value                &changes = result["changes"];
     QMap<QString, QList<Json::Value>> folderGroups;
 
     for (const auto &change : changes) {
-        QString path = QString::fromStdString(change["path"].asString());
+        QString path   = QString::fromStdString(change["path"].asString());
         QString folder = QFileInfo(path).dir().path();
 
-        // "." 경로를 "(Root)"로 바꾸지 않고 빈 문자열로 처리하여 구분
-        if (folder == ".") folder = "";
-
+        if (folder == ".")
+            folder = "";
         folderGroups[folder].append(change);
     }
 
@@ -160,24 +252,23 @@ void DiffTablePanel::setupFolderDiffMode(const Json::Value &result, const QStrin
     for (const QString &folderPath : folderKeys) {
         const QList<Json::Value> &files = folderGroups[folderPath];
 
-        // 폴더 경로가 비어있으면(최상위 파일들) 폴더 노드를 만들지 않고 invisibleRootItem 사용
         QTreeWidgetItem *lFolder = nullptr;
         QTreeWidgetItem *rFolder = nullptr;
 
         if (folderPath.isEmpty()) {
-            // 최상위 루트에 직접 붙임
             lFolder = leftFolderTree_->invisibleRootItem();
             rFolder = rightFolderTree_->invisibleRootItem();
         } else {
-            // 하위 폴더인 경우에만 폴더 노드 생성
             lFolder = new QTreeWidgetItem(leftFolderTree_);
             rFolder = new QTreeWidgetItem(rightFolderTree_);
 
             QString folderText = QString("📁 %1").arg(folderPath);
-            QString countText = QString("%1 file(s)").arg(files.size());
+            QString countText  = QString("%1 file(s)").arg(files.size());
 
-            lFolder->setText(0, folderText); lFolder->setText(1, countText);
-            rFolder->setText(0, folderText); rFolder->setText(1, countText);
+            lFolder->setText(0, folderText);
+            lFolder->setText(1, countText);
+            rFolder->setText(0, folderText);
+            rFolder->setText(1, countText);
 
             lFolder->setExpanded(true);
             rFolder->setExpanded(true);
@@ -185,10 +276,15 @@ void DiffTablePanel::setupFolderDiffMode(const Json::Value &result, const QStrin
 
         // 파일 노드 생성
         for (const auto &change : files) {
-            QString path = QString::fromStdString(change["path"].asString());
-            QString type = QString::fromStdString(change["type"].asString());
+            QString path     = QString::fromStdString(change["path"].asString());
+            QString type     = QString::fromStdString(change["type"].asString());
             QString fileName = QFileInfo(path).fileName();
-            QColor bgColor = getColorForDiffState(type);
+            QColor  bgColor  = getColorForDiffState(type);  // ✅ colors_ 사용
+
+            // ✅ 텍스트 색상 (다크 모드 대응)
+            QColor addedTextColor   = isDarkMode_ ? QColor(74, 222, 128) : QColor(22, 163, 74);
+            QColor removedTextColor = isDarkMode_ ? QColor(248, 113, 113) : QColor(220, 38, 38);
+            QColor changedTextColor = isDarkMode_ ? QColor(234, 179, 8) : QColor(184, 134, 11);
 
             // Left (Added / Modified)
             if (type != "removed") {
@@ -199,13 +295,14 @@ void DiffTablePanel::setupFolderDiffMode(const Json::Value &result, const QStrin
                 if (type == "added") {
                     item->setText(1, "Added");
                     item->setText(2, "+ ADDED");
-                    item->setForeground(2, QBrush(QColor(22, 163, 74)));
+                    item->setForeground(2, QBrush(addedTextColor));
                 } else {
                     item->setText(1, "Modified");
                     item->setText(2, "● CHANGED");
-                    item->setForeground(2, QBrush(QColor(184, 134, 11)));
+                    item->setForeground(2, QBrush(changedTextColor));
                 }
-                for(int c=0; c<3; c++) item->setBackground(c, bgColor);
+                for (int c = 0; c < 3; c++)
+                    item->setBackground(c, bgColor);
             }
 
             // Right (Removed / Modified)
@@ -217,19 +314,20 @@ void DiffTablePanel::setupFolderDiffMode(const Json::Value &result, const QStrin
                 if (type == "removed") {
                     item->setText(1, "Removed");
                     item->setText(2, "− REMOVED");
-                    item->setForeground(2, QBrush(QColor(220, 38, 38)));
+                    item->setForeground(2, QBrush(removedTextColor));
                 } else {
                     item->setText(1, "Modified");
                     item->setText(2, "● CHANGED");
-                    item->setForeground(2, QBrush(QColor(184, 134, 11)));
+                    item->setForeground(2, QBrush(changedTextColor));
                 }
-                for(int c=0; c<3; c++) item->setBackground(c, bgColor);
+                for (int c = 0; c < 3; c++)
+                    item->setBackground(c, bgColor);
             }
         }
     }
 
     // 컬럼 너비 자동 조절
-    for(int i=0; i<3; i++) {
+    for (int i = 0; i < 3; i++) {
         leftFolderTree_->resizeColumnToContents(i);
         rightFolderTree_->resizeColumnToContents(i);
     }
@@ -239,13 +337,20 @@ void DiffTablePanel::clearAll()
 {
     allRows_.clear();
     table_->setRowCount(0);
-    if (leftFolderTree_) leftFolderTree_->clear();
-    if (rightFolderTree_) rightFolderTree_->clear();
-    if (statLabel_) statLabel_->clear();
-    if (typeInfoLabel_) typeInfoLabel_->setText(tr(""));
+    if (leftFolderTree_)
+        leftFolderTree_->clear();
+    if (rightFolderTree_)
+        rightFolderTree_->clear();
+    if (statLabel_)
+        statLabel_->clear();
+    if (typeInfoLabel_)
+        typeInfoLabel_->setText(tr(""));
 }
 
-void DiffTablePanel::setFileTypeInfo(const QString &leftType, const QString &rightType, bool compatible, const QString &message)
+void DiffTablePanel::setFileTypeInfo(const QString &leftType,
+                                     const QString &rightType,
+                                     bool           compatible,
+                                     const QString &message)
 {
     Q_UNUSED(leftType)
     Q_UNUSED(rightType)
@@ -273,10 +378,18 @@ void DiffTablePanel::onTreeItemDoubleClicked(QTreeWidgetItem *item, int /*column
 void DiffTablePanel::onFilterChanged(int index)
 {
     switch (index) {
-    case 1: currentFilter_ = "Changed"; break;
-    case 2: currentFilter_ = "Added"; break;
-    case 3: currentFilter_ = "Removed"; break;
-    default: currentFilter_ = "All"; break;
+    case 1:
+        currentFilter_ = "Changed";
+        break;
+    case 2:
+        currentFilter_ = "Added";
+        break;
+    case 3:
+        currentFilter_ = "Removed";
+        break;
+    default:
+        currentFilter_ = "All";
+        break;
     }
     rebuildTable();
 }
@@ -294,7 +407,6 @@ bool DiffTablePanel::matchFilter(const DiffRow &row) const
     if (showOnlyChangedCheck_->isChecked() && !isChangedLike)
         return false;
 
-    // 콤보박스 필터
     if (currentFilter_ == "All")
         return true;
 
@@ -312,40 +424,47 @@ bool DiffTablePanel::matchFilter(const DiffRow &row) const
 
 void DiffTablePanel::rebuildTable()
 {
-    if (isFolderMode_) return;
+    if (isFolderMode_)
+        return;
 
     table_->setRowCount(0);
 
-    int changeCount = 0, added = 0, removed = 0, modified = 0;
+    int  changeCount = 0, added = 0, removed = 0, modified = 0;
     bool isYaml = (table_->columnCount() == 5);
 
     for (const auto &r : allRows_) {
-        if (!matchFilter(r)) continue;
+        if (!matchFilter(r))
+            continue;
 
         int row = table_->rowCount();
         table_->insertRow(row);
 
         QColor bgColor = getColorForDiffState(r.state.toLower());
 
-        if (r.state == "ADDED") added++;
-        else if (r.state == "REMOVED") removed++;
-        else if (r.state == "CHANGED") modified++;
-        if (r.state != "SAME") changeCount++;
+        if (r.state == "ADDED")
+            added++;
+        else if (r.state == "REMOVED")
+            removed++;
+        else if (r.state == "CHANGED")
+            modified++;
+        if (r.state != "SAME")
+            changeCount++;
 
-        // DiffRow 멤버 이름 변경 반영 (row.leftValue -> row.target 등)
-        auto createItem = [&](const QString& text) {
-            auto* item = new QTableWidgetItem(text);
+        auto createItem = [&](const QString &text) {
+            auto *item = new QTableWidgetItem(text);
             item->setBackground(bgColor);
             return item;
         };
 
-        QTableWidgetItem *itemLine = isYaml ? createItem(r.line > 0 ? QString::number(r.line) : "") : nullptr;
-        QTableWidgetItem *itemKey = createItem(r.key);
-        QTableWidgetItem *itemLeft = createItem(r.target); // target = Left Value
-        QTableWidgetItem *itemRight = createItem(r.origin); // origin = Right Value
+        QTableWidgetItem *itemLine =
+                isYaml ? createItem(r.line > 0 ? QString::number(r.line) : "") : nullptr;
+        QTableWidgetItem *itemKey   = createItem(r.key);
+        QTableWidgetItem *itemLeft  = createItem(r.target);
+        QTableWidgetItem *itemRight = createItem(r.origin);
         QTableWidgetItem *itemState = createItem(r.state);
 
-        if(itemLine) itemLine->setTextAlignment(Qt::AlignCenter);
+        if (itemLine)
+            itemLine->setTextAlignment(Qt::AlignCenter);
         itemState->setTextAlignment(Qt::AlignCenter);
 
         if (isYaml) {
@@ -364,16 +483,24 @@ void DiffTablePanel::rebuildTable()
 
     if (statLabel_) {
         statLabel_->setText(QString("Changes: %1 (+%2 -%3 ~%4)")
-                                    .arg(changeCount).arg(added).arg(removed).arg(modified));
+                                    .arg(changeCount)
+                                    .arg(added)
+                                    .arg(removed)
+                                    .arg(modified));
     }
 }
 
+// ✅ 색상 반환 함수 수정 (colors_ 멤버 사용)
 QColor DiffTablePanel::getColorForDiffState(const QString &state) const
 {
     QString s = state.toLower();
-    if (s == "added") return QColor(220, 252, 231);
-    if (s == "removed") return QColor(254, 226, 226);
-    if (s == "changed" || s == "modified") return QColor(255, 250, 205);
-    if (s == "error" || s == "mismatch") return QColor(255, 237, 213);
-    return QColor(255, 255, 255);
+    if (s == "added")
+        return colors_.added;
+    if (s == "removed")
+        return colors_.removed;
+    if (s == "changed" || s == "modified")
+        return colors_.changed;
+    if (s == "error" || s == "mismatch")
+        return colors_.error;
+    return colors_.normal;
 }

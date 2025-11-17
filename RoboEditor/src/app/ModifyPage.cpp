@@ -15,6 +15,8 @@
 
 #include "CodeEditor.h"
 #include "ComparePage.h"
+#include "LogManager.h"
+#include "mainwindow.h"
 
 ModifyPage::ModifyPage(QWidget *parent) : QWidget(parent), currentDoc(nullptr)
 {
@@ -101,13 +103,25 @@ Document *ModifyPage::openDocument(const QString &path)
     // 파일 경로 레이블 생성
     QLabel *pathLabel = new QLabel(tabPage);
     pathLabel->setObjectName("pathLabel");  // 나중에 찾기 위한 이름 설정
-    pathLabel->setStyleSheet("QLabel {"
-                             "  padding: 4px 8px;"
-                             "  background-color: #f0f0f0;"
-                             "  border-bottom: 1px solid #d0d0d0;"
-                             "  font-size: 9pt;"
-                             "  color: #666;"
-                             "}");
+    if (MainWindow::dark) {
+        //다크
+        pathLabel->setStyleSheet("QLabel {"
+                                 "  padding: 4px 8px;"
+                                 "  background-color: #2d2d2d;"
+                                 "  border-bottom: 1px solid #3a3a3a;"
+                                 "  font-size: 9pt;"
+                                 "  color: #a0a0a0;"
+                                 "}");
+    } else {
+        //라이트
+        pathLabel->setStyleSheet("QLabel {"
+                                 "  padding: 4px 8px;"
+                                 "  background-color: #f0f0f0;"
+                                 "  border-bottom: 1px solid #d0d0d0;"
+                                 "  font-size: 9pt;"
+                                 "  color: #666;"
+                                 "}");
+    }
     pathLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
 
     // 경로 포맷팅
@@ -325,8 +339,7 @@ void ModifyPage::ensureCompare(const QString &targetPath)
     });
 
     // 폴더 비교 트리에서 더블클릭 → ModifyPage가 파일을 열도록 연결
-    connect(comparePane_, &ComparePage::requestOpenFile,
-            this,        &ModifyPage::openFromTree);
+    connect(comparePane_, &ComparePage::requestOpenFile, this, &ModifyPage::openFromTree);
 
     // 탭 변경 시 ComparePage 업데이트는 생성자에서 이미 연결되어 있음
 
@@ -643,7 +656,15 @@ void ModifyPage::closeFile(int index)
     }
     updateTitle();
 }
+static QString shortenBackupPath(const QString &fullPath)
+{
+    QString base = "C:/backup/";
 
+    if (fullPath.startsWith(base, Qt::CaseInsensitive)) {
+        return fullPath.mid(base.length());
+    }
+    return fullPath;  // 백업 경로가 아니면 원문 그대로
+}
 Document *ModifyPage::currentDocument()
 {
     if (currentDocumentIndex >= 0 && currentDocumentIndex < documents.size()) {
@@ -695,6 +716,9 @@ void ModifyPage::saveFile()
     QTextStream out(&file);
     out << doc->gcontent();  // 문서 내용 쓰기
 
+    QString shortPath = shortenBackupPath(filePath);
+    QString msg       = QString("[%1] is saved").arg(shortPath);
+    LogManager::append(msg);
     doc->setModified(false);
     updateTitle();
     file.close();
@@ -728,7 +752,7 @@ void ModifyPage::saveAsFile()
     }
 
     QString newFilePath = QFileDialog::getSaveFileName(
-            nullptr, "Save As", initialDir, "Text Files (*.txt);;All Files (*)");
+            nullptr, "Save As", initialDir, "All Files (*);;Text Files (*.txt)");
 
     if (newFilePath.isEmpty()) {
         return;
@@ -740,8 +764,22 @@ void ModifyPage::saveAsFile()
         return;
     }
 
+    QFileInfo infoAfter(newFilePath);
+    QString   newName = infoAfter.fileName();
+
+    QFileInfo infoBefore(currentPath);
+    QString   beforeName = infoBefore.fileName();
+
     QTextStream out(&file);
     out << doc->gcontent();
+
+    QString shortBefore = shortenBackupPath(currentPath);
+    QString shortAfter  = shortenBackupPath(newFilePath);
+
+    QString msg = QString("[%1] is saved to [%2]").arg(shortBefore).arg(shortAfter);
+
+    LogManager::append(msg);
+
     doc->setFilePath(newFilePath);
     doc->setModified(false);
     updateTitle();

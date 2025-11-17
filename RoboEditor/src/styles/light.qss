@@ -167,3 +167,10 @@ QSpinBox::up-arrow, QSpinBox::down-arrow {
     width: 16px;
     height: 10px;
 }
+#ComparePageRoot QLabel#pathLabel {
+    padding: 4px 8px;
+    background-color: #f0f0f0;;
+    border-bottom: 1px solid #d0d0d0;
+    font-size: 9pt;
+    color: #666;
+}
