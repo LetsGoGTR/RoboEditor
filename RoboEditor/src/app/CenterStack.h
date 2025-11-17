@@ -44,7 +44,14 @@ class CenterStack : public QWidget
         {
             return modifyPage_;
         }
-
+        ComparePage *comparePage() const
+        {
+            return comparePage_;
+        }
+        ComparePage *getComparePage() const
+        {
+            return comparePage_;
+        }
         // 경로 관련
         QString getWorkspacePath() const;
         void    setBackupPath(const QString &path);
@@ -92,6 +99,7 @@ class CenterStack : public QWidget
         QFileSystemModel   *workspaceModel_;
 
         ModifyPage        *modifyPage_;
+        ComparePage       *comparePage_;
         ControllerManager *controllerManager_;
 
         // 경로

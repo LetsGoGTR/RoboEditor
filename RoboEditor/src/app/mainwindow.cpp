@@ -7,6 +7,7 @@
 #include <QMessageBox>
 #include <QSettings>
 #include <QStatusBar>
+#include <QStyleHints>
 
 #include "ApplyPage.h"
 #include "CenterStack.h"
@@ -16,6 +17,7 @@
 #include "ShortcutManager.h"
 #include "TopMenu.h"
 
+bool MainWindow::dark = false;
 MainWindow::~MainWindow()
 {
     LogManager::destroy();
@@ -29,6 +31,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
     ensureNav();     // 좌측 네비게이션
 
     wire();
+
+    applyStyleSheet();
 
     statusBar()->showMessage("UI Ready");
 }
@@ -121,8 +125,8 @@ void MainWindow::wire()
         backupPopup_->show();
     });
 
-    modifyPage = center_->getModifyPage();
-
+    modifyPage  = center_->getModifyPage();
+    comparePage = center_->getComparePage();
     shortcutMgr = new ShortcutManager(this);
     shortcutMgr->registerTo(this);
 
@@ -143,7 +147,31 @@ void MainWindow::wire()
                 statusBar()->showMessage("Compare (stub)");
             });
 }
+bool MainWindow::eventFilter(QObject *obj, QEvent *event)
+{
+    if (event->type() == QEvent::ApplicationPaletteChange || event->type() == QEvent::ThemeChange) {
+        qDebug() << "System theme changed → reloading stylesheet...";
+        applyStyleSheet();
+        return true;  // 이벤트 처리됐다고 알려서 재귀 방지
+    }
 
+    return QMainWindow::eventFilter(obj, event);
+}
+void MainWindow::applyStyleSheet()
+{
+    dark = qApp->styleHints()->colorScheme() == Qt::ColorScheme::Dark;
+
+    QString stylePath = dark ? ":/styles/dark.qss" : ":/styles/light.qss";
+
+    QFile f(stylePath);
+    if (f.open(QFile::ReadOnly)) {
+        QString css = QString::fromUtf8(f.readAll());
+        qApp->setStyleSheet(css);
+        qDebug() << " Style applied:" << stylePath;
+    } else {
+        qWarning() << " Failed to load stylesheet:" << stylePath;
+    }
+}
 void MainWindow::closeEvent(QCloseEvent *event)
 {
     QMainWindow::closeEvent(event);

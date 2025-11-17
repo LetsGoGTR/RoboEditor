@@ -13,6 +13,7 @@
 
 #include "ControllerSetting.h"
 #include "FileCompressor.h"
+#include "LogManager.h"
 #include "PasswordManager.h"
 #include "SftpClient.h"
 
@@ -86,6 +87,8 @@ void ControllerManager::registerController()
         qDebug() << "Username:" << newConInfo.username;
 
         saveToFile(newConInfo.serialNumber);
+        QString msg = QString("[%1] is registred").arg(newConInfo.serialNumber);
+        LogManager::append(msg);
 
         setupApiClient(newConInfo.serialNumber);
 
@@ -102,10 +105,10 @@ void ControllerManager::removeController(int index)
         cleanupApiClient(sn);
 
         controllers_.removeAt(index);
+        QString msg = QString("[%1] is removed").arg(sn);
+        LogManager::append(msg);
         saveToFile();
         emit controllerListChanged();
-
-        qDebug() << "controllers[" << index << "] (" << sn << ") removed";
     }
 }
 
@@ -123,8 +126,8 @@ void ControllerManager::removeController(const ControllerInfo *curCon)
             locker.relock();
 
             controllers_.removeAt(idx);
-            qDebug() << "controllers[" << idx << "] removed";
-
+            QString msg = QString("[%1] is removed").arg(sn);
+            LogManager::append(msg);
             saveToFile();
             emit controllerListChanged();
             break;
@@ -154,12 +157,8 @@ void ControllerManager::updateInfo(const ControllerInfo &newInfo)
                     c.pswd     = updated.pswd;
                     c.wsPath   = updated.wsPath;
 
-                    qDebug() << "[updateInfo] Controller updated:";
-                    qDebug() << "SN:" << c.serialNumber;
-                    qDebug() << "IP:" << c.ip;
-                    qDebug() << "Username:" << c.username;
-                    qDebug() << "workspace Path:" << c.wsPath;
-                    qDebug() << "SFTP:" << c.sftpPort;
+                    QString msg = QString("[%1] state has been updated").arg(c.serialNumber);
+                    LogManager::append(msg);
 
                     break;
                 }
@@ -983,6 +982,8 @@ void ControllerManager::onMasterPasswordChanged()
     if (!pm_)
         return;
 
+    QString msg = QString("Master Key is changed");
+    LogManager::append(msg);
     pm_->loadPasswordFromConfig();
 
     saveToFile();  // 모든 컨트롤러 정보 재저장
