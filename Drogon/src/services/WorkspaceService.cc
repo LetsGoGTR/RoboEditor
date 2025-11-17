@@ -314,7 +314,6 @@ services::ServiceResult services::WorkspaceService::listWorkspaces(const std::st
                 workspaces.append(metadata.toJson());
             }
         }
-
         ServiceResult result;
         result.success            = true;
         result.data["workspaces"] = workspaces;
@@ -404,8 +403,8 @@ services::WorkspaceService::createWorkspace(const WorkspaceMetadata &metadata,
         return ServiceResult::createError("Invalid device ID: " + deviceId);
     }
 
-    std::string baseDir = utils::config::getBaseDir() + (deviceId.empty() ? "" : deviceId + "/");
-    std::string workspacePath = baseDir + metadata.uuid;
+    std::string paramsPath = (deviceId.empty() ? "" : deviceId + "/") + metadata.uuid;
+    std::string workspacePath = utils::config::getBaseDir() + paramsPath;
 
     // Check if workspace already exists
     if (fs::exists(workspacePath) && fs::is_directory(workspacePath)) {
@@ -415,7 +414,7 @@ services::WorkspaceService::createWorkspace(const WorkspaceMetadata &metadata,
 
     try {
         // Create workspace directory using FolderService
-        auto folderResult = services::FolderService::createFolder(workspacePath);
+        auto folderResult = services::FolderService::createFolder(paramsPath);
         if (!folderResult.success) {
             return ServiceResult::createError("Failed to create workspace directory: " +
                                               folderResult.errorMessage);
@@ -556,8 +555,8 @@ services::ServiceResult services::WorkspaceService::deleteWorkspace(const std::s
         return ServiceResult::createError("Invalid device ID: " + deviceId);
     }
 
-    std::string baseDir = utils::config::getBaseDir() + (deviceId.empty() ? "" : deviceId + "/");
-    std::string workspacePath = baseDir + workspaceId;
+    std::string paramsPath = (deviceId.empty() ? "" : deviceId + "/") + workspaceId;
+    std::string workspacePath = utils::config::getBaseDir() + paramsPath;
 
     // Check if workspace exists
     if (!fs::exists(workspacePath) || !fs::is_directory(workspacePath)) {
@@ -570,7 +569,7 @@ services::ServiceResult services::WorkspaceService::deleteWorkspace(const std::s
         WorkspaceMetadata metadata = loadMetadata(workspacePath);
 
         // Delete workspace directory using FolderService
-        auto folderResult = services::FolderService::deleteFolder(workspacePath);
+        auto folderResult = services::FolderService::deleteFolder(paramsPath);
         if (!folderResult.success) {
             return ServiceResult::createError("Failed to delete workspace directory: " +
                                               folderResult.errorMessage);

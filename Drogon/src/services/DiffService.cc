@@ -66,7 +66,8 @@ services::ServiceResult services::DiffService::diffPython(const std::string &con
 {
     services::ServiceResult result;
     try {
-        result.data    = DiffPython::runFromText(contentA, contentB, nameA, nameB);
+        // result.data    = DiffPython::runFromText(contentA, contentB, nameA, nameB);
+        result.data    = DiffPython::runFromPythonAst(contentA, contentB, nameA, nameB);
         result.success = true;
     } catch (const std::exception &e) {
         result.success      = false;

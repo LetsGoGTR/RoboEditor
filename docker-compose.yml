@@ -1,0 +1,9 @@
+version: "3.8"
+
+services:
+  drogon-app:
+    build: .
+    ports:
+      - "8889:5555"
+    volumes:
+      - C:\Users\SSAFY\Desktop\S13P31S205\Svelte\build:/app/web:ro
