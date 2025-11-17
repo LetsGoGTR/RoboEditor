@@ -324,6 +324,10 @@ void ModifyPage::ensureCompare(const QString &targetPath)
         lastComparedPath_ = path;
     });
 
+    // 폴더 비교 트리에서 더블클릭 → ModifyPage가 파일을 열도록 연결
+    connect(comparePane_, &ComparePage::requestOpenFile,
+            this,        &ModifyPage::openFromTree);
+
     // 탭 변경 시 ComparePage 업데이트는 생성자에서 이미 연결되어 있음
 
     // Debouncing 타이머 초기화 (한 번만)
