@@ -1,7 +1,7 @@
-const DEVICE_API_PATH = '/proxy/api/v1/device';
+const DEVICE_API_PATH = '/api/v1/device';
 
 export const _listDevices = async () => {
-	const res = await fetch(`/proxy/api/v1/device`);
+	const res = await fetch(DEVICE_API_PATH);
 	return res.json();
 };
 

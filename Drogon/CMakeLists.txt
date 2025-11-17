@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project(Drogon CXX)
+project(Drogon C CXX)
 
 include(CheckIncludeFileCXX)
 
@@ -32,11 +32,46 @@ find_package(Drogon CONFIG REQUIRED)
 find_package(LibArchive REQUIRED)
 find_package(yaml-cpp REQUIRED)
 find_package(jsoncpp REQUIRED)
-add_subdirectory(external/libbcrypt)
+add_subdirectory(external/bcrypt)
+
+# ##############################################################################
+add_library(tree_sitter STATIC
+    external/tree-sitter/lib/src/lib.c
+)
+
+target_include_directories(tree_sitter
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/external/tree-sitter/lib/include
+)
+
+add_library(tree_sitter_python STATIC
+    external/tree-sitter-python/src/parser.c
+    external/tree-sitter-python/src/scanner.c
+)
+
+target_include_directories(tree_sitter_python
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/external/tree-sitter-python/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/external/tree-sitter/lib/include
+)
+
+target_link_libraries(tree_sitter_python
+    PRIVATE
+        tree_sitter
+)
+# ##############################################################################
 
 # Find libssh2 using pkg-config
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(LIBSSH2 REQUIRED libssh2)
+find_path(LIBSSH2_INCLUDE_DIR
+    NAMES libssh2.h
+)
+find_library(LIBSSH2_LIBRARY
+    NAMES ssh2 libssh2
+)
+if (NOT LIBSSH2_INCLUDE_DIR OR NOT LIBSSH2_LIBRARY)
+    message(FATAL_ERROR "libssh2 not found. Please install libssh2-1-dev")
+endif()
+
 target_link_libraries(
     ${PROJECT_NAME}
     PRIVATE
@@ -44,7 +79,8 @@ target_link_libraries(
     yaml-cpp
     LibArchive::LibArchive
     bcrypt
-    ${LIBSSH2_LIBRARIES}
+    ${LIBSSH2_LIBRARY}
+    tree_sitter_python
 )
 
 # ##############################################################################
@@ -83,9 +119,10 @@ target_include_directories(${PROJECT_NAME}
                            ${CMAKE_CURRENT_SOURCE_DIR}
                            ${CMAKE_CURRENT_SOURCE_DIR}/src
                            ${CMAKE_CURRENT_SOURCE_DIR}/models
-                           ${CMAKE_CURRENT_SOURCE_DIR}/external/libbcrypt/include
+                           ${CMAKE_CURRENT_SOURCE_DIR}/external/bcrypt
+                           ${CMAKE_CURRENT_SOURCE_DIR}/external/tree-sitter/lib/include
                            ${LibArchive_INCLUDE_DIRS}
-                           ${LIBSSH2_INCLUDE_DIRS})
+                           ${LIBSSH2_INCLUDE_DIR})
 target_sources(${PROJECT_NAME}
                PRIVATE
                ${SRC_DIR}
@@ -136,7 +173,7 @@ target_include_directories(test_diff_v4
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/models
-    ${CMAKE_CURRENT_SOURCE_DIR}/external/libbcrypt/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/external/bcrypt
     ${CMAKE_CURRENT_SOURCE_DIR}/src/utils/diff
     ${LibArchive_INCLUDE_DIRS}
 )

@@ -53,11 +53,16 @@ class DiffPython
     // 텍스트파일 A, B에 대해 diff를 수행하고 JSON 결과를 반환.
     // 입력: contentA, contentB, nameA, nameB
     // 출력: Json::Value (changes/통계)
-    static Json::Value runFromText(const std::string &contentA,
-                                   const std::string &contentB,
-                                   const std::string &nameA,
-                                   const std::string &nameB);
+    static Json::Value runFromText(const std::string& contentA,
+                                   const std::string& contentB,
+                                   const std::string& nameA,
+                                   const std::string& nameB);
 
+    static Json::Value runFromPythonAst(const std::string& contentA,
+                                    const std::string& contentB,
+                                    const std::string& nameA,
+                                    const std::string& nameB);
+    
     // 텍스트파일의 정규화(주석, 공백제거) 반환.
     // 입력: content
     // 출력: vector<pair<string, int>> (정규화/rank)
@@ -74,7 +79,9 @@ class DiffPython
                                        char              &tripleQuoteChar);
     // 텍스트 파일을 라인 단위로 정규화.
     // 라인으로 분해, 주석처리, 개행 처리
-    static std::vector<NormalizedLine> normalizeAll(const std::string &content);
+    static std::vector<NormalizedLine> normalizeAll(const std::string& content);
+    
+    static std::vector<NormalizedLine> normalizePythonAst(const std::string& content);
 
     // 정규화된 라인을 비교해 라인 간 관계를 표현한 목록 반환.
     // 정규화 정보 정수화 → 트림으로 비교 구간 단축 + 공통 접두 ops에 추가

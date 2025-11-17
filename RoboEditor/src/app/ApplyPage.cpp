@@ -2,6 +2,7 @@
 
 #include <QDir>
 #include <QFile>
+#include <QTimer>
 #include <QFileDialog>
 #include <QJsonObject>
 #include <QMessageBox>
@@ -10,6 +11,7 @@
 #include "ConfirmSelection.h"
 #include "ControllerManager.h"
 #include "PasswordManager.h"
+#include "ProgressDialog.h"
 #include "ui_ApplyPage.h"
 #include "ui_ConfirmSelection.h"
 
@@ -41,6 +43,12 @@ ApplyPage::ApplyPage(QWidget *parent) :
                 ui->selectedDir->setText(selectedBackupDir);
                 qDebug() << "ApplyPage received:" << selectedBackupDir;
             });
+
+    ControllerManager *manager = ControllerManager::instance();
+    connect(manager, &ControllerManager::applyCompleted,
+            this, &ApplyPage::onApplyCompleted);
+    connect(manager, &ControllerManager::applyFailed,
+            this, &ApplyPage::onApplyFailed);
 }
 
 //refresh : 제어기 목록 새로고침
@@ -187,21 +195,46 @@ void ApplyPage::startApplyQueue()
     totalApplyRequests_     = selectedControllerList.size();
     completedApplyRequests_ = 0;
     failedApplyRequests_    = 0;
+    applyInProgress_        = true;
+
+    // 진행 다이얼로그 새로 생성
+    if (applyProgressDialog_) {
+        applyProgressDialog_->close();
+        applyProgressDialog_->deleteLater();
+        applyProgressDialog_ = nullptr;
+    }
+
+    applyProgressDialog_ = new ProgressDialog(this);
+    applyProgressDialog_->setWindowTitle("적용 진행 중...");
+    applyProgressDialog_->setTotalCount(totalApplyRequests_);
+    applyProgressDialog_->setCurrentIndex(0);
+    applyProgressDialog_->setSerialNumber("-");
+    applyProgressDialog_->setProgress(0);
+    applyProgressDialog_->setFinishedMode(false);
+    applyProgressDialog_->show();
+
+    QApplication::processEvents();
+
+    connect(applyProgressDialog_,
+            &ProgressDialog::cancelRequested,
+            this,
+            [this]() {
+                if (applyProgressDialog_) {
+                    applyProgressDialog_->close();
+                }
+            });
 
     // Disable controls during apply
     if (ui->applyBtn)
         ui->applyBtn->setEnabled(false);
-    if (ui->refreshBtn)
-        ui->refreshBtn->setEnabled(false);
-    if (ui->importBtn)
-        ui->importBtn->setEnabled(false);
 
     for (const QString &sn : selectedControllerList) {
         applyQueue_.enqueue(sn);
     }
 
+    QTimer::singleShot(0, this, &ApplyPage::processNextApply);
     // 큐 처리 시작
-    processNextApply();
+    // processNextApply();
 }
 
 // 큐 처리
@@ -218,21 +251,35 @@ void ApplyPage::processNextApply()
 
     qDebug() << "[ApplyPage] Applying to:" << serialNumber << "backup dir:" << selectedBackupDir;
 
+    if (applyProgressDialog_) {
+        applyProgressDialog_->setSerialNumber(serialNumber);
+    }
+
     bool ok = ControllerManager::instance()->applyRequest(
             serialNumber, selectedBackupDir, apiPassword_);
-    if (ok) {
-        onApplyCompleted(serialNumber);
-    } else {
-        onApplyFailed(serialNumber, tr("SFTP 적용 실패"));
+    if (!ok) {
+        onApplyFailed(serialNumber, tr("적용 요청을 시작하지 못했습니다."));
     }
 }
 
 // 개별 적용 성공
 void ApplyPage::onApplyCompleted(const QString &serialNumber)
 {
+    if (!applyInProgress_)
+        return;
+
     completedApplyRequests_++;
     qDebug() << "[ApplyPage] Apply completed:" << serialNumber << "(" << completedApplyRequests_
              << "/" << totalApplyRequests_ << ")";
+
+
+    int doneCount = completedApplyRequests_ + failedApplyRequests_;
+
+    if (applyProgressDialog_ && totalApplyRequests_ > 0) {
+        applyProgressDialog_->setCurrentIndex(doneCount);
+        int percent = (doneCount * 100) / totalApplyRequests_;
+        applyProgressDialog_->setProgress(percent);
+    }
 
     // 다음 작업 처리
     processNextApply();
@@ -241,8 +288,20 @@ void ApplyPage::onApplyCompleted(const QString &serialNumber)
 // 개별 적용 실패
 void ApplyPage::onApplyFailed(const QString &serialNumber, const QString &error)
 {
+    if (!applyInProgress_)
+        return;
+
     failedApplyRequests_++;
     qWarning() << "[ApplyPage] Apply failed:" << serialNumber << error;
+
+
+    int doneCount = completedApplyRequests_ + failedApplyRequests_;
+
+    if (applyProgressDialog_ && totalApplyRequests_ > 0) {
+        applyProgressDialog_->setCurrentIndex(doneCount);
+        int percent = (doneCount * 100) / totalApplyRequests_;
+        applyProgressDialog_->setProgress(percent);
+    }
 
     // 다음 작업 처리
     processNextApply();
@@ -253,17 +312,22 @@ void ApplyPage::onAllAppliesCompleted()  //
 {
     qDebug() << "[ApplyPage] All applies processed.";
 
-    // BackupPage.cpp의 완료 로직을 참고하여 수정
-    QString message;
-    if (failedApplyRequests_ > 0) {
-        message = QString("적용 완료!\n성공: %1개, 실패: %2개")
-                          .arg(completedApplyRequests_)
-                          .arg(failedApplyRequests_);
-        QMessageBox::warning(this, "적용 완료", message);
-    } else {
-        message = QString("모든 제어기에 성공적으로 적용되었습니다!\n완료: %1개")
-                          .arg(completedApplyRequests_);
-        QMessageBox::information(this, "적용 완료", message);
+    applyInProgress_ = false;
+
+
+    if (applyProgressDialog_) {
+        applyProgressDialog_->setFinishedMode(true);
+
+        QString statusText;
+        if (failedApplyRequests_ > 0) {
+            statusText = QString("적용이 완료되었습니다.\n성공: %1대, 실패: %2대")
+                                 .arg(completedApplyRequests_)
+                                 .arg(failedApplyRequests_);
+        } else {
+            statusText = QString("적용이 완료되었습니다. (총 %1대, 모두 성공)")
+                                 .arg(completedApplyRequests_);
+        }
+        applyProgressDialog_->setStatusText(statusText);
     }
 
     // 창을 자동으로 닫지 않고 사용자가 계속 작업할 수 있도록 유지
@@ -273,10 +337,6 @@ void ApplyPage::onAllAppliesCompleted()  //
     // Re-enable controls after processing
     if (ui->applyBtn)
         ui->applyBtn->setEnabled(true);
-    if (ui->refreshBtn)
-        ui->refreshBtn->setEnabled(true);
-    if (ui->importBtn)
-        ui->importBtn->setEnabled(true);
 }
 
 ApplyPage::~ApplyPage()

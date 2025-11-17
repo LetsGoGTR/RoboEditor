@@ -66,16 +66,24 @@ void BackupPage::confirmSelection()
 
     ControllerManager *manager = ControllerManager::instance();
 
-    if (!backupProgressDialog_) {
-        backupProgressDialog_ = new ProgressDialog(this);
-        connect(backupProgressDialog_, &ProgressDialog::cancelRequested, this, [this]() {
-            // 일단 취소 누르면 창만 닫는 정도로
-            if (backupProgressDialog_) {
-                backupProgressDialog_->close();
-            }
-            // 나중에 진짜 "백업 중단" 로직 붙이고 싶으면 여기에서 처리
-        });
+    // 기존 dialog 있으면 정리
+    if (backupProgressDialog_) {
+        backupProgressDialog_->close();
+        backupProgressDialog_->deleteLater();
+        backupProgressDialog_ = nullptr;
     }
+
+    // 새 dialog 생성
+    backupProgressDialog_ = new ProgressDialog(this);
+    backupProgressDialog_->reset();
+
+    connect(backupProgressDialog_, &ProgressDialog::cancelRequested,
+            this, [this]() {
+                if (backupProgressDialog_) {
+                    backupProgressDialog_->close();
+                }
+            });
+
     backupProgressDialog_->setWindowTitle("백업 진행 중...");
     backupProgressDialog_->setTotalCount(totalBackupRequests_);
     backupProgressDialog_->setCurrentIndex(0);
@@ -106,10 +114,7 @@ void BackupPage::confirmSelection()
             continue;
         }
 
-        if (backupProgressDialog_) {
-            backupProgressDialog_->setCurrentIndex(idx);
-            backupProgressDialog_->setSerialNumber(serialNumber);
-        }
+        backupProgressDialog_->setSerialNumber(serialNumber);
 
         qDebug() << "[BackupPage] Backup request for:" << serialNumber;
 
@@ -150,6 +155,9 @@ void BackupPage::updateConfirmState()
 // 백업 완료 처리
 void BackupPage::onBackupCompleted(const QString &serialNumber)
 {
+    if (totalBackupRequests_ <= 0)
+        return;
+
     completedBackupRequests_++;
     qDebug() << "[BackupPage] Backup completed:" << serialNumber << "(" << completedBackupRequests_
              << "/" << totalBackupRequests_ << ")";
@@ -157,6 +165,7 @@ void BackupPage::onBackupCompleted(const QString &serialNumber)
     int doneCount = completedBackupRequests_ + failedBackupRequests_;
 
     if (backupProgressDialog_ && totalBackupRequests_ > 0) {
+        backupProgressDialog_->setCurrentIndex(doneCount);
         int percent = (doneCount * 100) / totalBackupRequests_;
         backupProgressDialog_->setProgress(percent);
     }
@@ -187,6 +196,9 @@ void BackupPage::onBackupCompleted(const QString &serialNumber)
 // 백업 실패 처리
 void BackupPage::onBackupFailed(const QString &serialNumber, const QString &error)
 {
+    if (totalBackupRequests_ <= 0)
+        return;
+
     failedBackupRequests_++;
     qWarning() << "[BackupPage] Backup failed:" << serialNumber << error;
 
@@ -194,6 +206,7 @@ void BackupPage::onBackupFailed(const QString &serialNumber, const QString &erro
 
     // 진행률 퍼센트 갱신
     if (backupProgressDialog_ && totalBackupRequests_ > 0) {
+        backupProgressDialog_->setCurrentIndex(doneCount);
         int percent = (doneCount * 100) / totalBackupRequests_;
         backupProgressDialog_->setProgress(percent);
     }

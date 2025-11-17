@@ -1,3 +1,0 @@
-[submodule "Drogon/external/libbcrypt"]
-	path = Drogon/external/libbcrypt
-	url = https://github.com/trusch/libbcrypt.git

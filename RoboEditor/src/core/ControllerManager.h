@@ -31,7 +31,9 @@ class ControllerManager : public QObject
 
       public:
         static ControllerManager *instance();
-        PasswordManager           pm;
+        PasswordManager          *passwordManager();
+      public slots:
+        void onMasterPasswordChanged();
 
         // 제어기 관리
         void registerController();
@@ -76,6 +78,8 @@ class ControllerManager : public QObject
         void controllerStateUpdated(const QString &serialNumber, bool isConnected, bool isRunning);
         void backupCompleted(const QString &serialNumber);
         void backupFailed(const QString &serialNumber, const QString &error);
+        void applyCompleted(const QString &serialNumber);
+        void applyFailed(const QString &serialNumber, const QString &error);
 
       private:
         explicit ControllerManager(QObject *parent = nullptr);
@@ -97,6 +101,7 @@ class ControllerManager : public QObject
         QString                    configFilePath_;
         QList<ControllerInfo>      controllers_;
         QMap<QString, ApiClient *> apiClients_;
+        PasswordManager           *pm_;
         mutable QMutex             mutex_;
 };
 

@@ -9,7 +9,7 @@
 
 ProgressDialog::ProgressDialog(QWidget *parent) : QDialog(parent)
 {
-    setWindowTitle("진행 중...");
+    //setWindowTitle("진행 중...");
     resize(400, 180);
 
     serialLabel_ = new QLabel("현재 제어기: -");
@@ -79,15 +79,31 @@ void ProgressDialog::setFinishedMode(bool finished)
     if (finished) {
         // 완료 모드
         cancelBtn_->setText("닫기");
-        setWindowTitle("백업 완료");
+        //setWindowTitle("백업 완료");
 
         if (timer_)
             timer_->stop();
     } else {
         // 진행 모드
         cancelBtn_->setText("취소");
-        setWindowTitle("진행 중...");
-        if (timer_)
-            timer_->start(1000);
+        //setWindowTitle("진행 중...");
+        if (timer_) timer_->start(1000);
     }
+}
+
+void ProgressDialog::reset()
+{
+    totalCount_ = 0;
+    currentIndex_ = 0;
+
+    serialLabel_->setText("현재 제어기: -");
+    countLabel_->setText("0 / 0");
+    progressBar_->setValue(0);
+    statusLabel_->setText("");
+
+    elapsed_.restart();
+    if (timer_) timer_->start(1000);
+
+    cancelBtn_->setText("취소");
+    setWindowTitle("진행 중...");
 }

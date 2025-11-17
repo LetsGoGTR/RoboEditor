@@ -7,6 +7,9 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+
+#include <tree_sitter/api.h>
+extern "C" TSLanguage* tree_sitter_python();
 //////////////////////////////////////////////////////////////////////////////
 //                                  퍼블릭                                  //
 //////////////////////////////////////////////////////////////////////////////
@@ -53,7 +56,50 @@ Json::Value DiffPython::runFromText(const std::string &contentA,
     return root;
 }
 
-std::vector<std::pair<std::string, int>> DiffPython::normalizeBodies(const std::string &content)
+//#########################################################################################3333
+Json::Value DiffPython::runFromPythonAst(const std::string& contentA,
+                                         const std::string& contentB,
+                                         const std::string& nameA,
+                                         const std::string& nameB)
+{
+    // 1) AST 기반 정규화
+    std::vector<NormalizedLine> aNorm = normalizePythonAst(contentA);
+    std::vector<NormalizedLine> bNorm = normalizePythonAst(contentB);
+
+    // 2) 나머지는 기존과 동일: 정수화 + 앵커 + Myers
+    std::vector<Op> ops   = compute(aNorm, bNorm);
+    std::vector<Diff> diffs = foldOpsToDiffs(ops, aNorm, bNorm, contentA, contentB);
+
+    // 3) JSON 조립도 그대로
+    Json::Value changes(Json::arrayValue);
+    DiffStats stats{};
+    buildChangesJson(diffs, changes, stats);
+
+    Json::Value root(Json::objectValue);
+
+    Json::Value base(Json::objectValue);
+    base["name"] = nameA;
+    root["base"] = std::move(base);
+
+    Json::Value compare(Json::objectValue);
+    compare["name"] = nameB;
+    root["compare"] = std::move(compare);
+
+    Json::Value jstats(Json::objectValue);
+    const Json::UInt64 total =
+        static_cast<Json::UInt64>(stats.added + stats.deleted + stats.modified);
+    jstats["added"]        = static_cast<Json::UInt64>(stats.added);
+    jstats["deleted"]      = static_cast<Json::UInt64>(stats.deleted);
+    jstats["modified"]     = static_cast<Json::UInt64>(stats.modified);
+    jstats["totalChanges"] = total;
+    root["statistics"]     = std::move(jstats);
+
+    root["changes"] = std::move(changes);
+    return root;
+}
+//##################################
+
+std::vector<std::pair<std::string, int>> DiffPython::normalizeBodies(const std::string& content)
 {
     std::vector<std::pair<std::string, int>> out;
     auto                                     lines = normalizeAll(content);
@@ -224,6 +270,87 @@ std::vector<NormalizedLine> DiffPython::normalizeAll(const std::string &content)
         }
         out.emplace_back(normalizeOne(content, start, endExcl, deep, inTriple, tripleQuoteChar));
     }
+
+    return out;
+}
+
+// --- Python AST 기반 정규화 (tree-sitter 사용) --- ##############################################333
+static std::vector<size_t> buildLineStarts(const std::string& s)
+{
+    std::vector<size_t> starts;
+    starts.reserve(128);
+    starts.push_back(0);
+    for (size_t i = 0; i < s.size(); ++i) {
+        if (s[i] == '\n') {
+            starts.push_back(i + 1);
+        }
+    }
+    return starts;
+}
+
+static int lineFromOffset(const std::vector<size_t>& starts, size_t offset)
+{
+    int lo = 0;
+    int hi = static_cast<int>(starts.size()) - 1;
+    while (lo <= hi) {
+        int mid = (lo + hi) / 2;
+        if (starts[mid] <= offset) lo = mid + 1;
+        else hi = mid - 1;
+    }
+    return hi < 0 ? 0 : hi;  // 0-based line index
+}
+
+std::vector<NormalizedLine> DiffPython::normalizePythonAst(const std::string& content)
+{
+    std::vector<NormalizedLine> out;
+    if (content.empty()) return out;
+
+    // 라인 시작 오프셋 미리 계산 (나중에 필요하면 활용)
+    std::vector<size_t> lineStarts = buildLineStarts(content);
+
+    // tree-sitter 파서 생성
+    TSParser* parser = ts_parser_new();
+    ts_parser_set_language(parser, tree_sitter_python());
+
+    TSTree* tree = ts_parser_parse_string(
+        parser,
+        nullptr,
+        content.c_str(),
+        static_cast<uint32_t>(content.size())
+    );
+    TSNode root = ts_tree_root_node(tree);
+
+    // 루트(module)의 자식 노드들 순회 (top-level statement 단위)
+    uint32_t childCount = ts_node_child_count(root);
+    out.reserve(childCount);
+
+    for (uint32_t i = 0; i < childCount; ++i) {
+        TSNode child = ts_node_child(root, i);
+        if (!ts_node_is_named(child)) continue; // 의미없는 토큰은 스킵
+
+        uint32_t startByte = ts_node_start_byte(child);
+        uint32_t endByte   = ts_node_end_byte(child);
+        if (startByte >= endByte || endByte > content.size()) continue;
+
+        NormalizedLine nl;
+        nl.start = startByte;
+        nl.len   = endByte - startByte;
+
+        // 일단 1차 버전: 원본 substring 그대로 body에 넣기
+        nl.body.assign(content.data() + nl.start, nl.len);
+
+        // rank는 AST 모드에선 크게 의미 없으니 0 이상 아무 값만 넣어두면 됨
+        nl.rank = 0;
+
+        // 필요하면 물리 라인 번호를 rank에 잠깐 꽂아서 써도 됨
+        // int line = lineFromOffset(lineStarts, nl.start);
+        // nl.rank = line;
+
+        out.emplace_back(std::move(nl));
+    }
+
+    ts_tree_delete(tree);
+    ts_parser_delete(parser);
 
     return out;
 }
