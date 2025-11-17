@@ -151,13 +151,13 @@ main {
 
 /* ─────────────────────────────── */
 /* 상단 제목 */
-.title {
+.header {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
-.title h1 {
+.header h1 {
   margin: 0;
   font-size: 1.4rem;
   font-weight: 600;
@@ -189,12 +189,6 @@ main {
   border-radius: 0.4rem;
   padding: 0.5rem;
   overflow-y: auto;
-}
-
-.empty {
-  color: #777;
-  text-align: center;
-  margin-top: 2rem;
 }
 
 /* 체크박스 토글 스타일 */

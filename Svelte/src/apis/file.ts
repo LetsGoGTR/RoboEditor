@@ -1,4 +1,5 @@
-const FILE_API_PATH = '/api/v1/file';
+const API_BASE = import.meta.env.DEV ? '/proxy' : '';
+const FILE_API_PATH = `${API_BASE}/api/v1/file`;
 
 export const _getFile = async (path: string) => {
 	const params = new URLSearchParams({ path });

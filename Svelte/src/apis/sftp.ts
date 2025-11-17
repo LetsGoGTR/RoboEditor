@@ -1,5 +1,8 @@
+const API_BASE = import.meta.env.DEV ? '/proxy' : '';
+const FT_API_BASE = `${API_BASE}/api/v1/ft`;
+
 export const _ftApply = async (formData: FormData) => {
-	const res = await fetch(`/api/v1/ft/apply`, {
+	const res = await fetch(`${FT_API_BASE}/apply`, {
 		method: 'POST',
 		body: formData
 	});
@@ -7,7 +10,7 @@ export const _ftApply = async (formData: FormData) => {
 };
 
 export const _ftBackup = async (payload: any) => {
-	const res = await fetch(`/api/v1/ft/backup`, {
+	const res = await fetch(`${FT_API_BASE}/backup`, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify(payload)

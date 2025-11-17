@@ -1,4 +1,5 @@
-const DEVICE_API_PATH = '/api/v1/device';
+const API_BASE = import.meta.env.DEV ? '/proxy' : '';
+const DEVICE_API_PATH = `${API_BASE}/api/v1/device`;
 
 export const _listDevices = async () => {
 	const res = await fetch(DEVICE_API_PATH);
