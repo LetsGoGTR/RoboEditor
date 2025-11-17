@@ -9,6 +9,7 @@
 
 // Forward declarations
 #include "BackupPage.h"
+#include "ComparePage.h"
 #include "ModifyPage.h"
 #include "ShortcutManager.h"
 
@@ -25,9 +26,12 @@ class MainWindow : public QMainWindow
       public:
         explicit MainWindow(QWidget *parent = nullptr);
         ~MainWindow();
+        static bool dark;
 
       protected:
-        void closeEvent(QCloseEvent *event) override;
+        void closeEvent(QCloseEvent * event) override;
+        bool eventFilter(QObject * obj, QEvent * event) override;
+        void applyStyleSheet();
 
       private:
         // lazy objects
@@ -35,6 +39,7 @@ class MainWindow : public QMainWindow
         ModifyPage      *modifyPage;
         BackupPage      *backupPage;
         ShortcutManager *shortcutMgr;
+        ComparePage     *comparePage = nullptr;
 
         QWidget *applyPopup_  = nullptr;
         QWidget *backupPopup_ = nullptr;
@@ -44,6 +49,10 @@ class MainWindow : public QMainWindow
         void ensureNav();
         void ensureLog();
         void wire();
+
+        void loadTheme(bool isDark);
+
+        bool isDarkMode_ = false;
 
         void saveSettings();
         void loadSettings();

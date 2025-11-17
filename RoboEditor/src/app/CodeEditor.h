@@ -35,6 +35,7 @@ class CodeEditor : public DropTextEdit
         core::DiffHighlighter *getDiffHighlighter() const;
         void                   clearDiffHighlights();
         void                   scrollToLine(int lineNumber);
+        void                   applyTheme(bool isDark);
 
       protected:
         void resizeEvent(QResizeEvent * event) override;
@@ -49,6 +50,7 @@ class CodeEditor : public DropTextEdit
         LineNumberArea        *lineNumberArea_{nullptr};
         core::DiffHighlighter *diffHighlighter_{nullptr};  // DiffHighlighter 객체
         QFont                  font_;
+        bool                   isDarkMode_ = false;
 };
 
 #endif  // CODEEDITOR_H
