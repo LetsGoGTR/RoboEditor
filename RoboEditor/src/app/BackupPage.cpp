@@ -7,6 +7,7 @@
 #include <QVBoxLayout>
 
 #include "ControllerManager.h"
+#include "LogManager.h"
 #include "ProgressDialog.h"
 #include "ui_BackupPage.h"
 
@@ -77,12 +78,11 @@ void BackupPage::confirmSelection()
     backupProgressDialog_ = new ProgressDialog(this);
     backupProgressDialog_->reset();
 
-    connect(backupProgressDialog_, &ProgressDialog::cancelRequested,
-            this, [this]() {
-                if (backupProgressDialog_) {
-                    backupProgressDialog_->close();
-                }
-            });
+    connect(backupProgressDialog_, &ProgressDialog::cancelRequested, this, [this]() {
+        if (backupProgressDialog_) {
+            backupProgressDialog_->close();
+        }
+    });
 
     backupProgressDialog_->setWindowTitle("백업 진행 중...");
     backupProgressDialog_->setTotalCount(totalBackupRequests_);
@@ -162,6 +162,13 @@ void BackupPage::onBackupCompleted(const QString &serialNumber)
     qDebug() << "[BackupPage] Backup completed:" << serialNumber << "(" << completedBackupRequests_
              << "/" << totalBackupRequests_ << ")";
 
+    QString msg = QString("Backup completed: %1 (%2/%3)")
+                          .arg(serialNumber)
+                          .arg(completedBackupRequests_)
+                          .arg(totalBackupRequests_);
+
+    LogManager::append(msg);
+
     int doneCount = completedBackupRequests_ + failedBackupRequests_;
 
     if (backupProgressDialog_ && totalBackupRequests_ > 0) {
@@ -203,6 +210,13 @@ void BackupPage::onBackupFailed(const QString &serialNumber, const QString &erro
     qWarning() << "[BackupPage] Backup failed:" << serialNumber << error;
 
     int doneCount = completedBackupRequests_ + failedBackupRequests_;
+
+    QString msg = QString("Backup failed: %1 (%2/%3)")
+                          .arg(serialNumber)
+                          .arg(failedBackupRequests_)
+                          .arg(totalBackupRequests_);
+
+    LogManager::append(msg);
 
     // 진행률 퍼센트 갱신
     if (backupProgressDialog_ && totalBackupRequests_ > 0) {

@@ -43,6 +43,8 @@ class ControllerManager : public QObject
 
         // 상태 업데이트
         void updateControllersStates();  // 모든 제어기 즉시 상태 체크
+        void pauseStateUpdates();
+        void resumeStateUpdates();
 
         // 제어기 정보 조회
         QList<ControllerInfo> getControllers() const;
@@ -98,6 +100,7 @@ class ControllerManager : public QObject
         void updateRunningState(const QString &serialNumber, bool running);
         void updateConnectionState(const QString &serialNumber, bool connected);
 
+        bool                       stateUpdatesPaused_ = false;
         QString                    configFilePath_;
         QList<ControllerInfo>      controllers_;
         QMap<QString, ApiClient *> apiClients_;

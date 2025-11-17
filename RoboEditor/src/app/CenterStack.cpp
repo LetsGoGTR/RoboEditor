@@ -19,6 +19,7 @@
 #include "BackupPage.h"
 #include "ComparePage.h"
 #include "ControllerManager.h"
+#include "LogManager.h"
 #include "ModifyPage.h"
 #include "WorkspaceContextMenuController.h"
 
@@ -421,7 +422,8 @@ void CenterStack::onRemoveController(const QString &serialNumber)
             QMessageBox::information(
                     this, "삭제 완료", QString("'%1'이(가) 삭제되었습니다.").arg(serialNumber));
 
-            qDebug() << "[CenterStack] Controller removed:" << serialNumber;
+            QString msg = QString("Controller removed: %1").arg(serialNumber);
+            LogManager::append(msg);
             break;
         }
     }
@@ -432,8 +434,6 @@ void CenterStack::startPolling(int intervalMs)
         qWarning() << "[CenterStack] Polling already started";
         return;
     }
-
-    qDebug() << "[CenterStack] Starting polling with interval:" << intervalMs << "ms";
 
     // 즉시 한 번 실행
     updateControllerList();
@@ -446,7 +446,6 @@ void CenterStack::stopPolling()
 {
     if (m_pollingTimer->isActive()) {
         m_pollingTimer->stop();
-        qDebug() << "[CenterStack] Polling stopped";
     }
 }
 
