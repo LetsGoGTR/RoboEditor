@@ -1,6 +1,7 @@
-import { currentFile } from '@/stores/currentFile';
-import { _diffFiles, _diffWorkspaces } from '@apis/diff';
+import { fileDiffStore } from '@/stores/fileDiff';
+import { _diffFiles } from '@apis/diff';
 import type { FileNode } from '@/types';
+import { _getFile } from '@apis/file';
 
 /**
  * 파일 Diff Handler
@@ -14,55 +15,31 @@ export async function handleDiffFiles(leftFile: FileNode, rightFile: FileNode) {
 	}
 
 	try {
-		// 1) Diff API 호출
-		const resp = await _diffFiles(leftFile.path, rightFile.path);
+		// 🔥 파일명 + 경로 모두 전달
+		fileDiffStore.openFileDiff(leftFile.name, rightFile.name, leftFile.path, rightFile.path);
 
-		if (!resp?.success) {
-			alert('파일 비교 중 오류가 발생했습니다.');
+		const [leftRes, rightRes] = await Promise.all([
+			_getFile(leftFile.path),
+			_getFile(rightFile.path)
+		]);
+		console.log(leftRes, rightRes);
+
+		const leftContent = leftRes?.data?.content ?? '';
+		const rightContent = rightRes?.data?.content ?? '';
+
+		fileDiffStore.applyFileDiffContent(leftContent, rightContent);
+
+		const diffRes = await _diffFiles(leftFile.path, rightFile.path);
+
+		if (!diffRes?.success) {
+			console.warn('[diff-files] diff API 실패:', diffRes);
 			return;
 		}
+		console.log(diffRes);
 
-		// 2) Diff 모드 진입 (기본 구조)
-		currentFile.openDiff(leftFile, rightFile);
-
-		// 3) diff content store 반영
-		currentFile.update((s) => {
-			if (!s.diff) return s;
-
-			return {
-				...s,
-				diff: {
-					left: { file: leftFile, content: resp.leftContent },
-					right: { file: rightFile, content: resp.rightContent }
-				}
-			};
-		});
+		fileDiffStore.setApiDiffResult(diffRes);
 	} catch (err) {
-		console.error('[diff-files] 비교 중 오류:', err);
-		alert('파일 비교 중 문제가 발생했습니다.');
-	}
-}
-
-/**
- * 워크스페이스(폴더) Diff Handler
- * @param dirA 비교 기준이 되는 좌측 폴더 경로
- * @param dirB 비교 대상이 되는 우측 폴더 경로
- */
-export async function handleDiffWorkspaces(dirA: string, dirB: string) {
-	if (!dirA || !dirB) {
-		alert('비교할 폴더 경로가 올바르지 않습니다.');
-		return;
-	}
-
-	try {
-		const resp = await _diffWorkspaces(dirA, dirB);
-
-		if (!resp?.success) {
-			alert('폴더 비교 중 오류가 발생했습니다.');
-			return;
-		}
-	} catch (err) {
-		console.error('[diff-workspaces] 비교 오류:', err);
-		alert('폴더 비교 중 문제가 발생했습니다.');
+		console.error('[diff-files] 오류 발생:', err);
+		alert('파일 비교 중 오류가 발생했습니다.');
 	}
 }

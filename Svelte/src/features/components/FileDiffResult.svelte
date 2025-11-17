@@ -1,57 +1,48 @@
 <script lang="ts">
-  import type { DiffItem, DiffFilter, DiffState } from "@/types";
+  import { fileDiffStore } from "@/stores/fileDiff";
+  import type { DiffFilter, FileDiffItem } from "@/types";
 
-  // props
-  let { diffs }: { diffs: DiffItem[] } = $props();
+  // diff store 전체를 반응형으로
+  const diff = $derived($fileDiffStore);
 
-  // states
-  let filter: DiffFilter = $state("ALL");
+  // literal tuple (타입 자동 생성)
+  const FILTERS = ["all", "added", "removed", "changed"] as const;
 
-  // derived
-  const filteredDiffs = $derived(
-    filter === "ALL" ? diffs : diffs.filter(d => d.state === filter)
-  );
+  // 필터 상태
+  let filter = $state<DiffFilter>("all");
 
-  // helpers
-  const stateColor = (s: DiffState) => {
-    switch (s) {
-      case "ADDED": return "#28a745";
-      case "REMOVED": return "#d73a49";
-      case "CHANGED": return "#f0ad4e";
-      default: return "#888";
-    }
-  };
+  // filtered list
+  const filteredDiffs = $derived<FileDiffItem[]>(() => {
+    const diffs = diff.diffs ?? [];
 
-  // Actions
-  function handleCompareFiles() {
-    console.log("Compare Files clicked");
-  }
-  function handleCompareFolders() {
-    console.log("Compare Folders clicked");
-  }
+    return filter === "all"
+      ? diffs
+      : diffs.filter((d) => d.state === filter);
+  });
+
+
+  const stateColor = (s: "added" | "removed" | "changed") =>
+    ({
+      added: "#28a745",
+      removed: "#d73a49",
+      changed: "#f0ad4e",
+    }[s] ?? "#888");
 </script>
 
 <section class="diff-section">
-  <!-- 상단 툴바 -->
-  <div class="toolbar" role="toolbar" aria-label="Diff operations">
-    <div class="left-buttons">
-      <button class="btn primary" onclick={handleCompareFiles}>Compare Files</button>
-      <button class="btn primary" onclick={handleCompareFolders}>Compare Folders</button>
-    </div>
-
+  <div class="toolbar">
     <div class="filter-group">
-      {#each ["ALL", "ADDED", "REMOVED", "CHANGED"] as f}
+      {#each FILTERS as f}
         <button
           class="btn filter {filter === f ? 'active' : ''}"
-          onclick={() => (filter = f as DiffFilter)}
+          onclick={() => (filter = f)}
         >
-          {f === "ALL" ? "All" : f.charAt(0) + f.slice(1).toLowerCase()}
+          {f.charAt(0).toUpperCase() + f.slice(1)}
         </button>
       {/each}
     </div>
   </div>
 
-  <!-- Diff 리스트 -->
   <div class="diff-container">
     <div class="diff-header">
       <span class="col line">Line</span>
@@ -66,21 +57,24 @@
         <div class="diff-row">
           <span class="col line">{d.line}</span>
           <span class="col path" title={d.path}>{d.path}</span>
-          <span class="col left" title={d.leftValue}>{d.leftValue}</span>
-          <span class="col right" title={d.rightValue}>{d.rightValue}</span>
-          <span class="col state" style={`color:${stateColor(d.state)};`}>{d.state}</span>
+          <span class="col left" title={d.oldValue}>{d.oldValue}</span>
+          <span class="col right" title={d.newValue}>{d.newValue}</span>
+          <span class="col state" style={`color:${stateColor(d.state)};`}>
+            {d.state}
+          </span>
         </div>
       {/each}
     </div>
   </div>
 </section>
 
+
 <style>
 .diff-section {
   display: flex;
   flex-direction: column;
   height: 100%;
-  min-width: 500px;
+  min-width: 400px;
   background: #fafafa;
   border-left: 1px solid #ddd;
   font-family: "Consolas", monospace;
@@ -100,7 +94,6 @@
   flex-wrap: wrap;
 }
 
-.left-buttons,
 .filter-group {
   display: flex;
   align-items: center;
@@ -118,8 +111,6 @@
 
 .btn:hover { background: #f0f0f0; border-color: #999; }
 .btn.active { background: #e2e6ff; border-color: #5b73e8; font-weight: 600; }
-.btn.primary { background: #5b73e8; color: #fff; border-color: #5b73e8; }
-.btn.primary:hover { background: #4a61d1; }
 
 /* Diff Rows */
 .diff-container {
