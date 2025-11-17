@@ -402,8 +402,8 @@ services::WorkspaceService::createWorkspace(const WorkspaceMetadata &metadata,
         return ServiceResult::createError("Invalid device ID: " + deviceId);
     }
 
-    std::string baseDir = utils::config::getBaseDir() + (deviceId.empty() ? "" : deviceId + "/");
-    std::string workspacePath = baseDir + metadata.uuid;
+    std::string paramsPath = (deviceId.empty() ? "" : deviceId + "/") + metadata.uuid;
+    std::string workspacePath = utils::config::getBaseDir() + paramsPath;
 
     // Check if workspace already exists
     if (fs::exists(workspacePath) && fs::is_directory(workspacePath)) {
