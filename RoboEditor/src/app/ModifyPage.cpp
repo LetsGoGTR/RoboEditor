@@ -546,6 +546,7 @@ void ModifyPage::showCompareFolders()
     // ComparePage가 없으면 생성
     if (!comparePane_) {
         comparePane_ = new ComparePage(this);
+        comparePane_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
         mainSplit_->addWidget(comparePane_);
         mainSplit_->setStretchFactor(0, 1);
         mainSplit_->setStretchFactor(1, 0);

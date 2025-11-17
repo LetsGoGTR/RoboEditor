@@ -39,6 +39,8 @@ ComparePage::ComparePage(QWidget *parent) : QWidget(parent)
     auto v = new QVBoxLayout(this);
     v->setContentsMargins(0, 0, 0, 0);
     v->addWidget(dock_);
+
+    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 }
 
 ComparePage::~ComparePage()
