@@ -1,63 +1,81 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { browser } from '$app/environment';
-  import * as monaco from 'monaco-editor/esm/vs/editor/editor.api'; // ✅ 직접 API 로드
-  import { currentFile } from '@/stores/currentFile';
-  import type { FileNode } from '@/types';
-  import HorizontalSplit from '@layouts/HorizontalSplit.svelte';
+  import { onMount } from "svelte";
+  import { browser } from "$app/environment";
+  import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
+
+  import HorizontalSplit from "@layouts/HorizontalSplit.svelte";
+  import FileDiffResult from "@features/FileDiffResult.svelte";
+
+  import { fileDiffStore } from "@/stores/fileDiff";
+  import { toMonacoUri, getOrCreateModel } from "@/utils/monaco";
+
+  /** 🔥 store → Svelte 최신 문법으로 반응형 연결 */
+  let diff = $derived($fileDiffStore);
 
   let diffContainer: HTMLDivElement | null = null;
   let diffEditor: monaco.editor.IStandaloneDiffEditor | null = null;
 
-  let state = $derived($currentFile);
+  /** DiffEditor 모델 갱신 */
+  function applyDiff() {
+    if (!diffEditor) return;
 
-  /** 파일 내용을 읽고 모델 생성 */
-  async function createModel(file: FileNode | null) {
-    
+    // 모든 데이터가 준비된 뒤에만 실행
+    if (!diff.leftFilePath || !diff.rightFilePath) return;
+    if (!diff.leftContent || !diff.rightContent) return;
+
+    const original = getOrCreateModel(
+      toMonacoUri(diff.leftFilePath),
+      diff.leftContent
+    );
+    const modified = getOrCreateModel(
+      toMonacoUri(diff.rightFilePath),
+      diff.rightContent
+    );
+
+    diffEditor.setModel({ original, modified });
+
+    // Layout 보정
+    queueMicrotask(() => diffEditor?.layout());
   }
 
+  /** mount 시 에디터 생성 */
   onMount(() => {
     if (!browser) return;
 
-    // 🔹 DOM이 완전히 렌더된 다음 프레임까지 대기
-    requestAnimationFrame(async () => {
-      if (!diffContainer) {
-        console.error('❌ diffContainer is null — cannot mount editor');
-        return;
-      }
-
-      try {
-        const original = await createModel(state.active?.file ?? null);
-        const modified = await createModel(state.right?.file ?? null);
+    const wait = setInterval(() => {
+      if (diffContainer) {
+        clearInterval(wait);
 
         diffEditor = monaco.editor.createDiffEditor(diffContainer, {
-          theme: 'vs-white',
-          readOnly: true,
+          theme: "vs-white",
           renderSideBySide: true,
+          readOnly: true,
           automaticLayout: true,
-          originalEditable: false,
-          scrollBeyondLastLine: false,
-          minimap: { enabled: false }
+          minimap: { enabled: false },
+          scrollBeyondLastLine: false
         });
 
-        // ✅ 반드시 original=왼쪽, modified=오른쪽 순서
-        diffEditor.setModel({ original, modified });
-
-        // 레이아웃 재계산 (한 프레임 뒤)
-        setTimeout(() => diffEditor?.layout(), 50);
-      } catch (err) {
-        console.error('❌ Diff Editor 초기화 실패:', err);
+        applyDiff();
       }
-    });
+    }, 30);
+  });
 
-    return () => {
-      diffEditor?.dispose();
-    };
+  /** 🔥 store 변화 시 applyDiff() 다시 실행 */
+  $effect(() => {
+    if (diffEditor) applyDiff();
   });
 </script>
 
 <HorizontalSplit initialLeftRatio={75}>
-  <div slot="left" class="compare-body" bind:this={diffContainer}></div>
+  <div
+    slot="left"
+    class="compare-body"
+    bind:this={diffContainer}
+  ></div>
+
+  <FileDiffResult
+    slot="right"
+  />
 </HorizontalSplit>
 
 <style>
@@ -66,9 +84,5 @@
   width: 100%;
   display: block;
   overflow: hidden;
-}
-
-:global(.monaco-editor) {
-  border-radius: 4px;
 }
 </style>

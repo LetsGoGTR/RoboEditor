@@ -35,6 +35,7 @@ class ApplyPage : public QWidget
         void importAnyspace();
 
         QQueue<QString> applyQueue_;
+        QString         apiPassword_;
         int             totalApplyRequests_;
         int             completedApplyRequests_;
         int             failedApplyRequests_;

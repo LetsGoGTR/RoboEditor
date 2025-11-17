@@ -1,6 +1,7 @@
 #include "ApiClient.h"
 
 #include <QTemporaryFile>
+#include <QTimer>
 
 #include <QDateTime>
 #include <QDebug>
@@ -9,6 +10,7 @@
 #include <QFileInfo>
 #include <QHttpMultiPart>
 #include <QHttpPart>
+#include <QJsonDocument>
 #include <QJsonParseError>
 
 #include "FileCompressor.h"
@@ -26,53 +28,25 @@ ApiClient::ApiClient(const QString &baseUrl, QObject *parent) :
 }
 
 ApiClient::~ApiClient() {}
-// url 정규화, ip:port또는도메인
+// url 정규화
 QString ApiClient::normalizeBaseUrl(const QString &baseUrl)
 {
     QString input = baseUrl.trimmed();
-    QUrl    url;
 
-    // 이미 스킴이 있는 경우
-    if (input.startsWith("https://") || input.startsWith("https://")) {
-        url = QUrl(input);
-    }
-    // 스킴이 없는 경우 http 기본값
-    else {
-        if (input.contains(":443")) {
-            url = QUrl("https://" + input);
-        } else {
-            url = QUrl("https://" + input);
-        }
+    if (input.startsWith("https://")) {
+        input.remove(0, 8);  // "https://" 제거
     }
 
-    // URL이 유효하지 않으면 원본 반환
+    QUrl url("https://" + input);
+
+    // URL 유효성 검사
     if (!url.isValid() || url.host().isEmpty()) {
-        qWarning() << "[normalizeBaseUrl] Invalid URL:" << input;
-        return input;
+        qWarning() << "[normalizeBaseUrl] Invalid URL:" << baseUrl;
+        return baseUrl;
     }
 
-    // 포트 처리
-    int     port   = url.port();
-    QString scheme = url.scheme();
-
-    // 포트가 명시되지 않은 경우 스킴 기본 포트 사용
-    if (port == -1) {
-        if (scheme == "https") {
-            port = 443;
-        } else {
-            port = 80;
-        }
-    }
-
-    // 표준 포트는 생략
-    QString result;
-    if ((scheme == "http" && port == 80) || (scheme == "https" && port == 443)) {
-        result = QString("%1://%2").arg(scheme).arg(url.host());
-    } else {
-        result = QString("%1://%2:%3").arg(scheme).arg(url.host()).arg(port);
-    }
-
-    qDebug() << "[normalizeBaseUrl]" << input << "->" << result;
+    QString result = QString("https://%1").arg(url.host());
+    qDebug() << "[normalizeBaseUrl]" << baseUrl << "->" << result;
     return result;
 }
 
@@ -383,4 +357,47 @@ void ApiClient::parseRunningStateResponse(const QByteArray &responseData)
         qDebug() << "[ApiClient] Robot state changed:" << (m_robotRunning ? "RUNNING" : "IDLE");
         emit robotStateChanged(m_robotRunning);
     }
+}
+
+bool ApiClient::postJson(const QString &endpoint, const QJsonObject &body, int timeoutMs)
+{
+    QNetworkRequest request = createRequest(
+            endpoint);  // baseUrl + endpoint, JSON 헤더 설정됨 :contentReference[oaicite:1]{index=1}
+    QNetworkReply *reply = m_manager->post(request, QJsonDocument(body).toJson());
+    reply->setProperty("endpoint", endpoint);
+    reply->setProperty("method", "POST");
+
+    QTimer *timeoutTimer = new QTimer(reply);
+    timeoutTimer->setSingleShot(true);
+    timeoutTimer->setInterval(timeoutMs);
+    connect(timeoutTimer, &QTimer::timeout, this, [=]() {
+        if (reply->isRunning()) {
+            reply->abort();
+            qWarning() << "[ApiClient] Timeout for" << endpoint;
+            emit requestFailed(endpoint, "Timeout - no response", request.url().toString());
+        }
+        timeoutTimer->deleteLater();
+    });
+    connect(reply, &QNetworkReply::finished, timeoutTimer, [timeoutTimer]() {
+        if (timeoutTimer->isActive())
+            timeoutTimer->stop();
+        timeoutTimer->deleteLater();
+    });
+    timeoutTimer->start();
+    return true;  // 비동기. 성공/실패는 onFinished에서 emit됨 :contentReference[oaicite:2]{index=2}
+}
+
+bool ApiClient::postWorkspaceCompress(const QString &user)
+{
+    QJsonObject j;
+    j["user"] = user;
+    return postJson("/api/workspace/compress", j);
+}
+
+bool ApiClient::postWorkspaceExtract(const QString &user, const QString &password)
+{
+    QJsonObject j;
+    j["user"]     = user;
+    j["password"] = password;
+    return postJson("/api/workspace/extract", j);
 }

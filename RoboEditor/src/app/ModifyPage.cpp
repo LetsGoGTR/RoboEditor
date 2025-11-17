@@ -43,10 +43,10 @@ ModifyPage::ModifyPage(QWidget *parent) : QWidget(parent), currentDoc(nullptr)
         // comparePane_가 유효하고 삭제되지 않았는지 확인
         ComparePage *pane = comparePane_;
         if (pane && pane == comparePane_) {
-            CodeEditor *currentEditor = qobject_cast<CodeEditor *>(tabWidget->currentWidget());
+            CodeEditor *currentEditor = tabPage ? tabPage->findChild<CodeEditor *>() : nullptr;
             if (currentEditor) {
                 // ComparePage가 여전히 유효한지 재확인 후 호출
-                if (comparePane_ == pane) {
+                if (currentEditor && comparePane_ == pane) {
                     pane->setLeftEditor(currentEditor);
                     pane->recalcDiff(currentLeftText(), currentLeftPath());
                 }
@@ -297,7 +297,8 @@ void ModifyPage::restoreCompareSettings()
 void ModifyPage::ensureCompare(const QString &targetPath)
 {
     // 현재 활성 탭의 편집기 가져오기
-    CodeEditor *leftEditor = qobject_cast<CodeEditor *>(tabWidget->currentWidget());
+    QWidget    *tabPage    = tabWidget->currentWidget();
+    CodeEditor *leftEditor = tabPage ? tabPage->findChild<CodeEditor *>() : nullptr;
 
     if (comparePane_) {
         // 이미 존재하면 경로만 업데이트하고 좌측 편집기도 갱신
@@ -565,7 +566,9 @@ void ModifyPage::openFromTree(const QString &path)
     if (comparePane_) {
         ComparePage *pane = comparePane_;
         if (pane == comparePane_) {
-            pane->setLeftEditor(qobject_cast<CodeEditor *>(tabWidget->currentWidget()));
+            QWidget    *tabPage       = tabWidget->currentWidget();
+            CodeEditor *currentEditor = tabPage ? tabPage->findChild<CodeEditor *>() : nullptr;
+            pane->setLeftEditor(currentEditor);
             pane->recalcDiff(currentLeftText(), currentLeftPath());
         }
     }
@@ -664,6 +667,11 @@ void ModifyPage::openFile()
 
 void ModifyPage::saveFile()
 {
+    if (documents.isEmpty() || currentDocumentIndex < 0 ||
+        currentDocumentIndex >= documents.size()) {
+        return;
+    }
+
     Document *doc = documents[currentDocumentIndex];
     if (!doc)
         return;
@@ -696,6 +704,11 @@ void ModifyPage::saveFile()
 }
 void ModifyPage::saveAsFile()
 {
+    if (documents.isEmpty() || currentDocumentIndex < 0 ||
+        currentDocumentIndex >= documents.size()) {
+        return;
+    }
+
     Document *doc = documents[currentDocumentIndex];
     if (!doc)
         return;
@@ -750,6 +763,13 @@ bool ModifyPage::hasUnsavedChanges(Document *doc)
 void ModifyPage::closeCurrentTab()
 {
     int index = tabWidget->currentIndex();
+
+    if (index < 0)
+        return;
+
+    if (documents.isEmpty() || index >= documents.size())
+        return;
+
     if (index >= 0)
         closeFile(index);
 }

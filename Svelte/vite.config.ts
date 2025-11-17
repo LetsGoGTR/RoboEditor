@@ -1,15 +1,10 @@
 import { defineConfig } from 'vitest/config';
 import { sveltekit } from '@sveltejs/kit/vite';
-import monacoEditorPlugin from 'vite-plugin-monaco-editor-esm';
 import path from 'path';
 
 export default defineConfig({
 	plugins: [
 		sveltekit(),
-		monacoEditorPlugin({
-			languageWorkers: ['editorWorkerService', 'typescript', 'json'],
-			publicPath: 'monaco'
-		})
 	],
 	server: {
 		proxy: {
@@ -60,7 +55,8 @@ export default defineConfig({
 			'@': path.resolve(__dirname, './src'),
 			'@components': path.resolve(__dirname, './src/lib/components'),
 			'@layouts': path.resolve(__dirname, './src/lib/layouts'),
-			'@features': path.resolve(__dirname, './src/features'),
+			'@features': path.resolve(__dirname, './src/features/components'),
+			'@handlers': path.resolve(__dirname, './src/features/handlers'),
 			'@apis': path.resolve(__dirname, '/src/apis'),
 			'@routes': path.resolve(__dirname, './src/routes'),
 			'@utils': path.resolve(__dirname, './src/utils'),

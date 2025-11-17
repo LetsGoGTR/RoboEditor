@@ -30,7 +30,7 @@ export interface BaseNode {
 	id: string;
 	name: string;
 	type: NodeType;
-	path: string | null; // 루트 기준 상대 경로
+	path: string | null; // 절대 경로
 	parentId?: string | null; // 상위 폴더 id
 	checked?: boolean; // UI 선택 용도
 }
@@ -115,19 +115,36 @@ export interface BackupRoot extends FolderNode {
 /* ============================================================
  * 7. Diff 타입 — Monaco Diff 및 Drogon Diff API 기반
  * ============================================================ */
+export type DiffState = 'added' | 'removed' | 'changed';
+export type DiffFilter = 'all' | DiffState;
 
-export type DiffState = 'ADDED' | 'REMOVED' | 'CHANGED';
-export type DiffFilter = 'ALL' | DiffState;
-
-export interface DiffItem {
+export interface FileDiffItem {
 	line: number;
 	path: string;
-	leftValue: string;
-	rightValue: string;
+
+	oldLineNumber: number;
+	oldLineCount: number;
+	oldValue: string | number | null;
+
+	newLineNumber: number;
+	newLineCount: number;
+	newValue: string | number | null;
+
 	state: DiffState;
 }
 
-export interface WorkspaceDiffResult {
+export interface FileDiffResult {
 	success: boolean;
-	diff: DiffItem[];
+	diff: FileDiffItem[];
+
+	file1: string;
+	file2: string;
+
+	statistics: {
+		added: number;
+		modified: number;
+		removed: number;
+		totalChanges: number;
+		fileType: string;
+	};
 }

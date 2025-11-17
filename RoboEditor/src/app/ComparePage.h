@@ -77,11 +77,13 @@ class ComparePage : public QWidget
         QSplitter  *rightSplit_{nullptr};        // (좌) rightText_ | (우) diffPanel_
         QTabWidget *compareTabWidget_{nullptr};  // 비교 파일들을 탭으로 관리
         CodeEditor *rightText_{nullptr};  // 읽기 전용 (비교대상) - 현재 활성 탭 (라인 번호 포함)
-        CodeEditor   *leftText_{nullptr};   // 좌측 편집기 (ModifyPage의 현재 탭)
-        QWidget      *diffPanel_{nullptr};  // 기존 "테이블+상단 버튼" 위젯
-        QTableWidget *diffTable_      = nullptr;
-        QTreeWidget  *folderDiffTree_ = nullptr;  // 폴더 비교 결과 트리
-        QLabel       *statLabel_      = nullptr;
+        CodeEditor   *leftText_{nullptr};          // 좌측 편집기 (ModifyPage의 현재 탭)
+        QWidget      *diffPanel_{nullptr};         // 기존 "테이블+상단 버튼" 위젯
+        QTableWidget *diffTable_       = nullptr;  // 좌/우 폴더 트리 & 스플리터
+        QSplitter    *folderSplit_     = nullptr;
+        QTreeWidget  *leftFolderTree_  = nullptr;
+        QTreeWidget  *rightFolderTree_ = nullptr;
+        QLabel       *statLabel_       = nullptr;
         QString       targetPath_;
         QString       cachedLeftPath_;
         QString       cachedLeftText_;
@@ -93,6 +95,10 @@ class ComparePage : public QWidget
         // 폴더 비교 관련
         bool        isFolderMode_{false};  // 파일 비교 vs 폴더 비교 모드
         QStringList tempFolders_;  // 임시 폴더 목록 (압축 해제 시 생성, 정리용)
+
+        // 폴더 비교 시 마지막 좌/우 경로 저장 (루트 이름 계산용)
+        QString lastLeftFolderPath_;
+        QString lastRightFolderPath_;
 
         QWidget *buildDock();
 
@@ -119,7 +125,9 @@ class ComparePage : public QWidget
         void           applyFilter(const QString &filterType);
         QList<DiffRow> filterRows(const QList<DiffRow> &rows, const QString &filterType) const;
 
-        void    displayFolderDiffResult(const Json::Value &result);
+        void    displayFolderDiffResult(const Json::Value &result,
+                                        const QString     &leftRootPath,
+                                        const QString     &rightRootPath);
         QString extractArchiveToTemp(const QString &archivePath);
         void    cleanupTempFolders();
         QColor  getColorForDiffState(const QString &state) const;

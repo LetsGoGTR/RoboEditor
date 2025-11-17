@@ -8,7 +8,6 @@
 #include "../utils/diff/DiffText.h"
 #include "../utils/diff/DiffTree.h"
 #include "../utils/diff/DiffYaml.h"
-#include "../utils/diff/treediff.h"
 #include "../utils/logging/Logger.h"
 
 namespace fs = std::filesystem;

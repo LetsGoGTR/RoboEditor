@@ -2,8 +2,6 @@
 
 #include <string>
 
-#include "logging/Logger.h"
-
 namespace utils
 {
     inline bool validatePath(const std::string &path)

@@ -1,6 +1,6 @@
 #ifndef CONTROLLERMANAGER_H
 #define CONTROLLERMANAGER_H
-
+#pragma once
 #include <QList>
 #include <QMap>
 #include <QMutex>
@@ -8,19 +8,21 @@
 #include <QString>
 
 #include "ApiClient.h"
+#include "PasswordManager.h"
 
 struct ControllerInfo
 {
     QString serialNumber;
     QString ip;
     int     sftpPort;
-    int     apiPort;
     QString username;
     QString pswd;
+    QString wsPath;
+    QString birth;
     bool    isConnected;
     bool    isRunning;
 
-    ControllerInfo() : sftpPort(22), apiPort(80), isConnected(false), isRunning(false) {}
+    ControllerInfo() : sftpPort(22), isConnected(false), isRunning(false) {}
 };
 
 class ControllerManager : public QObject
@@ -29,6 +31,7 @@ class ControllerManager : public QObject
 
       public:
         static ControllerManager *instance();
+        PasswordManager           pm;
 
         // 제어기 관리
         void registerController();
@@ -45,18 +48,34 @@ class ControllerManager : public QObject
         ApiClient            *getApiClient(const QString &serialNumber);
 
         // 파일 저장/로드
-        void saveToFile(const QString &filePath = "");
-        void loadFromFile(const QString &filePath = "");
+        void saveToFile(const QString &serialNumber = "");
+        void loadFromFile();
 
-        //그냥 호출해도 괜찮
-        void backupRequest(const QString &serialNumber);
+        // 개별 제어기 저장/로드
+        bool saveController(const ControllerInfo &controller);
+        bool loadController(const QString &serialNumber);
 
-        //여러개 한번에 보내면 안돼서 보낼 제어기 리스트를 큐로 관리해서 하나씩 보내고 완료되면 다음꺼 보내야함
-        void applyRequest(const QString &serialNumber, const QString &filePath);
+        // 전체 제어기 목록 관리
+        void saveControllerList();
+        void loadControllerList();
+
+        bool backupRequest(const QString &serialNumber, const QString &baseBackupDir);
+        bool applyRequest(
+                const QString &serialNumber, const QString &filePath, const QString &apiPassword);
+
+        bool receive(const QString &serialNumber,
+                     const QString &remoteTarGz,
+                     const QString &parentDir,
+                     const QString &localDestDir);
+        bool send(const QString     &serialNumber,
+                  const QStringList &localPaths,
+                  const QString     &remoteDir);
 
       signals:
         void controllerListChanged();
         void controllerStateUpdated(const QString &serialNumber, bool isConnected, bool isRunning);
+        void backupCompleted(const QString &serialNumber);
+        void backupFailed(const QString &serialNumber, const QString &error);
 
       private:
         explicit ControllerManager(QObject *parent = nullptr);
