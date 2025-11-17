@@ -253,6 +253,10 @@ void ControllerManager::cleanupApiClient(const QString &serialNumber)
 // 모든 제어기 상태 업데이트
 void ControllerManager::updateControllersStates()
 {
+    if (stateUpdatesPaused_) {
+        return;
+    }
+
     QList<ControllerInfo>      controllersCopy;
     QMap<QString, ApiClient *> clientsCopy;
 
@@ -271,7 +275,7 @@ void ControllerManager::updateControllersStates()
 
         // URL이 틀리거나, ApiClient가 없으면 재생성
         if (!client) {
-            updateConnectionState(c.serialNumber, false);  // 즉시 끊김 표시
+            //updateConnectionState(c.serialNumber, false);  // 즉시 끊김 표시
             setupApiClient(c.serialNumber);
             continue;
         }
@@ -285,33 +289,13 @@ void ControllerManager::updateControllersStates()
             qDebug() << "exp : " << expectedUrl;
             qDebug() << "cur : " << currentUrl;
 
-            updateConnectionState(c.serialNumber, false);  // 즉시 끊김 표시
+            //updateConnectionState(c.serialNumber, false);  // 즉시 끊김 표시
             cleanupApiClient(c.serialNumber);
             setupApiClient(c.serialNumber);
             continue;
         }
-        updateConnectionState(c.serialNumber, false);
 
         client->get("/api/robot/running");
-        if (c.serialNumber == "SN1") {
-            ControllerManager *manager = ControllerManager::instance();
-
-            QStringList localFiles;
-            localFiles << "C:/Users/SSAFY/workspace.tgz";  // 로컬 파일 (Windows 경로)
-
-            QString remoteDir = "/workspace/";  // 원격 디렉토리 (리눅스 경로)
-
-            // bool success = manager->send("SN1",       // 시리얼 번호
-            // localFiles,  // 로컬 파일들 (압축할 파일 목록)
-            // remoteDir    // 원격 저장 경로
-            // );
-
-            // bool success = manager->receive(
-            // "SN1",                      // 시리얼 번호
-            // "/workspace/test.tgz",   // 원격 파일 경로
-            // "C:/Download"               // 로컬 폴더 경로
-            // );
-        }
     }
 }
 
@@ -516,19 +500,21 @@ bool ControllerManager::backupRequest(const QString &serialNumber, const QString
     // 타임스탬프 이름 계산 (폴더명 & 내부 workspace rename 용)
     const QString ts            = QDateTime::currentDateTime().toString("yyyy-MM-dd_HHmmss");
     const QString targetDirName = sn + "_" + ts;  // 예: 123_2025-11-12_153723
-    const QString remoteTarGz   = info.wsPath + "/workspace.tgz";
+    const QString remoteTarGz   = info.wsPath + "/output.tgz";
 
-    // compress 완료 콜백에서만 받기
-    QMetaObject::Connection okConn, failConn;
-    okConn = connect(
+    QObject *context = new QObject(this);
+
+    connect(
             client,
             &ApiClient::requestSucceeded,
-            this,
-            [=](const QString &endpoint, const QJsonObject &) {
+            context,  // ← context 추가
+            [this, serialNumber, remoteTarGz, snDir, targetDirName, context](
+                    const QString &endpoint, const QJsonObject &) {
                 if (endpoint != "/api/workspace/compress")
                     return;
-                QObject::disconnect(okConn);
-                QObject::disconnect(failConn);
+
+                // context 삭제 (자동으로 모든 연결 해제)
+                context->deleteLater();
 
                 // receive는 snDir(부모 폴더) + targetDirName(원하는 최상위 폴더명)으로 호출
                 bool ok = receive(serialNumber, remoteTarGz, snDir, targetDirName);
@@ -543,29 +529,31 @@ bool ControllerManager::backupRequest(const QString &serialNumber, const QString
             },
             Qt::QueuedConnection);
 
-    failConn = connect(
+    connect(
             client,
             &ApiClient::requestFailed,
-            this,
-            [=](const QString &endpoint, const QString &err, const QString &) {
+            context,  // ← context 추가
+            [this, serialNumber, context](
+                    const QString &endpoint, const QString &err, const QString &) {
                 if (endpoint != "/api/workspace/compress")
                     return;
-                QObject::disconnect(okConn);
-                QObject::disconnect(failConn);
-                qWarning() << "[backupRequest] compress failed:" << err;
 
+                // context 삭제 (자동으로 모든 연결 해제)
+                context->deleteLater();
+
+                qWarning() << "[backupRequest] compress failed:" << err;
                 emit backupFailed(serialNumber, QStringLiteral("압축 요청 실패: ") + err);
             },
             Qt::QueuedConnection);
 
     if (!client->postWorkspaceCompress(info.username)) {
-        QObject::disconnect(okConn);
-        QObject::disconnect(failConn);
+        // 요청 전송 실패 시 context 정리
+        context->deleteLater();
         qWarning() << "[backupRequest] failed to send compress request";
-
         emit backupFailed(serialNumber, QStringLiteral("압축 요청 전송 실패"));
         return false;
     }
+
     return true;
 }
 
@@ -604,47 +592,45 @@ bool ControllerManager::applyRequest(const QString &serialNumber,
     }
 
     // 2) /api/workspace/extract 결과 비동기 감시
-    QMetaObject::Connection okConn, failConn;
-    okConn = connect(
+    QObject *context = new QObject(this);
+
+    connect(
             client,
             &ApiClient::requestSucceeded,
-            this,
-            [=](const QString &endpoint, const QJsonObject &) {
+            context,
+            [this, serialNumber, context](const QString &endpoint, const QJsonObject &) {
                 if (endpoint != "/api/workspace/extract")
                     return;
-                QObject::disconnect(okConn);
-                QObject::disconnect(failConn);
+
+                context->deleteLater();  // 자동으로 모든 연결 해제
 
                 qDebug() << "[applyRequest] extract completed for" << serialNumber;
                 emit applyCompleted(serialNumber);
             },
             Qt::QueuedConnection);
 
-    failConn = connect(
+    connect(
             client,
             &ApiClient::requestFailed,
-            this,
-            [=](const QString &endpoint, const QString &err, const QString &) {
+            context,  // ← context 추가
+            [this, serialNumber, context](
+                    const QString &endpoint, const QString &err, const QString &) {
                 if (endpoint != "/api/workspace/extract")
                     return;
-                QObject::disconnect(okConn);
-                QObject::disconnect(failConn);
+
+                context->deleteLater();  // 자동으로 모든 연결 해제
 
                 qWarning() << "[applyRequest] extract failed:" << err;
-                emit applyFailed(serialNumber,
-                                 QStringLiteral("압축 해제 요청 실패: ") + err);
+                emit applyFailed(serialNumber, QStringLiteral("압축 해제 요청 실패: ") + err);
             },
             Qt::QueuedConnection);
 
-    // 3) 실제 extract 요청 전송
-    if (!client->postWorkspaceExtract(info.username, apiPassword)) {
-        QObject::disconnect(okConn);
-        QObject::disconnect(failConn);
+    if (!client->postWorkspaceExtract(info.username, "0000")) {
+        context->deleteLater();
         qWarning() << "[ControllerManager][applyRequest] extract request send failed for"
                    << serialNumber;
 
-        emit applyFailed(serialNumber,
-                         QStringLiteral("압축 해제 요청 전송 실패"));
+        emit applyFailed(serialNumber, QStringLiteral("압축 해제 요청 전송 실패"));
         return false;
     }
 
@@ -685,7 +671,7 @@ bool ControllerManager::send(const QString     &serialNumber,
         return false;
     }
 
-    QString remotePath = remoteDir + "/workspace.tgz";
+    QString remotePath = remoteDir + "/input.tgz";
     qDebug() << "Uploading to:" << remotePath;
 
     bool uploadSuccess = client.uploadFile(tarGzPath, remotePath);
@@ -1000,4 +986,19 @@ void ControllerManager::onMasterPasswordChanged()
     pm_->loadPasswordFromConfig();
 
     saveToFile();  // 모든 컨트롤러 정보 재저장
+}
+
+void ControllerManager::pauseStateUpdates()
+{
+    stateUpdatesPaused_ = true;
+    qDebug() << "[ControllerManager] State updates paused";
+}
+
+void ControllerManager::resumeStateUpdates()
+{
+    stateUpdatesPaused_ = false;
+    qDebug() << "[ControllerManager] State updates resumed";
+
+    // 즉시 한 번 업데이트
+    QTimer::singleShot(0, this, &ControllerManager::updateControllersStates);
 }

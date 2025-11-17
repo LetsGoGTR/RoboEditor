@@ -1,8 +1,9 @@
 #include "ApplyPage.h"
 
+#include <QTimer>
+
 #include <QDir>
 #include <QFile>
-#include <QTimer>
 #include <QFileDialog>
 #include <QJsonObject>
 #include <QMessageBox>
@@ -10,6 +11,7 @@
 
 #include "ConfirmSelection.h"
 #include "ControllerManager.h"
+#include "LogManager.h"
 #include "PasswordManager.h"
 #include "ProgressDialog.h"
 #include "ui_ApplyPage.h"
@@ -45,10 +47,8 @@ ApplyPage::ApplyPage(QWidget *parent) :
             });
 
     ControllerManager *manager = ControllerManager::instance();
-    connect(manager, &ControllerManager::applyCompleted,
-            this, &ApplyPage::onApplyCompleted);
-    connect(manager, &ControllerManager::applyFailed,
-            this, &ApplyPage::onApplyFailed);
+    connect(manager, &ControllerManager::applyCompleted, this, &ApplyPage::onApplyCompleted);
+    connect(manager, &ControllerManager::applyFailed, this, &ApplyPage::onApplyFailed);
 }
 
 //refresh : 제어기 목록 새로고침
@@ -77,7 +77,6 @@ void ApplyPage::confirmSelection()
     }
 
     showPasswordUI();
-    qDebug() << "apply clicked";
 }
 
 //import : 다른 백업 스페이스 폴더 찾기
@@ -131,7 +130,7 @@ void ApplyPage::showPasswordUI()
         }
     } else {
         // 사용자가 취소함
-        qDebug() << "Password dialog cancelled";
+        LogManager::append("Password dialog cancelled");
     }
 }
 
@@ -147,6 +146,8 @@ void ApplyPage::startApplyQueue()
     QStringList        disconnectedControllers;
     QStringList        unknownControllers;
     QStringList        runningControllers;
+
+    manager->pauseStateUpdates();
 
     for (const QString &sn : selectedControllerList) {
         ControllerInfo info = manager->getController(sn);
@@ -215,14 +216,11 @@ void ApplyPage::startApplyQueue()
 
     QApplication::processEvents();
 
-    connect(applyProgressDialog_,
-            &ProgressDialog::cancelRequested,
-            this,
-            [this]() {
-                if (applyProgressDialog_) {
-                    applyProgressDialog_->close();
-                }
-            });
+    connect(applyProgressDialog_, &ProgressDialog::cancelRequested, this, [this]() {
+        if (applyProgressDialog_) {
+            applyProgressDialog_->close();
+        }
+    });
 
     // Disable controls during apply
     if (ui->applyBtn)
@@ -233,8 +231,6 @@ void ApplyPage::startApplyQueue()
     }
 
     QTimer::singleShot(0, this, &ApplyPage::processNextApply);
-    // 큐 처리 시작
-    // processNextApply();
 }
 
 // 큐 처리
@@ -269,9 +265,11 @@ void ApplyPage::onApplyCompleted(const QString &serialNumber)
         return;
 
     completedApplyRequests_++;
-    qDebug() << "[ApplyPage] Apply completed:" << serialNumber << "(" << completedApplyRequests_
-             << "/" << totalApplyRequests_ << ")";
-
+    QString msg = QString("Apply completed: %1 (%2/%3)")
+                          .arg(serialNumber)
+                          .arg(completedApplyRequests_)
+                          .arg(totalApplyRequests_);
+    LogManager::append(msg);
 
     int doneCount = completedApplyRequests_ + failedApplyRequests_;
 
@@ -293,7 +291,11 @@ void ApplyPage::onApplyFailed(const QString &serialNumber, const QString &error)
 
     failedApplyRequests_++;
     qWarning() << "[ApplyPage] Apply failed:" << serialNumber << error;
-
+    QString msg = QString("[Apply failed: %1 (%2/%3)")
+                          .arg(serialNumber)
+                          .arg(failedApplyRequests_)
+                          .arg(totalApplyRequests_);
+    LogManager::append(msg);
 
     int doneCount = completedApplyRequests_ + failedApplyRequests_;
 
@@ -313,7 +315,7 @@ void ApplyPage::onAllAppliesCompleted()  //
     qDebug() << "[ApplyPage] All applies processed.";
 
     applyInProgress_ = false;
-
+    ControllerManager::instance()->resumeStateUpdates();
 
     if (applyProgressDialog_) {
         applyProgressDialog_->setFinishedMode(true);

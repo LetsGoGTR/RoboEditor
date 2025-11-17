@@ -44,8 +44,10 @@ QString PasswordManager::hashPassword(const QString &pwd) const
 QString PasswordManager::getConfigFilePath() const
 {
     // 애플리케이션 데이터 저장 경로
+
     QString configPath = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
 
+    qDebug() << configPath;
     // 디렉토리가 없으면 생성
     QDir dir(configPath);
     if (!dir.exists()) {
@@ -92,7 +94,8 @@ void PasswordManager::loadPasswordFromConfig()
 void PasswordManager::savePasswordToConfig(const QString &hashedPwd)
 {
     QString configFile = getConfigFilePath();
-    QFile   file(configFile);
+
+    QFile file(configFile);
 
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
         qWarning() << "설정 파일에 쓸 수 없습니다:" << configFile;
