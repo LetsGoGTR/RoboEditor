@@ -13,11 +13,14 @@
 
 #include "ControllerSetting.h"
 #include "FileCompressor.h"
+#include "PasswordManager.h"
 #include "SftpClient.h"
 
 static ControllerManager *getinstance = nullptr;
 
-ControllerManager::ControllerManager(QObject *parent) : QObject(parent)
+ControllerManager::ControllerManager(QObject *parent) :
+    QObject(parent),
+    pm_(new PasswordManager(nullptr))
 {
     loadFromFile();
 }
@@ -600,10 +603,48 @@ bool ControllerManager::applyRequest(const QString &serialNumber,
         return false;
     }
 
-    // 4) 서버에 압축 해제 요청
+    // 2) /api/workspace/extract 결과 비동기 감시
+    QMetaObject::Connection okConn, failConn;
+    okConn = connect(
+            client,
+            &ApiClient::requestSucceeded,
+            this,
+            [=](const QString &endpoint, const QJsonObject &) {
+                if (endpoint != "/api/workspace/extract")
+                    return;
+                QObject::disconnect(okConn);
+                QObject::disconnect(failConn);
+
+                qDebug() << "[applyRequest] extract completed for" << serialNumber;
+                emit applyCompleted(serialNumber);
+            },
+            Qt::QueuedConnection);
+
+    failConn = connect(
+            client,
+            &ApiClient::requestFailed,
+            this,
+            [=](const QString &endpoint, const QString &err, const QString &) {
+                if (endpoint != "/api/workspace/extract")
+                    return;
+                QObject::disconnect(okConn);
+                QObject::disconnect(failConn);
+
+                qWarning() << "[applyRequest] extract failed:" << err;
+                emit applyFailed(serialNumber,
+                                 QStringLiteral("압축 해제 요청 실패: ") + err);
+            },
+            Qt::QueuedConnection);
+
+    // 3) 실제 extract 요청 전송
     if (!client->postWorkspaceExtract(info.username, apiPassword)) {
-        qWarning() << "[ControllerManager][applyRequest] extract request failed for"
+        QObject::disconnect(okConn);
+        QObject::disconnect(failConn);
+        qWarning() << "[ControllerManager][applyRequest] extract request send failed for"
                    << serialNumber;
+
+        emit applyFailed(serialNumber,
+                         QStringLiteral("압축 해제 요청 전송 실패"));
         return false;
     }
 
@@ -776,7 +817,7 @@ bool ControllerManager::saveController(const ControllerInfo &controller)
     obj["ip"]           = controller.ip;
     obj["sftpPort"]     = controller.sftpPort;
     obj["username"]     = controller.username;
-    obj["pswd"]         = pm.encrypt(controller.pswd);
+    obj["pswd"]         = pm_->encrypt(controller.pswd);
     obj["wsPath"]       = controller.wsPath;
     obj["createdAt"]    = controller.birth;
     obj["lastModified"] = QDateTime::currentDateTime().toString(Qt::ISODate);
@@ -827,14 +868,13 @@ bool ControllerManager::loadController(const QString &serialNumber)
     }
 
     QJsonObject obj = doc.object();
-
     // 6. ControllerInfo 생성
     ControllerInfo c;
     c.serialNumber = obj["serialNumber"].toString();
     c.ip           = obj["ip"].toString();
     c.sftpPort     = obj["sftpPort"].toInt();
     c.username     = obj["username"].toString();
-    c.pswd         = pm.decrypt(obj["pswd"].toString());
+    c.pswd         = pm_->decrypt(obj["pswd"].toString());
     c.birth        = obj["createdAt"].toString();
     c.wsPath       = obj["wsPath"].toString();
     c.isConnected  = false;  // 시작 시 연결 안됨
@@ -951,4 +991,13 @@ void ControllerManager::loadControllerList()
 
     qDebug() << "[loadControllerList] Loaded successfully:" << successCount
              << "Failed:" << failCount;
+}
+void ControllerManager::onMasterPasswordChanged()
+{
+    if (!pm_)
+        return;
+
+    pm_->loadPasswordFromConfig();
+
+    saveToFile();  // 모든 컨트롤러 정보 재저장
 }

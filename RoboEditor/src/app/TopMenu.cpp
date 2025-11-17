@@ -7,6 +7,9 @@
 #include <QMenu>
 #include <QMenuBar>
 
+#include "ControllerManager.h"
+#include "PasswordManager.h"
+
 TopMenu::TopMenu(QMainWindow *mw) : QObject(mw), mw_(mw)
 {
     build();
@@ -63,6 +66,12 @@ void TopMenu::build()
 }
 void TopMenu::onChangePasswordTriggered()
 {
-    PasswordManager manager(mw_);  // 다이얼로그 객체 생성
-    manager.changePassword();      // ✅ 직접 changePassword() 호출
+    PasswordManager manager(mw_);
+
+    QObject::connect(&manager,
+                     &PasswordManager::masterPasswordChanged,
+                     ControllerManager::instance(),
+                     &ControllerManager::onMasterPasswordChanged);
+
+    manager.changePassword();
 }
