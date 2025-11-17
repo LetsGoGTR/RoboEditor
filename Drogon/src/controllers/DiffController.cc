@@ -79,12 +79,8 @@ void api::v1::Diff::diffFiles(const drogon::HttpRequestPtr                      
                 callback, drogon::k400BadRequest, "filePathA and filePathB cannot be empty");
     }
 
-    std::string fullPathA = getBaseDir() + filePathA;
-    std::string fullPathB = getBaseDir() + filePathB;
-
-    LOG_DEBUG << "diff api called";
-    LOG_DEBUG << "filePathA: " << fullPathA;
-    LOG_DEBUG << "filePathB: " << fullPathB;
+    std::string fullPathA = filePathA;//getBaseDir() + filePathA;
+    std::string fullPathB = filePathB;//getBaseDir() + filePathB;
 
     auto resultA = services::FileService::readFile(fullPathA);
     if (!resultA.success) {
@@ -150,6 +146,10 @@ void api::v1::Diff::diffWorkspaces(const drogon::HttpRequestPtr                 
     // ---- 경로 조립 & canonical ----
     fs::path joinedA = fs::path(getBaseDir()) / wsReq->dirPathA;
     fs::path joinedB = fs::path(getBaseDir()) / wsReq->dirPathB;
+
+    LOG_DEBUG << "baseDir = " << getBaseDir();
+    LOG_INFO << "joinedA = " << joinedA.string();
+    LOG_INFO << "joinedB = " << joinedB.string();
 
     std::error_code ec;
     auto            normalize = [&](const fs::path &p) {
