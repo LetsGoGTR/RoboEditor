@@ -174,3 +174,27 @@ QSpinBox::up-arrow, QSpinBox::down-arrow {
     font-size: 9pt;
     color: #666;
 }
+
+#ComparePageRoot #topBar{
+    background-color: #e8eaff;
+    border-bottom: 1px solid #c0c8ff;
+}
+
+#ComparePageRoot QPushButton#fileBtn,
+#ComparePageRoot QPushButton#folderBtn {
+    background-color: #f0f0f0;
+    color: #000000;
+    border: 1px solid #b0b0b0;
+    border-radius: 3px;
+    padding: 4px 8px;
+    font-size: 9pt;
+}
+
+#ComparePageRoot QPushButton:hover {
+    background-color: #e0e0e0;
+    border: 1px solid #909090;
+}
+
+#ComparePageRoot QPushButton:pressed {
+    background-color: #d0d0d0;
+}
