@@ -213,6 +213,10 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         src/core/WorkspaceContextMenuController.cpp
         src/app/ProgressDialog.cpp
         src/app/ProgressDialog.h
+        src/app/DiffTablePanel.cpp
+        src/app/DiffTablePanel.h
+        src/core/FileTypeHelper.cpp
+        src/core/FileTypeHelper.h
     )
     qt_create_translation(QM_FILES ${CMAKE_SOURCE_DIR} ${TS_FILES})
 else()
