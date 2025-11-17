@@ -4,7 +4,6 @@
 #include <filesystem>
 #include <fstream>
 
-#include "../services/AuthService.h"
 #include "../services/DeviceService.h"
 #include "../services/WorkspaceService.h"
 #include "../utils/ConfigUtils.h"
@@ -239,14 +238,6 @@ void api::v1::Repo::apply(const drogon::HttpRequestPtr                          
     auto json = req->getJsonObject();
     if (!json) {
         return sendError(callback, drogon::k400BadRequest, "Invalid JSON body");
-    }
-
-    if (!json->isMember("password")) {
-        return sendError(callback, drogon::k400BadRequest, "Missing password");
-    }
-    std::string password = (*json)["password"].asString();
-    if (!services::AuthService::verifyDevicePassword(password)) {
-        return sendError(callback, drogon::k401Unauthorized, "Invalid password");
     }
 
     // Get workspaceId
@@ -682,14 +673,15 @@ void api::v1::Repo::workspaceExport(const drogon::HttpRequestPtr                
                                     std::function<void(const drogon::HttpResponsePtr &)> &&callback)
 {
     auto json = req->getJsonObject();
-    if (!json || !json->isMember("id"))
-        return sendError(callback, drogon::k400BadRequest, "Missing 'id' field");
+    if (!json || !json->isMember("id") || !json->isMember("deviceId"))
+        return sendError(callback, drogon::k400BadRequest, "Missing 'id' or 'deviceId' field");
 
     std::string workspaceId = (*json)["id"].asString();
+    std::string deviceId    = (*json)["deviceId"].asString();
 
     try {
         // Read workspace to get metadata
-        auto readResult = services::WorkspaceService::readWorkspace(workspaceId);
+        auto readResult = services::WorkspaceService::readWorkspace(workspaceId, deviceId);
         if (!readResult.success)
             return sendError(callback, drogon::k404NotFound, "Workspace not found", workspaceId);
 
@@ -703,7 +695,7 @@ void api::v1::Repo::workspaceExport(const drogon::HttpRequestPtr                
         std::string outputFilename = workspaceName + ".tar.gz";
         std::string outputPath     = tempDir + outputFilename;
 
-        auto result = services::WorkspaceService::exportWorkspace(workspaceId, outputPath);
+        auto result = services::WorkspaceService::exportWorkspace(workspaceId, outputPath, deviceId);
 
         if (!result.success)
             return sendError(callback,

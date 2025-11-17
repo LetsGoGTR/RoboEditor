@@ -1,27 +1,27 @@
 #include "FileTransferService.h"
 
 #include <algorithm>
+#include <bcrypt.h>
 #include <ctime>
 #include <drogon/HttpClient.h>
 #include <drogon/utils/Utilities.h>
 #include <filesystem>
+#include <fstream>
 #include <iomanip>
 #include <sstream>
 
 #include "../services/DeviceService.h"
 #include "../services/WorkspaceService.h"
+#include "../utils/ConfigUtils.h"
 #include "../utils/TimeUtils.h"
 #include "../utils/logging/Logger.h"
 
 namespace fs = std::filesystem;
 
-services::ServiceResult FileTransferService::backupFromRemote(const std::string &deviceId,
-                                                              const std::string &password,
-                                                              const std::string &remotePath)
+services::ServiceResult FileTransferService::backupFromRemote(const std::string &deviceId)
 {
     try {
-        utils::logging::info("원격 백업 다운로드 시작: deviceId=" + deviceId +
-                             ", remote=" + remotePath);
+        utils::logging::info("원격 백업 다운로드 시작: deviceId=" + deviceId);
 
         // 1. Device 정보 조회
         auto deviceResult = services::DeviceService::readDevice(deviceId);
@@ -114,9 +114,9 @@ services::ServiceResult FileTransferService::backupFromRemote(const std::string 
                                                         sftpClient.getLastError());
         }
 
-        // 5. 원격 파일 경로 구성
-        std::string fullRemotePath = "/home/" + sftpUser + "/" + remotePath;
-        utils::logging::info("원격 파일 전체 경로: " + fullRemotePath);
+        // 5. 원격 파일 경로 구성 (output.tgz 고정)
+        std::string fullRemotePath = "/home/" + sftpUser + "/output.tgz";
+        utils::logging::info("원격 파일 다운로드: " + fullRemotePath);
 
         // 6. 임시 디렉토리에 다운로드
         std::string tempDir = "/tmp/backup_";
@@ -187,27 +187,13 @@ services::ServiceResult FileTransferService::applyWorkspace(const std::string &w
         utils::logging::info("워크스페이스 적용 시작: workspaceId=" + workspaceId +
                              ", deviceId=" + deviceId);
 
-        // 1. Workspace 정보 조회
-        auto workspaceResult = services::WorkspaceService::readWorkspace(workspaceId, deviceId);
-        if (!workspaceResult.success) {
-            return services::ServiceResult::createError("Workspace not found: " + workspaceId);
-        }
-
-        // // 2. Workspace의 target (deviceId) 추출
-        // std::string deviceId = workspaceResult.data["target"].asString();
-        // if (deviceId.empty()) {
-        //     return services::ServiceResult::createError("Workspace has no target device");
-        // }
-
-        utils::logging::info("Workspace target device: " + deviceId);
-
-        // 3. Device 정보 조회
+        // 1. Device 정보 조회
         auto deviceResult = services::DeviceService::readDevice(deviceId);
         if (!deviceResult.success) {
             return services::ServiceResult::createError("Device not found: " + deviceId);
         }
 
-        // 4. Device metadata에서 SFTP 및 API 정보 추출
+        // 2. Device metadata에서 SFTP 및 API 정보 추출
         std::string api          = deviceResult.data["api"].asString();
         std::string sftpHost     = deviceResult.data["sftpHost"].asString();
         int         sftpPort     = deviceResult.data["sftpPort"].asInt();
@@ -217,7 +203,7 @@ services::ServiceResult FileTransferService::applyWorkspace(const std::string &w
         utils::logging::info("Device info: api=" + api + ", sftpHost=" + sftpHost +
                              ", sftpUser=" + sftpUser);
 
-        // 5. 임시 디렉토리에 workspace export
+        // 3. 임시 디렉토리에 workspace export
         std::string tempDir = "/tmp/apply_";
         if (!fs::exists(tempDir)) {
             fs::create_directories(tempDir);
@@ -225,7 +211,7 @@ services::ServiceResult FileTransferService::applyWorkspace(const std::string &w
 
         std::string tempFile = tempDir + drogon::utils::getUuid() + ".tar.gz";
 
-        // 6. Workspace export
+        // 4. Workspace export
         auto exportResult =
                 services::WorkspaceService::exportWorkspace(workspaceId, tempFile, deviceId);
 
@@ -235,7 +221,7 @@ services::ServiceResult FileTransferService::applyWorkspace(const std::string &w
                                                         exportResult.errorMessage);
         }
 
-        // 7. SFTP로 원격 서버에 파일 업로드
+        // 5. SFTP로 원격 서버에 파일 업로드
         SFTPConfig sftpConfig(sftpHost, sftpPort, sftpUser, sftpPassword);
         SFTPClient sftpClient(sftpConfig);
 
@@ -245,7 +231,7 @@ services::ServiceResult FileTransferService::applyWorkspace(const std::string &w
                                                         sftpClient.getLastError());
         }
 
-        std::string remotePath = "/home/" + sftpUser + "/workspace.tgz";
+        std::string remotePath = "/home/" + sftpUser + "/input.tgz";
         utils::logging::info("SFTP 파일 업로드 시작: " + tempFile + " -> " + remotePath);
 
         if (!sftpClient.uploadFile(tempFile, remotePath)) {
@@ -256,11 +242,11 @@ services::ServiceResult FileTransferService::applyWorkspace(const std::string &w
 
         utils::logging::info("SFTP 파일 업로드 성공");
 
-        // 8. 임시 파일 삭제
+        // 6. 임시 파일 삭제
         fs::remove(tempFile);
 
-        // 9. Workspace Extract API 호출하여 압축 해제
-        auto [success, errorMsg] = extractWorkspace(sftpUser, password, api);
+        // 7. Workspace Extract API 호출하여 압축 해제
+        auto [success, errorMsg] = extractWorkspace(sftpUser, api);
         if (!success) {
             return services::ServiceResult::createError(errorMsg);
         }
@@ -285,7 +271,6 @@ services::ServiceResult FileTransferService::applyWorkspace(const std::string &w
 }
 
 std::pair<bool, std::string> FileTransferService::extractWorkspace(const std::string &user,
-                                                                   const std::string &password,
                                                                    const std::string &api)
 {
     try {
@@ -298,8 +283,7 @@ std::pair<bool, std::string> FileTransferService::extractWorkspace(const std::st
         req->setPath("/api/workspace/extract");
 
         Json::Value body;
-        body["user"]     = user;
-        body["password"] = password;
+        body["user"] = user;
         req->setBody(body.toStyledString());
         req->setContentTypeCode(drogon::CT_APPLICATION_JSON);
 
@@ -358,4 +342,159 @@ std::pair<bool, std::string> FileTransferService::extractWorkspace(const std::st
         utils::logging::error(error);
         return {false, error};
     }
+}
+
+// ============================================================================
+// 비밀번호 관리 메서드
+// ============================================================================
+
+std::string FileTransferService::getPasswordFilePath()
+{
+    std::string baseDir = utils::config::getBaseDir();
+    return baseDir + "/.password";
+}
+
+void FileTransferService::ensurePasswordFileExists()
+{
+    std::string passwordFile = getPasswordFilePath();
+
+    if (fs::exists(passwordFile)) {
+        return;  // 이미 존재하면 아무것도 하지 않음
+    }
+
+    utils::logging::info("초기 비밀번호 파일 생성 중...");
+
+    // 기본 비밀번호 "0000"의 해시 생성
+    char salt[BCRYPT_HASHSIZE];
+    char hash[BCRYPT_HASHSIZE];
+
+    int ret = bcrypt_gensalt(12, salt);
+    if (ret != 0) {
+        utils::logging::error("비밀번호 salt 생성 실패");
+        return;
+    }
+
+    ret = bcrypt_hashpw("0000", salt, hash);
+    if (ret != 0) {
+        utils::logging::error("비밀번호 해시 생성 실패");
+        return;
+    }
+
+    // 해시를 파일에 저장
+    if (writePasswordHash(std::string(hash))) {
+        utils::logging::info("초기 비밀번호(0000) 설정 완료");
+    } else {
+        utils::logging::error("초기 비밀번호 파일 쓰기 실패");
+    }
+}
+
+std::string FileTransferService::readPasswordHash()
+{
+    ensurePasswordFileExists();  // 파일이 없으면 생성
+
+    std::string   passwordFile = getPasswordFilePath();
+    std::ifstream file(passwordFile);
+
+    if (!file.is_open()) {
+        utils::logging::error("비밀번호 파일 읽기 실패: " + passwordFile);
+        return "";
+    }
+
+    std::string hash;
+    std::getline(file, hash);
+    file.close();
+
+    return hash;
+}
+
+bool FileTransferService::writePasswordHash(const std::string &hash)
+{
+    std::string passwordFile = getPasswordFilePath();
+
+    // storage 디렉토리가 없으면 생성
+    std::string baseDir = utils::config::getBaseDir();
+    if (!fs::exists(baseDir)) {
+        fs::create_directories(baseDir);
+    }
+
+    std::ofstream file(passwordFile);
+    if (!file.is_open()) {
+        utils::logging::error("비밀번호 파일 쓰기 실패: " + passwordFile);
+        return false;
+    }
+
+    file << hash;
+    file.close();
+
+    return true;
+}
+
+bool FileTransferService::verifyPassword(const std::string &password)
+{
+    if (password.empty()) {
+        utils::logging::warn("빈 비밀번호 검증 시도");
+        return false;
+    }
+
+    std::string storedHash = readPasswordHash();
+    if (storedHash.empty()) {
+        utils::logging::error("저장된 비밀번호 해시가 없습니다");
+        return false;
+    }
+
+    int ret = bcrypt_checkpw(password.c_str(), storedHash.c_str());
+
+    if (ret == -1) {
+        utils::logging::error("비밀번호 검증 중 오류 발생");
+        return false;
+    }
+
+    if (ret == 0) {
+        utils::logging::info("비밀번호 검증 성공");
+        return true;
+    } else {
+        utils::logging::warn("비밀번호 불일치");
+        return false;
+    }
+}
+
+services::ServiceResult FileTransferService::changePassword(const std::string &oldPassword,
+                                                            const std::string &newPassword)
+{
+    // 1. 기존 비밀번호 검증
+    if (!verifyPassword(oldPassword)) {
+        utils::logging::warn("비밀번호 변경 실패: 기존 비밀번호 불일치");
+        return services::ServiceResult::createError("기존 비밀번호가 일치하지 않습니다");
+    }
+
+    // 2. 새 비밀번호 유효성 검사
+    if (newPassword.empty()) {
+        utils::logging::warn("비밀번호 변경 실패: 새 비밀번호가 비어있음");
+        return services::ServiceResult::createError("새 비밀번호는 비어있을 수 없습니다");
+    }
+
+    // 3. 새 비밀번호 해시 생성
+    char salt[BCRYPT_HASHSIZE];
+    char hash[BCRYPT_HASHSIZE];
+
+    int ret = bcrypt_gensalt(12, salt);
+    if (ret != 0) {
+        utils::logging::error("비밀번호 salt 생성 실패");
+        return services::ServiceResult::createError("비밀번호 변경 중 오류 발생");
+    }
+
+    ret = bcrypt_hashpw(newPassword.c_str(), salt, hash);
+    if (ret != 0) {
+        utils::logging::error("비밀번호 해시 생성 실패");
+        return services::ServiceResult::createError("비밀번호 변경 중 오류 발생");
+    }
+
+    // 4. 새 해시 저장
+    if (!writePasswordHash(std::string(hash))) {
+        utils::logging::error("비밀번호 파일 저장 실패");
+        return services::ServiceResult::createError("비밀번호 변경 중 오류 발생");
+    }
+
+    utils::logging::info("비밀번호 변경 완료");
+    return services::ServiceResult::createSuccess("비밀번호가 성공적으로 변경되었습니다");
 }

@@ -1,6 +1,3 @@
-[submodule "Drogon/external/libbcrypt"]
-	path = Drogon/external/libbcrypt
-	url = https://github.com/trusch/libbcrypt.git
 [submodule "RoboEditor/external/jsoncpp"]
 	path = RoboEditor/external/jsoncpp
 	url = https://github.com/open-source-parsers/jsoncpp.git
@@ -13,3 +10,6 @@
 [submodule "Drogon/external/tree-sitter-python"]
 	path = Drogon/external/tree-sitter-python
 	url = https://github.com/tree-sitter/tree-sitter-python
+[submodule "Drogon/external/bcrypt"]
+	path = Drogon/external/bcrypt
+	url = https://github.com/gonudayo/bcrypt

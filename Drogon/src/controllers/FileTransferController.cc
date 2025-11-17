@@ -58,6 +58,17 @@ void FT::apply(const HttpRequestPtr &req, std::function<void(const HttpResponseP
     std::string deviceId    = (*jsonBody)["deviceId"].asString();
     std::string password    = (*jsonBody)["password"].asString();
 
+    // 비밀번호 검증
+    if (!FileTransferService::verifyPassword(password)) {
+        Json::Value error;
+        error["success"] = false;
+        error["error"]   = "Invalid password";
+        auto resp        = HttpResponse::newHttpJsonResponse(error);
+        resp->setStatusCode(k401Unauthorized);
+        callback(resp);
+        return;
+    }
+
     auto task = [workspaceId, deviceId, password, callback]() {
         FileTransferService service;
         auto                result = service.applyWorkspace(workspaceId, deviceId, password);
@@ -102,33 +113,11 @@ void FT::backup(const HttpRequestPtr &req, std::function<void(const HttpResponse
         return;
     }
 
-    if (!jsonBody->isMember("password") || (*jsonBody)["password"].asString().empty()) {
-        Json::Value error;
-        error["success"] = false;
-        error["error"]   = "Missing required field: password";
-        auto resp        = HttpResponse::newHttpJsonResponse(error);
-        resp->setStatusCode(k400BadRequest);
-        callback(resp);
-        return;
-    }
+    std::string deviceId = (*jsonBody)["deviceId"].asString();
 
-    if (!jsonBody->isMember("remotePath") || (*jsonBody)["remotePath"].asString().empty()) {
-        Json::Value error;
-        error["success"] = false;
-        error["error"]   = "Missing required field: remotePath";
-        auto resp        = HttpResponse::newHttpJsonResponse(error);
-        resp->setStatusCode(k400BadRequest);
-        callback(resp);
-        return;
-    }
-
-    std::string deviceId   = (*jsonBody)["deviceId"].asString();
-    std::string password   = (*jsonBody)["password"].asString();
-    std::string remotePath = (*jsonBody)["remotePath"].asString();
-
-    auto task = [deviceId, password, remotePath, callback]() {
+    auto task = [deviceId, callback]() {
         FileTransferService service;
-        auto                result = service.backupFromRemote(deviceId, password, remotePath);
+        auto                result = service.backupFromRemote(deviceId);
 
         if (!result.success) {
             Json::Value error;
@@ -150,4 +139,59 @@ void FT::backup(const HttpRequestPtr &req, std::function<void(const HttpResponse
     };
 
     std::thread(task).detach();
+}
+
+void FT::changePassword(const HttpRequestPtr                          &req,
+                        std::function<void(const HttpResponsePtr &)> &&callback)
+{
+    auto jsonBody = req->getJsonObject();
+    if (!jsonBody) {
+        Json::Value error;
+        error["success"] = false;
+        error["error"]   = "Invalid JSON";
+        auto resp        = HttpResponse::newHttpJsonResponse(error);
+        resp->setStatusCode(k400BadRequest);
+        callback(resp);
+        return;
+    }
+
+    // 필수 파라미터 검증
+    if (!jsonBody->isMember("oldPassword") || (*jsonBody)["oldPassword"].asString().empty()) {
+        Json::Value error;
+        error["success"] = false;
+        error["error"]   = "Missing required field: oldPassword";
+        auto resp        = HttpResponse::newHttpJsonResponse(error);
+        resp->setStatusCode(k400BadRequest);
+        callback(resp);
+        return;
+    }
+
+    if (!jsonBody->isMember("newPassword") || (*jsonBody)["newPassword"].asString().empty()) {
+        Json::Value error;
+        error["success"] = false;
+        error["error"]   = "Missing required field: newPassword";
+        auto resp        = HttpResponse::newHttpJsonResponse(error);
+        resp->setStatusCode(k400BadRequest);
+        callback(resp);
+        return;
+    }
+
+    std::string oldPassword = (*jsonBody)["oldPassword"].asString();
+    std::string newPassword = (*jsonBody)["newPassword"].asString();
+
+    // 비밀번호 변경
+    auto result = FileTransferService::changePassword(oldPassword, newPassword);
+
+    Json::Value response;
+    response["success"] = result.success;
+    if (result.success) {
+        response["message"] =
+                result.errorMessage;  // createSuccess에서는 errorMessage에 성공 메시지 저장
+    } else {
+        response["error"] = result.errorMessage;
+    }
+
+    auto resp = HttpResponse::newHttpJsonResponse(response);
+    resp->setStatusCode(result.success ? k200OK : k401Unauthorized);
+    callback(resp);
 }
