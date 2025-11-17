@@ -9,12 +9,13 @@
 	import type { TreeNode } from '@/types';
 	import NewFileDialog from './dialogs/NewFileDialog.svelte';
 	import DeleteDialog from './dialogs/DeleteDialog.svelte';
+	import { handleDiffFiles } from '@handlers/diff';
+	import CompareDialog from './dialogs/CompareDialog.svelte';
 
 	let warningDialog: HTMLDialogElement;
 	let showNewFile = $state(false);
 	let showDelete = $state(false);
 	let showCompareFile = $state(false);
-	let showCompareFolder = $state(false);
 	let root = $derived(fileTree);
 
 	function handleApply() { gotoPage('apply'); }
@@ -35,12 +36,8 @@
   }
 
 	function handleCompareFiles() {
-		if (!root) warningDialog
+		if (!root) return warningDialog.showModal();
 		showCompareFile = true;
-	}
-
-	function handleCompareFolders() {
-		showCompareFolder = true;
 	}
 
 	// create a new folder
@@ -94,7 +91,7 @@
 			<span>도구</span>
 			<ul class="dropdown">
 				<li><button onclick={handleCompareFiles}>파일 비교</button></li>
-				<li><button onclick={handleCompareFolders}>폴더 비교</button></li>
+				<li><button>폴더 비교</button></li>
 			</ul>
 		</li>
 		<!-- 제어기 탭 -->
@@ -113,7 +110,7 @@
 <!-- 비교 대상 폴더 없음 -->
 <dialog bind:this={warningDialog}>
 	<h3>경고</h3>
-	<p>비교할 대상이 선택되지 않았습니다. 먼저 항목을 선택하세요.</p>
+	<p>먼저 백업 폴더를 선택하여 주십시요.</p>
 	<button class="confirm-btn" onclick={() => warningDialog.close()}>확인</button>
 </dialog>
 
@@ -129,6 +126,17 @@
   root={$fileTree}
   onConfirm={confirmDelete}
   onCancel={() => (showDelete = false)}
+/>
+
+<CompareDialog
+  bind:open={showCompareFile}
+  root={$fileTree}
+  mode="file"
+  onConfirm={({ left, right }) => {
+    handleDiffFiles(left, right);
+    gotoPage("compare");
+  }}
+  onCancel={() => (showCompareFile = false)}
 />
 
 <style>
