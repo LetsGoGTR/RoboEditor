@@ -3,18 +3,7 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import path from 'path';
 
 export default defineConfig({
-	plugins: [
-		sveltekit(),
-	],
-	server: {
-		proxy: {
-			'/proxy': {
-				target: 'http://localhost:8889',
-				changeOrigin: true,
-				rewrite: (path) => path.replace(/^\/proxy/, '')
-			}
-		}
-	},
+	plugins: [sveltekit()],
 	ssr: {
 		noExternal: ['monaco-editor'] // SSR 번들에서 monaco 제외
 	},
@@ -57,7 +46,7 @@ export default defineConfig({
 			'@layouts': path.resolve(__dirname, './src/lib/layouts'),
 			'@features': path.resolve(__dirname, './src/features/components'),
 			'@handlers': path.resolve(__dirname, './src/features/handlers'),
-			'@apis': path.resolve(__dirname, '/src/apis'),
+			'@apis': path.resolve(__dirname, './src/apis'),
 			'@routes': path.resolve(__dirname, './src/routes'),
 			'@utils': path.resolve(__dirname, './src/utils'),
 			'@styles': path.resolve(__dirname, './src/styles')
