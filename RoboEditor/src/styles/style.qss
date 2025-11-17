@@ -146,3 +146,24 @@ QLabel#status_connected {
 QLabel#status_disconnected {
     color: #ff4c4c;
 }
+QLineEdit {
+    min-width: 70px;
+    min-height: 20px;
+    font-size: 12px;
+    padding: 2px 6px;
+}
+QSpinBox {
+    min-width: 70px;
+    min-height: 20px;
+    font-size: 12px;
+    padding: 2px 6px;
+}
+QSpinBox::up-button, QSpinBox::down-button {
+    width: 16px;
+    height: 10px;
+}
+
+QSpinBox::up-arrow, QSpinBox::down-arrow {
+    width: 16px;
+    height: 10px;
+}

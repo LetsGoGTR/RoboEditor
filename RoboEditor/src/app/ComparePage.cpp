@@ -89,27 +89,6 @@ QWidget *ComparePage::buildDock()
     // 좌측: 비교 파일들을 탭으로 관리
     compareTabWidget_ = new QTabWidget(rightSplit_);
     compareTabWidget_->setTabsClosable(true);
-    compareTabWidget_->setStyleSheet("QTabWidget::pane { "
-                                     "  border: none; "
-                                     "  background-color: white; "
-                                     "} "
-                                     "QTabBar::tab { "
-                                     "  background-color: #f0f0f0; "
-                                     "  border: 1px solid #ccc; "
-                                     "  border-bottom: none; "
-                                     "  border-top-left-radius: 3px; "
-                                     "  border-top-right-radius: 3px; "
-                                     "  padding: 4px 8px; "
-                                     "  margin-right: 2px; "
-                                     "  font-size: 9pt; "
-                                     "} "
-                                     "QTabBar::tab:selected { "
-                                     "  background-color: white; "
-                                     "  font-weight: bold; "
-                                     "} "
-                                     "QTabBar::tab:hover { "
-                                     "  background-color: #e0e0e0; "
-                                     "}");
 
     // 탭 닫기 시그널 연결 - 마지막 탭이 닫히면 Compare 전체 닫기
     connect(compareTabWidget_, &QTabWidget::tabCloseRequested, this, [this](int index) {
@@ -173,10 +152,7 @@ QWidget *ComparePage::buildDiffPanel()
     if (diffPanel_)
         return diffPanel_;
     diffPanel_ = new QWidget(this);
-    diffPanel_->setStyleSheet("QWidget { "
-                              "  background-color: white; "
-                              "  border: none; "
-                              "}");
+    diffPanel_->setAutoFillBackground(false);
 
     auto v = new QVBoxLayout(diffPanel_);
     v->setContentsMargins(8, 8, 8, 8);
@@ -192,6 +168,7 @@ QWidget *ComparePage::buildDiffPanel()
 
     QString buttonStyle = "QPushButton { "
                           "  background-color: #f0f0f0; "
+                          "  color: #000000;"  // ✅ 글씨 검은색 추가
                           "  border: 1px solid #b0b0b0; "
                           "  border-radius: 3px; "
                           "  padding: 4px 8px; "
@@ -341,20 +318,24 @@ QWidget *ComparePage::buildDiffPanel()
     v->addWidget(topBar);
 
     // 통계 레이블 - 별도 위젯으로 분리 (좌측 정렬)
-    auto statsBar = new QWidget(diffPanel_);
-    statsBar->setStyleSheet("QWidget { background-color: transparent; border: none; }");
-    auto statsLayout = new QHBoxLayout(statsBar);
-    statsLayout->setContentsMargins(0, 4, 0, 4);
-    statsLayout->setSpacing(6);
-
     if (!statLabel_)
-        statLabel_ = new QLabel("Changes: 0", statsBar);
+        statLabel_ = new QLabel("Changes: 0", topBar);
     statLabel_->setStyleSheet("QLabel { font-weight: bold; font-size: 9pt; }");
-    statsLayout->addWidget(statLabel_);
+    topLayout->addWidget(statLabel_);
+    // auto statsBar = new QWidget(diffPanel_);
+    // statsBar->setStyleSheet("QWidget { background-color: transparent; border: none; }");
+    // auto statsLayout = new QHBoxLayout(statsBar);
+    // statsLayout->setContentsMargins(0, 4, 0, 4);
+    // statsLayout->setSpacing(6);
 
-    statsLayout->addStretch();
+    // if (!statLabel_)
+    //     statLabel_ = new QLabel("Changes: 0", statsBar);
+    // statLabel_->setStyleSheet("QLabel { font-weight: bold; font-size: 9pt; }");
+    // statsLayout->addWidget(statLabel_);
 
-    v->addWidget(statsBar);
+    // statsLayout->addStretch();
+    topLayout->addWidget(statLabel_);
+    //v->addWidget(statsBar);
 
     // 필터 버튼 연결 (상호 배타적)
     connect(btnAll, &QPushButton::clicked, this, [=, this]() {
@@ -394,6 +375,12 @@ QWidget *ComparePage::buildDiffPanel()
     // 컬럼 설정
     diffTable_->setColumnCount(4);
     diffTable_->setHorizontalHeaderLabels({"Key", "Left", "Right", "State"});
+
+    // Diff 테이블의 수직 헤더는 없애고
+    diffTable_->verticalHeader()->setVisible(false);
+
+    // 행 간격 약간 띄우기 (QSS와 조화 좋음)
+    diffTable_->setStyleSheet("QTableWidget::item { padding: 6px; }");
 
     // 가로 헤더 설정
     QHeaderView *hHeader = diffTable_->horizontalHeader();
@@ -443,80 +430,6 @@ QWidget *ComparePage::buildDiffPanel()
             }
         }
     });
-
-    // 테이블 스타일 (스크롤바 포함)
-    diffTable_->setStyleSheet("QTableWidget { "
-                              "  background-color: white; "
-                              "  gridline-color: #e0e0e0; "
-                              "  border: none; "
-                              "  font-family: 'Consolas', 'Monaco', 'Courier New', monospace; "
-                              "  font-size: 9pt; "
-                              "} "
-                              "QTableWidget::item { "
-                              "  padding: 4px 8px; "
-                              "  border: none; "
-                              "} "
-                              "QTableWidget::item:selected { "
-                              "  background-color: #cce8ff; "
-                              "  color: black; "
-                              "} "
-                              "QTableWidget::item:alternate { "
-                              "  background-color: #fafafa; "
-                              "} "
-                              /* 세로 스크롤바 */
-                              "QScrollBar:vertical { "
-                              "  background: #f0f0f0; "
-                              "  width: 14px; "
-                              "  border: none; "
-                              "  margin: 0px; "
-                              "} "
-                              "QScrollBar::handle:vertical { "
-                              "  background: #c0c0c0; "
-                              "  min-height: 20px; "
-                              "  border-radius: 7px; "
-                              "  margin: 2px; "
-                              "} "
-                              "QScrollBar::handle:vertical:hover { "
-                              "  background: #a0a0a0; "
-                              "} "
-                              "QScrollBar::handle:vertical:pressed { "
-                              "  background: #808080; "
-                              "} "
-                              "QScrollBar::add-line:vertical, "
-                              "QScrollBar::sub-line:vertical { "
-                              "  height: 0px; "
-                              "} "
-                              "QScrollBar::add-page:vertical, "
-                              "QScrollBar::sub-page:vertical { "
-                              "  background: none; "
-                              "} "
-                              /* 가로 스크롤바 */
-                              "QScrollBar:horizontal { "
-                              "  background: #f0f0f0; "
-                              "  height: 14px; "
-                              "  border: none; "
-                              "  margin: 0px; "
-                              "} "
-                              "QScrollBar::handle:horizontal { "
-                              "  background: #c0c0c0; "
-                              "  min-width: 20px; "
-                              "  border-radius: 7px; "
-                              "  margin: 2px; "
-                              "} "
-                              "QScrollBar::handle:horizontal:hover { "
-                              "  background: #a0a0a0; "
-                              "} "
-                              "QScrollBar::handle:horizontal:pressed { "
-                              "  background: #808080; "
-                              "} "
-                              "QScrollBar::add-line:horizontal, "
-                              "QScrollBar::sub-line:horizontal { "
-                              "  width: 0px; "
-                              "} "
-                              "QScrollBar::add-page:horizontal, "
-                              "QScrollBar::sub-page:horizontal { "
-                              "  background: none; "
-                              "}");
 
     // 초기 컬럼 너비 설정 (최소 크기)
     diffTable_->setColumnWidth(0, 60);   // Key/Line
@@ -734,7 +647,7 @@ void ComparePage::recalcDiff(const QString &leftText, const QString &leftPath)
     std::string rightContentStr = rightText.toStdString();
     std::string leftContentStr  = leftText.toStdString();
     std::string rightNameStr    = targetPath_.toStdString();
-    std::string leftNameStr     = "ModifyPage";  // 임시 이름
+    std::string leftNameStr     = leftPath.toStdString();
 
     // 파일 타입 감지 (확장자 기반)
     QFileInfo fileInfo(targetPath_);
@@ -1106,6 +1019,43 @@ void ComparePage::setDiffRows(const QList<DiffRow> &rows)
 
 void ComparePage::performDiff(const QString &leftPath, const QString &rightPath)
 {
+    // 파일 비교 모드로 전환
+    isFolderMode_ = false;
+
+    auto *layout = qobject_cast<QVBoxLayout *>(diffPanel_->layout());
+    if (layout) {
+        // 폴더 스플리터를 레이아웃에서 제거
+        if (folderSplit_) {
+            layout->removeWidget(folderSplit_);
+            folderSplit_->hide();
+        }
+
+        // diff 테이블을 statsBar 바로 아래에 다시 삽입
+        if (diffTable_) {
+            if (layout->indexOf(diffTable_) == -1) {
+                layout->insertWidget(1, diffTable_);
+            }
+            layout->setStretch(0, 0);
+            layout->setStretch(1, 1);
+            diffTable_->show();
+        }
+    }
+
+    // 폴더 트리 숨기고 초기화 (새 구조 기준)
+    if (folderSplit_) {
+        folderSplit_->hide();
+    }
+    if (leftFolderTree_) {
+        leftFolderTree_->clear();
+    }
+    if (rightFolderTree_) {
+        rightFolderTree_->clear();
+    }
+
+    // diff 테이블 다시 보이게
+    if (diffTable_) {
+        diffTable_->show();
+    }
     // 파일 내용 읽기
     QFile leftFile(leftPath);
     QFile rightFile(rightPath);
@@ -1538,6 +1488,10 @@ void ComparePage::applyFilter(const QString &filterType)
 {
     currentFilter_ = filterType;
 
+    if (isFolderMode_) {
+        return;
+    }
+
     // 전체 데이터에 필터 적용
     QList<DiffRow> filteredRows = filterRows(allDiffRows_, filterType);
     refreshDiffTable(filteredRows);
@@ -1623,9 +1577,13 @@ void ComparePage::performFolderDiff(const QString &leftPath, const QString &righ
         return;
     }
 
+    // 좌/우 경로 기억
+    lastLeftFolderPath_  = finalLeftPath;
+    lastRightFolderPath_ = finalRightPath;
+
     // 결과 표시
     isFolderMode_ = true;
-    displayFolderDiffResult(result.data);
+    displayFolderDiffResult(result.data, finalLeftPath, finalRightPath);
 }
 
 QString ComparePage::extractArchiveToTemp(const QString &archivePath)
@@ -1768,28 +1726,13 @@ QPair<QString, QString> ComparePage::determineColumnHeaders(const QString &leftP
     QString leftHeader;
     QString rightHeader;
 
-    bool leftHasSerial  = !leftInfo.serial.isEmpty();
-    bool rightHasSerial = !rightInfo.serial.isEmpty();
-    bool sameController = leftHasSerial && rightHasSerial &&
-                          leftInfo.serial.compare(rightInfo.serial, Qt::CaseInsensitive) == 0;
+    // 항상 시리얼을 우선적으로 사용
+    if (!leftInfo.serial.isEmpty())
+        leftHeader = leftInfo.serial;
+    if (!rightInfo.serial.isEmpty())
+        rightHeader = rightInfo.serial;
 
-    if (sameController) {
-        if (!leftInfo.detail.isEmpty())
-            leftHeader = leftInfo.detail;
-        else if (leftHasSerial)
-            leftHeader = leftInfo.serial;
-
-        if (!rightInfo.detail.isEmpty())
-            rightHeader = rightInfo.detail;
-        else if (rightHasSerial)
-            rightHeader = rightInfo.serial;
-    } else {
-        if (leftHasSerial)
-            leftHeader = leftInfo.serial;
-        if (rightHasSerial)
-            rightHeader = rightInfo.serial;
-    }
-
+    // 시리얼을 못 찾았을 때만 파일/폴더 이름으로 fallback
     if (leftHeader.isEmpty() && !leftPath.isEmpty()) {
         leftHeader = QFileInfo(leftPath).fileName();
     }
@@ -1801,31 +1744,53 @@ QPair<QString, QString> ComparePage::determineColumnHeaders(const QString &leftP
     return {leftHeader, rightHeader};
 }
 
-void ComparePage::displayFolderDiffResult(const Json::Value &result)
+void ComparePage::displayFolderDiffResult(const Json::Value &result,
+                                          const QString     &leftRootPath,
+                                          const QString     &rightRootPath)
 {
-    // 테이블 숨기고 트리 위젯 생성/표시
+    // 레이아웃 포인터 확보
+    auto *layout = qobject_cast<QVBoxLayout *>(diffPanel_->layout());
+    if (!layout)
+        return;
+    // 파일 diff 테이블은 레이아웃에서 빼고 숨기기
     if (diffTable_) {
+        layout->removeWidget(diffTable_);
         diffTable_->hide();
     }
 
-    if (!folderDiffTree_) {
-        folderDiffTree_ = new QTreeWidget(diffPanel_);
-        folderDiffTree_->setHeaderLabels({tr("Path"), tr("Status"), tr("Type")});
-        folderDiffTree_->setAlternatingRowColors(true);
-        folderDiffTree_->setStyleSheet(
-                "QTreeWidget { "
-                "  background-color: white; "
-                "  border: none; "
-                "  font-family: 'Consolas', 'Monaco', 'Courier New', monospace; "
-                "  font-size: 9pt; "
-                "}");
+    // 처음 한 번만 좌/우 트리 + 스플리터 생성
+    if (!folderSplit_) {
+        folderSplit_ = new QSplitter(Qt::Horizontal, diffPanel_);
 
-        // diffPanel_의 레이아웃에 추가
-        diffPanel_->layout()->addWidget(folderDiffTree_);
+        leftFolderTree_  = new QTreeWidget(folderSplit_);
+        rightFolderTree_ = new QTreeWidget(folderSplit_);
+
+        leftFolderTree_->setAlternatingRowColors(true);
+        rightFolderTree_->setAlternatingRowColors(true);
+
+        leftFolderTree_->setFrameShape(QFrame::NoFrame);
+        rightFolderTree_->setFrameShape(QFrame::NoFrame);
+
+        folderSplit_->setStretchFactor(0, 1);
+        folderSplit_->setStretchFactor(1, 1);
+
+        // diffPanel_ 레이아웃에 추가
+        diffPanel_->layout()->addWidget(folderSplit_);
     }
 
-    folderDiffTree_->clear();
-    folderDiffTree_->show();
+    // 폴더 스플리터를 statsBar 바로 아래 위치에 삽입
+    // topBar(0), statsBar(1) 뒤, 즉 index 2 에 고정
+    if (layout->indexOf(folderSplit_) == -1) {
+        layout->insertWidget(1, folderSplit_);
+    }
+
+    layout->setStretch(0, 0);
+    layout->setStretch(1, 1);
+
+    // 기존 내용 초기화
+    leftFolderTree_->clear();
+    rightFolderTree_->clear();
+    folderSplit_->show();
 
     // statistics 파싱
     const Json::Value &stats    = result["statistics"];
@@ -1843,88 +1808,155 @@ void ComparePage::displayFolderDiffResult(const Json::Value &result)
                                     .arg(modified));
     }
 
-    // 통계 헤더 아이템
-    QTreeWidgetItem *statsItem = new QTreeWidgetItem(folderDiffTree_);
-    statsItem->setText(0, QString("📊 Total Changes: %1").arg(total));
-    statsItem->setText(1, QString("+%1 -%2 ~%3").arg(added).arg(removed).arg(modified));
-    statsItem->setBackground(0, QColor(240, 240, 240));
-    statsItem->setBackground(1, QColor(240, 240, 240));
-    statsItem->setBackground(2, QColor(240, 240, 240));
-    QFont boldFont = statsItem->font(0);
-    boldFont.setBold(true);
-    statsItem->setFont(0, boldFont);
+    // 좌/우 루트 이름 계산 (제어기 동일/다름 로직 재사용)
+    QPair<QString, QString> headers       = determineColumnHeaders(leftRootPath, rightRootPath);
+    QString                 leftRootName  = headers.first;
+    QString                 rightRootName = headers.second;
 
-    // changes 파싱
+    if (leftRootName.isEmpty())
+        leftRootName = QFileInfo(leftRootPath).fileName();
+    if (rightRootName.isEmpty())
+        rightRootName = QFileInfo(rightRootPath).fileName();
+
+    leftFolderTree_->setHeaderLabels({leftRootName, tr("Status"), tr("Type")});
+    rightFolderTree_->setHeaderLabels({rightRootName, tr("Status"), tr("Type")});
+
+    // 비교한 디렉터리 경로 라벨
+    auto makePathItem = [&](QTreeWidget *tree, const QString &fullPath) {
+        // 파일 비교에서 쓰던 포맷 사용
+        QString pathText = formatPathForCompare(fullPath);
+
+        // 헤더(제어기 시리얼) 바로 아래에는 workspace~ 이하만 보이게
+        int idx = pathText.indexOf(" > ");
+        if (idx != -1) {
+            pathText = pathText.mid(idx + 3);  // "123123123 > " 잘라내기
+        }
+
+        QTreeWidgetItem *item = new QTreeWidgetItem(tree);
+        item->setText(0, pathText);
+        item->setFirstColumnSpanned(true);  // 첫 컬럼 전체 폭 사용
+        item->setFlags(Qt::NoItemFlags);    // 선택 안 되게
+
+        QFont f = item->font(0);
+        f.setPointSize(qMax(8, f.pointSize() - 1));  // 살짝 작은 폰트
+        item->setFont(0, f);
+        item->setForeground(0, QColor(120, 120, 120));  // 옅은 회색 글씨
+
+        return item;
+    };
+
+    makePathItem(leftFolderTree_, leftRootPath);
+    makePathItem(rightFolderTree_, rightRootPath);
+
+    // 상단에 통계 노드 하나씩 넣기 (좌/우 동일)
+    auto makeStatsItem = [&](QTreeWidget *tree) {
+        QTreeWidgetItem *statsItem = new QTreeWidgetItem(tree);
+        statsItem->setText(0, QString("📊 Total Changes: %1").arg(total));
+        statsItem->setText(1, QString("+%1 -%2 ~%3").arg(added).arg(removed).arg(modified));
+        statsItem->setBackground(0, QColor(240, 240, 240));
+        statsItem->setBackground(1, QColor(240, 240, 240));
+        statsItem->setBackground(2, QColor(240, 240, 240));
+        QFont bold = statsItem->font(0);
+        bold.setBold(true);
+        statsItem->setFont(0, bold);
+    };
+
+    makeStatsItem(leftFolderTree_);
+    makeStatsItem(rightFolderTree_);
+
+    // changes 배열 → 폴더 단위 그룹
     const Json::Value &changes = result["changes"];
 
-    // 폴더별로 그룹화
     QMap<QString, QList<Json::Value>> folderGroups;
-
     for (const auto &change : changes) {
         QString path   = QString::fromStdString(change["path"].asString());
         QString folder = QFileInfo(path).dir().path();
-
-        if (folder == ".") {
+        if (folder == ".")
             folder = "(Root)";
-        }
-
         folderGroups[folder].append(change);
     }
 
-    // 폴더별로 트리 아이템 생성
     QStringList folderKeys = folderGroups.keys();
     folderKeys.sort();
 
+    // 폴더별로 좌/우에 각각 노드 생성
     for (const QString &folderPath : folderKeys) {
-        QList<Json::Value> files = folderGroups[folderPath];
+        const QList<Json::Value> &files = folderGroups[folderPath];
 
-        // 폴더 아이템
-        QTreeWidgetItem *folderItem = new QTreeWidgetItem(folderDiffTree_);
-        folderItem->setText(0, QString("📁 %1").arg(folderPath));
-        folderItem->setText(1, QString("%1 file(s)").arg(files.size()));
-        folderItem->setExpanded(true);
+        // 폴더 아이템(좌/우 둘 다)
+        QTreeWidgetItem *leftFolderItem  = new QTreeWidgetItem(leftFolderTree_);
+        QTreeWidgetItem *rightFolderItem = new QTreeWidgetItem(rightFolderTree_);
 
-        QFont folderFont = folderItem->font(0);
+        leftFolderItem->setText(0, QString("📁 %1").arg(folderPath));
+        rightFolderItem->setText(0, QString("📁 %1").arg(folderPath));
+
+        leftFolderItem->setText(1, QString("%1 file(s)").arg(files.size()));
+        rightFolderItem->setText(1, QString("%1 file(s)").arg(files.size()));
+
+        leftFolderItem->setExpanded(true);
+        rightFolderItem->setExpanded(true);
+
+        QFont folderFont = leftFolderItem->font(0);
         folderFont.setBold(true);
-        folderItem->setFont(0, folderFont);
+        leftFolderItem->setFont(0, folderFont);
+        rightFolderItem->setFont(0, folderFont);
 
-        // 파일 아이템들
+        // 파일들
         for (const auto &change : files) {
             QString path     = QString::fromStdString(change["path"].asString());
             QString type     = QString::fromStdString(change["type"].asString());
             QString fileName = QFileInfo(path).fileName();
+            QColor  bgColor  = getColorForDiffState(type);
 
-            QTreeWidgetItem *fileItem = new QTreeWidgetItem(folderItem);
-            fileItem->setText(0, fileName);
-            fileItem->setData(0, Qt::UserRole, path);  // 전체 경로 저장
+            // 🔹 Left 트리: added / modified 만 존재 (removed는 오른쪽에만)
+            if (type != "removed") {
+                QTreeWidgetItem *item = new QTreeWidgetItem(leftFolderItem);
+                item->setText(0, fileName);
+                item->setData(0, Qt::UserRole, path);
 
-            // 상태별 색상 및 텍스트
-            QColor bgColor = getColorForDiffState(type);
-
-            if (type == "added") {
-                fileItem->setText(1, tr("Added"));
-                fileItem->setText(2, "+ ADDED");
-                fileItem->setForeground(2, QBrush(QColor(22, 163, 74)));  // 진한 초록
-            } else if (type == "removed") {
-                fileItem->setText(1, tr("Removed"));
-                fileItem->setText(2, "− REMOVED");
-                fileItem->setForeground(2, QBrush(QColor(220, 38, 38)));  // 진한 빨강
-            } else if (type == "modified") {
-                fileItem->setText(1, tr("Modified"));
-                fileItem->setText(2, "● CHANGED");
-                fileItem->setForeground(2, QBrush(QColor(184, 134, 11)));  // 어두운 황금색
+                if (type == "added") {
+                    item->setText(1, tr("Added"));
+                    item->setText(2, "+ ADDED");
+                    item->setForeground(2, QBrush(QColor(22, 163, 74)));
+                } else if (type == "modified") {
+                    item->setText(1, tr("Modified"));
+                    item->setText(2, "● CHANGED");
+                    item->setForeground(2, QBrush(QColor(184, 134, 11)));
+                }
+                item->setBackground(0, bgColor);
+                item->setBackground(1, bgColor);
+                item->setBackground(2, bgColor);
             }
 
-            fileItem->setBackground(0, bgColor);
-            fileItem->setBackground(1, bgColor);
-            fileItem->setBackground(2, bgColor);
+            // 🔹 Right 트리: removed / modified 만 존재 (added는 왼쪽에만)
+            if (type != "added") {
+                QTreeWidgetItem *item = new QTreeWidgetItem(rightFolderItem);
+                item->setText(0, fileName);
+                item->setData(0, Qt::UserRole, path);
+
+                if (type == "removed") {
+                    item->setText(1, tr("Removed"));
+                    item->setText(2, "− REMOVED");
+                    item->setForeground(2, QBrush(QColor(220, 38, 38)));
+                } else if (type == "modified") {
+                    item->setText(1, tr("Modified"));
+                    item->setText(2, "● CHANGED");
+                    item->setForeground(2, QBrush(QColor(184, 134, 11)));
+                }
+                item->setBackground(0, bgColor);
+                item->setBackground(1, bgColor);
+                item->setBackground(2, bgColor);
+            }
         }
     }
 
-    // 컬럼 너비 조정
-    folderDiffTree_->setColumnWidth(0, 400);
-    folderDiffTree_->setColumnWidth(1, 150);
-    folderDiffTree_->setColumnWidth(2, 150);
+    leftFolderTree_->setColumnWidth(0, 350);
+    leftFolderTree_->setColumnWidth(1, 140);
+    leftFolderTree_->setColumnWidth(2, 120);
 
-    qDebug() << "[ComparePage] Folder diff result displayed:" << total << "changes";
+    rightFolderTree_->setColumnWidth(0, 350);
+    rightFolderTree_->setColumnWidth(1, 140);
+    rightFolderTree_->setColumnWidth(2, 120);
+
+    qDebug() << "[ComparePage] Folder diff result displayed (split view):" << total << "changes";
 }

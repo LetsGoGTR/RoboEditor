@@ -11,7 +11,7 @@ namespace services
 
     struct WorkspaceMetadata
     {
-        std::string id;
+        std::string uuid;
         std::string target;
         std::string name;
         std::string description;

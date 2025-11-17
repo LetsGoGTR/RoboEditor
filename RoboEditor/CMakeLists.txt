@@ -1,4 +1,3 @@
-#libssh 없는 순정
 cmake_minimum_required(VERSION 3.16)
 
 project(RoboEditor VERSION 0.1 LANGUAGES CXX)
@@ -13,6 +12,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets LinguistTools)
 find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets LinguistTools)
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Network)
+
+# pkg-config 제거 - Windows에서는 직접 경로 지정이 더 안정적
 
 include(FetchContent)
 FetchContent_Declare(
@@ -30,22 +31,31 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(zlib)
 
+# ZLIB::ZLIB alias 보장
+if (NOT TARGET ZLIB::ZLIB)
+    add_library(ZLIB::ZLIB ALIAS zlibstatic)
+endif()
+
+# --- libarchive ---
 FetchContent_Declare(
     libarchive
     GIT_REPOSITORY https://github.com/libarchive/libarchive.git
-    GIT_TAG        v3.7.4 # 안정적인 최신 태그
+    GIT_TAG        v3.7.4
 )
-# libarchive가 zlib 등 다른 라이브러리를 찾지 못하도록 옵션을 켭니다.
-set(ENABLE_TEST OFF CACHE BOOL "")
-set(ENABLE_ZLIB ON CACHE BOOL "")
-set(ENABLE_BZIP2 OFF CACHE BOOL "")
-set(ENABLE_LZMA OFF CACHE BOOL "")
-set(ENABLE_ZSTD OFF CACHE BOOL "")
-set(ENABLE_ICONV OFF CACHE BOOL "")
-set(ENABLE_CNG OFF CACHE BOOL "")
 
-set(ZLIB_INCLUDE_DIR ${zlib_SOURCE_DIR} ${zlib_BINARY_DIR} CACHE PATH "")
-set(ZLIB_LIBRARY zlibstatic CACHE STRING "")
+set(ENABLE_TEST OFF CACHE BOOL "" FORCE)
+set(ENABLE_ZLIB ON CACHE BOOL "" FORCE)
+set(ENABLE_BZip2 OFF CACHE BOOL "" FORCE)
+set(ENABLE_LZMA OFF CACHE BOOL "" FORCE)
+set(ENABLE_ZSTD OFF CACHE BOOL "" FORCE)
+set(ENABLE_ICONV OFF CACHE BOOL "" FORCE)
+set(ENABLE_CNG OFF CACHE BOOL "" FORCE)
+set(ENABLE_OPENSSL OFF CACHE BOOL "" FORCE)
+
+# 🔥 핵심: libarchive가 zlib을 찾을 수 있도록 경로를 명시적으로 설정
+set(ZLIB_INCLUDE_DIR "${zlib_SOURCE_DIR}" "${zlib_BINARY_DIR}" CACHE PATH "" FORCE)
+set(ZLIB_LIBRARY zlibstatic CACHE FILEPATH "" FORCE)
+set(ZLIB_LIBRARIES zlibstatic CACHE STRING "" FORCE)
 
 FetchContent_MakeAvailable(libarchive)
 
@@ -60,6 +70,25 @@ set_target_properties(jsoncpp_static PROPERTIES
 # libbcrypt
 add_subdirectory(external/libbcrypt)
 include_directories(external/libbcrypt/include)
+
+# OpenSSL 및 libssh2 경로 설정
+set(MSYS2_ROOT "C:/msys64/mingw64")
+set(OPENSSL_ROOT_DIR "${MSYS2_ROOT}" CACHE PATH "" FORCE)
+set(OPENSSL_INCLUDE_DIR "${MSYS2_ROOT}/include" CACHE PATH "" FORCE)
+set(OPENSSL_CRYPTO_LIBRARY "${MSYS2_ROOT}/lib/libcrypto.a" CACHE FILEPATH "" FORCE)
+set(OPENSSL_SSL_LIBRARY "${MSYS2_ROOT}/lib/libssl.a" CACHE FILEPATH "" FORCE)
+
+# libssh2 경로 직접 지정 (MSYS2에 설치된 것 사용)
+set(LIBSSH2_INCLUDE_DIR "${MSYS2_ROOT}/include" CACHE PATH "")
+set(LIBSSH2_LIBRARY "${MSYS2_ROOT}/lib/libssh2.a" CACHE FILEPATH "")
+
+# libssh2 라이브러리 존재 확인
+if(NOT EXISTS ${LIBSSH2_LIBRARY})
+    message(FATAL_ERROR
+        "libssh2 not found at ${LIBSSH2_LIBRARY}\n"
+        "Please install it with: pacman -S mingw-w64-x86_64-libssh2"
+    )
+endif()
 
 set(CMAKE_AUTOUIC_SEARCH_PATHS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ui
@@ -80,7 +109,6 @@ set(PROJECT_SOURCES
         src/app/ApplyPage.cpp
         src/app/ConfirmSelection.cpp
         src/app/ModifyPage.cpp
-
         src/app/SelectController.cpp
         src/app/SelectStorage.cpp
 
@@ -114,7 +142,6 @@ set(PROJECT_SOURCES
         src/core/SftpClient.h
         src/core/ShortcutManager.cpp
         src/core/ShortcutManager.h
-
 
         # Core Controllers
         src/core/controllers/ControllerHelper.h
@@ -159,9 +186,9 @@ set(PROJECT_SOURCES
         src/core/utils/diff/DiffPython.cc
         src/core/utils/diff/DiffYaml.h
         src/core/utils/diff/DiffYaml.cc
-        src/core/utils/diff/treediff.h
-        src/core/utils/diff/treediff.cpp
-        src/core/utils/diff/line-diff-v6+.cpp
+        src/core/utils/diff/DiffTree.h
+        src/core/utils/diff/DiffTree.cc
+
 
         src/ui/mainwindow.ui
         src/ui/ApplyPage.ui
@@ -172,70 +199,57 @@ set(PROJECT_SOURCES
 )
 
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
-    find_package(Qt6 REQUIRED COMPONENTS Widgets)
-
     qt_add_executable(RoboEditor
         MANUAL_FINALIZATION
         ${PROJECT_SOURCES}
         src/app/CodeEditor.cpp
         src/app/CodeEditor.h
         src/ui/BackupPage.ui
-
         src/ui/ControllerSettings.ui
-        src/core/FileCompressor.h src/core/FileCompressor.cpp
+        src/core/FileCompressor.h
+        src/core/FileCompressor.cpp
         RoboEditor.qrc
-
+        src/core/WorkspaceContextMenuController.h
+        src/core/WorkspaceContextMenuController.cpp
+        src/app/ProgressDialog.cpp
+        src/app/ProgressDialog.h
     )
-# Define target properties for Android with Qt 6 as:
-#    set_property(TARGET RoboEditor APPEND PROPERTY QT_ANDROID_PACKAGE_SOURCE_DIR
-#                 ${CMAKE_CURRENT_SOURCE_DIR}/android)
-# For more information, see https://doc.qt.io/qt-6/qt-add-executable.html#target-creation
-
     qt_create_translation(QM_FILES ${CMAKE_SOURCE_DIR} ${TS_FILES})
 else()
     if(ANDROID)
-        add_library(RoboEditor SHARED
-            ${PROJECT_SOURCES}
-        )
-# Define properties for Android with Qt 5 after find_package() calls as:
-#    set(ANDROID_PACKAGE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/android")
+        add_library(RoboEditor SHARED ${PROJECT_SOURCES})
     else()
-        add_executable(RoboEditor
-            ${PROJECT_SOURCES}
-        )
+        add_executable(RoboEditor ${PROJECT_SOURCES})
     endif()
-
     qt5_create_translation(QM_FILES ${CMAKE_SOURCE_DIR} ${TS_FILES})
 endif()
 
 target_include_directories(RoboEditor PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/app
     ${CMAKE_CURRENT_SOURCE_DIR}/src/core
+    ${LIBSSH2_INCLUDE_DIR}
 )
-target_link_libraries(RoboEditor PRIVATE Qt${QT_VERSION_MAJOR}::Widgets)
-target_link_libraries(RoboEditor PRIVATE Qt6::Widgets)
-target_link_libraries(RoboEditor PRIVATE Qt6::Network)
 
-# jsoncpp
-target_link_libraries(RoboEditor PRIVATE jsoncpp_static)
+target_link_libraries(RoboEditor PRIVATE
+    Qt${QT_VERSION_MAJOR}::Widgets
+    Qt6::Network
+    jsoncpp_static
+    bcrypt
+    archive_static
+    yaml-cpp
+    ${LIBSSH2_LIBRARY}
+    ${OPENSSL_CRYPTO_LIBRARY}
+    ${OPENSSL_SSL_LIBRARY}
+    zlibstatic
+    ws2_32
+    crypt32
+    ssp
+)
 
-# libbcrypt
-target_link_libraries(RoboEditor PRIVATE bcrypt)
-
-# libarchive (for WorkspaceService)
-target_link_libraries(RoboEditor PRIVATE archive_static)
-
-# yaml-cpp (for DiffYaml)
-target_link_libraries(RoboEditor PRIVATE yaml-cpp)
-
-target_link_libraries(RoboEditor PRIVATE zlibstatic)
-
-# Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
-# If you are developing for iOS or macOS you should consider setting an
-# explicit, fixed bundle identifier manually though.
 if(${QT_VERSION} VERSION_LESS 6.1.0)
-  set(BUNDLE_ID_OPTION MACOSX_BUNDLE_GUI_IDENTIFIER com.example.RoboEditor)
+    set(BUNDLE_ID_OPTION MACOSX_BUNDLE_GUI_IDENTIFIER com.example.RoboEditor)
 endif()
+
 set_target_properties(RoboEditor PROPERTIES
     ${BUNDLE_ID_OPTION}
     MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}

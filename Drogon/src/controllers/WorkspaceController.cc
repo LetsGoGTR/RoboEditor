@@ -41,7 +41,7 @@ void api::v1::Workspace::workspaceImport(
         workspaceName = fs::path(filename).stem().string();
 
     services::WorkspaceMetadata metadata;
-    metadata.id          = drogon::utils::getUuid();
+    metadata.uuid        = drogon::utils::getUuid();
     metadata.target      = req->getParameter("target");
     metadata.name        = workspaceName;
     metadata.description = req->getParameter("description");
@@ -74,7 +74,7 @@ void api::v1::Workspace::workspaceImport(
         resp->setStatusCode(drogon::k201Created);
         callback(resp);
 
-        LOG_INFO << "Imported: " << workspaceName << " (ID: " << metadata.id << ")";
+        LOG_INFO << "Imported: " << workspaceName << " (ID: " << metadata.uuid << ")";
 
     } catch (const std::exception &e) {
         LOG_ERROR << "Import exception: " << e.what();
@@ -178,7 +178,7 @@ void api::v1::Workspace::create(const drogon::HttpRequestPtr                    
         return sendError(callback, drogon::k400BadRequest, "Missing required field: name");
 
     services::WorkspaceMetadata metadata;
-    metadata.id          = drogon::utils::getUuid();
+    metadata.uuid        = drogon::utils::getUuid();
     metadata.name        = (*json)["name"].asString();
     metadata.target      = json->isMember("target") ? (*json)["target"].asString() : "";
     metadata.description = json->isMember("description") ? (*json)["description"].asString() : "";
@@ -201,7 +201,7 @@ void api::v1::Workspace::create(const drogon::HttpRequestPtr                    
         resp->setStatusCode(drogon::k201Created);
         callback(resp);
 
-        LOG_INFO << "Created workspace: " << metadata.name << " (ID: " << metadata.id << ")";
+        LOG_INFO << "Created workspace: " << metadata.name << " (ID: " << metadata.uuid << ")";
 
     } catch (const std::exception &e) {
         LOG_ERROR << "Create exception: " << e.what();

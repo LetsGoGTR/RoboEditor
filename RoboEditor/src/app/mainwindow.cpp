@@ -167,32 +167,6 @@ void MainWindow::saveSettings()
     if (!dir.exists(configDir)) {
         dir.mkpath(configDir);
     }
-
-    QString   configFile = configDir + "/settings.ini";
-    QSettings settings(configFile, QSettings::IniFormat);
-
-    // 윈도우 크기와 위치 저장
-    settings.setValue("MainWindow/geometry", saveGeometry());
-
-    // 독 위젯과 툴바 상태 저장
-    settings.setValue("MainWindow/windowState", saveState());
-
-    // CenterStack의 Splitter 상태 저장 (좌측 트리와 우측 에디터의 비율)
-    if (center_) {
-        QByteArray splitterState = center_->saveSplitterState();
-        settings.setValue("CenterStack/splitterState", splitterState);
-
-        // ModifyPage의 Splitter 상태 저장 (에디터와 Compare 패널 비율)
-        // ComparePage가 열려있을 때만 저장 (ComparePage가 없으면 복원 시 충돌 발생)
-        ModifyPage *modifyPage = center_->getModifyPage();
-        if (modifyPage) {
-            // ComparePage가 열려있는지 확인하고 저장
-            modifyPage
-                    ->saveComparePageState();  // 내부에서 ComparePage 상태와 ModifyPage 상태 모두 저장
-        }
-    }
-
-    settings.sync();  // 파일에 즉시 쓰기
 }
 
 void MainWindow::loadSettings()
