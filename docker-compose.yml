@@ -1,0 +1,7 @@
+version: "3.8"
+
+services:
+  drogon-app:
+    build: .
+    ports:
+      - "8889:5555"
