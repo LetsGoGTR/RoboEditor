@@ -56,6 +56,9 @@ void ControllerManager::registerController()
 
         // 동일한 SN이 있으면 에러
         if (isDuplicatedSN(newConInfo.serialNumber)) {
+            QString msg = QString("Registration failed : [%1] already exists")
+                                  .arg(newConInfo.serialNumber);
+            LogManager::append(msg);
             QMessageBox::warning(nullptr, "등록 실패", "이미 동일한 제어기가 등록되어 있습니다.");
             return;
         }
@@ -87,7 +90,7 @@ void ControllerManager::registerController()
         qDebug() << "Username:" << newConInfo.username;
 
         saveToFile(newConInfo.serialNumber);
-        QString msg = QString("[%1] is registred").arg(newConInfo.serialNumber);
+        QString msg = QString("[%1] registred").arg(newConInfo.serialNumber);
         LogManager::append(msg);
 
         setupApiClient(newConInfo.serialNumber);
@@ -105,7 +108,7 @@ void ControllerManager::removeController(int index)
         cleanupApiClient(sn);
 
         controllers_.removeAt(index);
-        QString msg = QString("[%1] is removed").arg(sn);
+        QString msg = QString("[%1] removed").arg(sn);
         LogManager::append(msg);
         saveToFile();
         emit controllerListChanged();
@@ -213,6 +216,9 @@ void ControllerManager::setupApiClient(const QString &serialNumber)
                 qWarning() << "[ControllerManager]" << serialNumber << " " << url << " "
                            << "request failed:" << error;
 
+                QString msg = QString("[%1] API request failed: %2").arg(info.serialNumber, error);
+                LogManager::append(msg);
+
                 updateConnectionState(serialNumber, false);
                 updateRunningState(serialNumber, false);
             });
@@ -264,17 +270,11 @@ void ControllerManager::updateControllersStates()
         controllersCopy = controllers_;
         clientsCopy     = apiClients_;
     }
-
-    qDebug() << "[ControllerManager] Processing" << controllersCopy.size() << "controllers";
-
-    // mutex 없이 순회
-
     for (const auto &c : controllersCopy) {
         ApiClient *client = clientsCopy.value(c.serialNumber, nullptr);
 
         // URL이 틀리거나, ApiClient가 없으면 재생성
         if (!client) {
-            //updateConnectionState(c.serialNumber, false);  // 즉시 끊김 표시
             setupApiClient(c.serialNumber);
             continue;
         }
@@ -288,7 +288,6 @@ void ControllerManager::updateControllersStates()
             qDebug() << "exp : " << expectedUrl;
             qDebug() << "cur : " << currentUrl;
 
-            //updateConnectionState(c.serialNumber, false);  // 즉시 끊김 표시
             cleanupApiClient(c.serialNumber);
             setupApiClient(c.serialNumber);
             continue;
@@ -394,6 +393,8 @@ void ControllerManager::saveToFile(const QString &serialNumber)
                 successCount++;
             } else {
                 failCount++;
+                QString msg = QString("[%1] status save failed").arg(c.serialNumber);
+                LogManager::append(msg);
                 qWarning() << "[saveToFile] Failed to save:" << c.serialNumber;
             }
         }
@@ -493,6 +494,7 @@ bool ControllerManager::backupRequest(const QString &serialNumber, const QString
     }
     if (!QDir().mkpath(snDir)) {
         qWarning() << "[backupRequest] cannot mkpath:" << snDir;
+
         return false;
     }
 
@@ -532,7 +534,7 @@ bool ControllerManager::backupRequest(const QString &serialNumber, const QString
             client,
             &ApiClient::requestFailed,
             context,  // ← context 추가
-            [this, serialNumber, context](
+            [this, serialNumber, context, info](
                     const QString &endpoint, const QString &err, const QString &) {
                 if (endpoint != "/api/workspace/compress")
                     return;
@@ -540,6 +542,9 @@ bool ControllerManager::backupRequest(const QString &serialNumber, const QString
                 // context 삭제 (자동으로 모든 연결 해제)
                 context->deleteLater();
 
+                QString msg =
+                        QString("[%1] compress request failed: %2").arg(info.serialNumber, err);
+                LogManager::append(msg);
                 qWarning() << "[backupRequest] compress failed:" << err;
                 emit backupFailed(serialNumber, QStringLiteral("압축 요청 실패: ") + err);
             },
@@ -570,6 +575,8 @@ bool ControllerManager::applyRequest(const QString &serialNumber,
     ControllerInfo info = getController(serialNumber);
     if (info.serialNumber.isEmpty()) {
         qWarning() << "[ControllerManager][applyRequest] Controller not found:" << serialNumber;
+        QString msg = QString("[%1] not found").arg(info.serialNumber);
+        LogManager::append(msg);
         return false;
     }
 
@@ -577,6 +584,9 @@ bool ControllerManager::applyRequest(const QString &serialNumber,
     ApiClient *client = getApiClient(serialNumber);
     if (!client) {
         qWarning() << "[ControllerManager][applyRequest] ApiClient not found for:" << serialNumber;
+        QString msg = QString("[%1] ApiClient not found").arg(info.serialNumber);
+        LogManager::append(msg);
+
         return false;
     }
 
@@ -612,13 +622,16 @@ bool ControllerManager::applyRequest(const QString &serialNumber,
             client,
             &ApiClient::requestFailed,
             context,  // ← context 추가
-            [this, serialNumber, context](
+            [this, serialNumber, context, info](
                     const QString &endpoint, const QString &err, const QString &) {
                 if (endpoint != "/api/workspace/extract")
                     return;
 
                 context->deleteLater();  // 자동으로 모든 연결 해제
 
+                QString msg =
+                        QString("[%1] extract request failed: %2").arg(info.serialNumber, err);
+                LogManager::append(msg);
                 qWarning() << "[applyRequest] extract failed:" << err;
                 emit applyFailed(serialNumber, QStringLiteral("압축 해제 요청 실패: ") + err);
             },
@@ -644,6 +657,8 @@ bool ControllerManager::send(const QString     &serialNumber,
     ControllerInfo controller = getController(serialNumber);
     if (controller.serialNumber.isEmpty()) {
         qWarning() << "Controller not found:" << serialNumber;
+        QString msg = QString("[%1] is not found").arg(serialNumber);
+        LogManager::append(msg);
         return false;
     }
 
@@ -651,6 +666,8 @@ bool ControllerManager::send(const QString     &serialNumber,
     QTemporaryDir tempDir;
     if (!tempDir.isValid()) {
         qWarning() << "Cannot create temporary directory";
+        QString msg = QString("Failed to create temporary directory");
+        LogManager::append(msg);
         return false;
     }
 
@@ -659,6 +676,9 @@ bool ControllerManager::send(const QString     &serialNumber,
     qDebug() << "Creating tgz:" << tarGzPath;
     if (!FileCompressor::createTarGz(localPaths, tarGzPath)) {
         qWarning() << "Failed to create tgz";
+
+        QString msg = QString("Failed to create create tgz");
+        LogManager::append(msg);
         return false;
     }
 
@@ -667,6 +687,9 @@ bool ControllerManager::send(const QString     &serialNumber,
 
     if (!client.connectToServer()) {
         qWarning() << "SFTP connection failed:" << controller.ip;
+
+        QString msg = QString("SFTP connection failed: [%1]").arg(controller.ip);
+        LogManager::append(msg);
         return false;
     }
 
@@ -677,6 +700,8 @@ bool ControllerManager::send(const QString     &serialNumber,
     client.disconnect();
 
     if (!uploadSuccess) {
+        QString msg = QString("SFTP upload failed: [%1]").arg(controller.ip);
+        LogManager::append(msg);
         qWarning() << "Upload failed";
         return false;
     }
@@ -701,12 +726,16 @@ bool ControllerManager::ControllerManager::receive(const QString &serialNumber,
     SFTPClient client(controller.ip, controller.sftpPort, controller.username, controller.pswd);
     if (!client.connectToServer()) {
         qWarning() << "SFTP connection failed:" << controller.ip;
+
+        QString msg = QString("SFTP connection failed: [%1]").arg(controller.ip);
+        LogManager::append(msg);
         return false;
     }
 
     QTemporaryDir tempDir;  // 세션 임시폴더
     if (!tempDir.isValid()) {
         qWarning() << "Cannot create temporary directory";
+        LogManager::append("Failed to create temporary directory");
         client.disconnect();
         return false;
     }
@@ -718,6 +747,9 @@ bool ControllerManager::ControllerManager::receive(const QString &serialNumber,
     client.disconnect();
     if (!downloadSuccess) {
         qWarning() << "Download failed";
+
+        QString msg = QString("SFTP download failed: [%1]").arg(controller.ip);
+        LogManager::append(msg);
         return false;
     }
 
@@ -726,6 +758,7 @@ bool ControllerManager::ControllerManager::receive(const QString &serialNumber,
     qDebug() << "Extracting to:" << tempExtractRoot;
     if (!FileCompressor::extractTarGz(localTarPath, tempExtractRoot)) {
         qWarning() << "Failed to extract tgz";
+        LogManager::append("Failed to extract tgz");
         return false;
     }
 
@@ -733,6 +766,7 @@ bool ControllerManager::ControllerManager::receive(const QString &serialNumber,
     const QString srcWorkspace = QDir(tempExtractRoot).filePath("workspace");
     if (!QDir(srcWorkspace).exists()) {
         qWarning() << "Missing 'workspace' root in archive";
+
         return false;
     }
 

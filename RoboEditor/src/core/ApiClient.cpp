@@ -1,6 +1,7 @@
 #include "ApiClient.h"
 
 #include <QTemporaryFile>
+#include <QTimer>
 
 #include <QDateTime>
 #include <QDebug>
@@ -9,11 +10,11 @@
 #include <QFileInfo>
 #include <QHttpMultiPart>
 #include <QHttpPart>
-#include <QJsonParseError>
-#include <QTimer>
 #include <QJsonDocument>
+#include <QJsonParseError>
 
 #include "FileCompressor.h"
+#include "LogManager.h"
 
 ApiClient::ApiClient(const QString &baseUrl, QObject *parent) :
     QObject(parent),
@@ -359,14 +360,15 @@ void ApiClient::parseRunningStateResponse(const QByteArray &responseData)
     }
 }
 
-bool ApiClient::postJson(const QString& endpoint, const QJsonObject& body, int timeoutMs)
+bool ApiClient::postJson(const QString &endpoint, const QJsonObject &body, int timeoutMs)
 {
-    QNetworkRequest request = createRequest(endpoint); // baseUrl + endpoint, JSON 헤더 설정됨 :contentReference[oaicite:1]{index=1}
-    QNetworkReply* reply = m_manager->post(request, QJsonDocument(body).toJson());
+    QNetworkRequest request = createRequest(
+            endpoint);  // baseUrl + endpoint, JSON 헤더 설정됨 :contentReference[oaicite:1]{index=1}
+    QNetworkReply *reply = m_manager->post(request, QJsonDocument(body).toJson());
     reply->setProperty("endpoint", endpoint);
     reply->setProperty("method", "POST");
 
-    QTimer* timeoutTimer = new QTimer(reply);
+    QTimer *timeoutTimer = new QTimer(reply);
     timeoutTimer->setSingleShot(true);
     timeoutTimer->setInterval(timeoutMs);
     connect(timeoutTimer, &QTimer::timeout, this, [=]() {
@@ -378,21 +380,25 @@ bool ApiClient::postJson(const QString& endpoint, const QJsonObject& body, int t
         timeoutTimer->deleteLater();
     });
     connect(reply, &QNetworkReply::finished, timeoutTimer, [timeoutTimer]() {
-        if (timeoutTimer->isActive()) timeoutTimer->stop();
+        if (timeoutTimer->isActive())
+            timeoutTimer->stop();
         timeoutTimer->deleteLater();
     });
     timeoutTimer->start();
-    return true; // 비동기. 성공/실패는 onFinished에서 emit됨 :contentReference[oaicite:2]{index=2}
+    return true;  // 비동기. 성공/실패는 onFinished에서 emit됨 :contentReference[oaicite:2]{index=2}
 }
 
-bool ApiClient::postWorkspaceCompress(const QString& user)
+bool ApiClient::postWorkspaceCompress(const QString &user)
 {
-    QJsonObject j; j["user"] = user;
+    QJsonObject j;
+    j["user"] = user;
     return postJson("/api/workspace/compress", j);
 }
 
-bool ApiClient::postWorkspaceExtract(const QString& user, const QString& password)
+bool ApiClient::postWorkspaceExtract(const QString &user, const QString &password)
 {
-    QJsonObject j; j["user"] = user; j["password"] = password;
+    QJsonObject j;
+    j["user"]     = user;
+    j["password"] = password;
     return postJson("/api/workspace/extract", j);
 }
