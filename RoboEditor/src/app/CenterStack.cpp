@@ -469,21 +469,6 @@ void CenterStack::onPollingTimeout()
     ControllerManager::instance()->updateControllersStates();
 }
 
-QByteArray CenterStack::saveSplitterState() const
-{
-    if (splitter_) {
-        return splitter_->saveState();
-    }
-    return QByteArray();
-}
-
-void CenterStack::restoreSplitterState(const QByteArray &state)
-{
-    if (splitter_ && !state.isEmpty()) {
-        splitter_->restoreState(state);
-    }
-}
-
 CenterStack::~CenterStack()
 {
     stopPolling();
