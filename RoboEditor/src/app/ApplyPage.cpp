@@ -121,11 +121,10 @@ void ApplyPage::showPasswordUI()
                     Qt::SingleShotConnection);
 
             if (confirmDialog.exec() == QDialog::Accepted) {
-                qDebug() << "User confirmed";
             }
         } else {
             // 비밀번호 틀림
-
+            LogManager::append("Apply password not match");
             QMessageBox::warning(this, tr("오류"), tr("비밀번호가 올바르지 않습니다."));
         }
     } else {
@@ -172,6 +171,20 @@ void ApplyPage::startApplyQueue()
                              "오류",
                              QString("등록 정보가 없는 제어기가 선택되었습니다:\n%1")
                                      .arg(unknownControllers.join(", ")));
+
+        // 로그 추가
+        for (const QString &sn : unknownControllers) {
+            QString msg = QString("[%1] Apply canceled: Controller is NOT REGISTERED").arg(sn);
+            LogManager::append(msg);
+        }
+
+        // 전체 메시지
+        {
+            QString msg = QString("Apply aborted: Unknown controller(s) selected (%1)")
+                                  .arg(unknownControllers.join(", "));
+            LogManager::append(msg);
+        }
+
         return;
     }
 
@@ -180,6 +193,20 @@ void ApplyPage::startApplyQueue()
                              "오류",
                              QString("다음 제어기가 오프라인 상태입니다:\n%1")
                                      .arg(disconnectedControllers.join(", ")));
+
+        // 로그 추가
+        for (const QString &sn : disconnectedControllers) {
+            QString msg = QString("[%1] Apply canceled: Controller is OFFLINE").arg(sn);
+            LogManager::append(msg);
+        }
+
+        // 전체 메시지
+        {
+            QString msg = QString("Apply aborted: Offline controller(s) detected (%1)")
+                                  .arg(disconnectedControllers.join(", "));
+            LogManager::append(msg);
+        }
+
         return;
     }
 
@@ -188,6 +215,20 @@ void ApplyPage::startApplyQueue()
                              "오류",
                              QString("제어기가 동작중입니다. 전체 적용을 취소합니다:\n%1")
                                      .arg(runningControllers.join(", ")));
+
+        // 로그 추가
+        for (const auto &sn : runningControllers) {
+            QString msg = QString("[%1] Apply canceled: Controller is RUNNING").arg(sn);
+            LogManager::append(msg);
+        }
+
+        // 전체 적용 취소 로그
+        {
+            QString msg = QString("Apply aborted: %1 controller(s) running (%2)")
+                                  .arg(runningControllers.size())
+                                  .arg(runningControllers.join(", "));
+            LogManager::append(msg);
+        }
         return;
     }
 
@@ -239,6 +280,7 @@ void ApplyPage::processNextApply()
     // 큐가 비어있으면 완료 처리
     if (applyQueue_.isEmpty()) {
         qDebug() << "[ApplyPage] Apply queue finished.";
+
         onAllAppliesCompleted();
         return;
     }
@@ -254,6 +296,8 @@ void ApplyPage::processNextApply()
     bool ok = ControllerManager::instance()->applyRequest(
             serialNumber, selectedBackupDir, apiPassword_);
     if (!ok) {
+        QString msg = QString("[%1] Apply request could not be started").arg(serialNumber);
+        LogManager::append(msg);
         onApplyFailed(serialNumber, tr("적용 요청을 시작하지 못했습니다."));
     }
 }
@@ -313,7 +357,7 @@ void ApplyPage::onApplyFailed(const QString &serialNumber, const QString &error)
 void ApplyPage::onAllAppliesCompleted()  //
 {
     qDebug() << "[ApplyPage] All applies processed.";
-
+    LogManager::append("All applies processed");
     applyInProgress_ = false;
     ControllerManager::instance()->resumeStateUpdates();
 

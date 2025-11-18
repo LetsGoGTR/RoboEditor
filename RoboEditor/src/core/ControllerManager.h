@@ -100,12 +100,14 @@ class ControllerManager : public QObject
         void updateRunningState(const QString &serialNumber, bool running);
         void updateConnectionState(const QString &serialNumber, bool connected);
 
-        bool                       stateUpdatesPaused_ = false;
-        QString                    configFilePath_;
-        QList<ControllerInfo>      controllers_;
-        QMap<QString, ApiClient *> apiClients_;
-        PasswordManager           *pm_;
-        mutable QMutex             mutex_;
+        static QPair<QString, quint16> parseHostPort(const QString &hostString,
+                                                     quint16        defaultPort);
+        bool                           stateUpdatesPaused_ = false;
+        QString                        configFilePath_;
+        QList<ControllerInfo>          controllers_;
+        QMap<QString, ApiClient *>     apiClients_;
+        PasswordManager               *pm_;
+        mutable QMutex                 mutex_;
 };
 
 #endif  // CONTROLLERMANAGER_H

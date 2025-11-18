@@ -30,7 +30,6 @@ class CenterStack : public QWidget
 
         // 페이지 전환
         void showCompare();
-        void showModify();
         void showModifyWithCompare();
         void openCompareResult(const QString &left, const QString &right);
         void startPolling(int intervalMs = 5000);
