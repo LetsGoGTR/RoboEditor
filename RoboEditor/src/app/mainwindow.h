@@ -58,9 +58,6 @@ class MainWindow : public QMainWindow
 
         bool isDarkMode_ = false;
 
-        void saveSettings();
-        void loadSettings();
-
         std::unique_ptr<TopMenu>     menu_;
         std::unique_ptr<CenterStack> center_;  // CenterStack → Center
         std::unique_ptr<NavDock>     nav_;

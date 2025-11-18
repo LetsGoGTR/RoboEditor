@@ -39,24 +39,13 @@ ComparePage::ComparePage(QWidget *parent) : QWidget(parent)
     auto v = new QVBoxLayout(this);
     v->setContentsMargins(0, 0, 0, 0);
     v->addWidget(dock_);
+
+    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 }
 
 ComparePage::~ComparePage()
 {
     cleanupTempFolders();
-}
-
-QByteArray ComparePage::saveSplitterState() const
-{
-    if (rightSplit_)
-        return rightSplit_->saveState();
-    return QByteArray();
-}
-
-void ComparePage::restoreSplitterState(const QByteArray &state)
-{
-    if (rightSplit_ && !state.isEmpty())
-        rightSplit_->restoreState(state);
 }
 
 QWidget *ComparePage::buildDock()
