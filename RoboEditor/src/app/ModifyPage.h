@@ -121,9 +121,13 @@ class ModifyPage : public QWidget
         Document *currentDocument();  // private에서 public으로 이동
         void      createNewFile();
         void      closeFile(int index);
+        void      closeFile();
+        void      closeAll();
         void      openFile();
         void      saveFile();
         void      saveAsFile();
+        void      saveAsFile(int index);
+        void      saveAll();
         bool      hasUnsavedChanges(Document * doc);
         void      updateTitle();
         void      onTabChanged(int index);

@@ -2,6 +2,7 @@
 
 #include <QAction>
 #include <QActionGroup>
+#include <QApplication>
 #include <QKeySequence>
 #include <QMainWindow>
 #include <QMenu>
@@ -38,6 +39,13 @@ void TopMenu::build()
     actExit_       = file_->addAction("Exit");
 
     connect(actNewFile_, &QAction::triggered, mw_, &MainWindow::createNewDocument);
+    connect(actOpenFile_, &QAction::triggered, mw_, &MainWindow::openFileFromMenu);
+    connect(actSaveFile_, &QAction::triggered, mw_, &MainWindow::saveFileFromMenu);
+    connect(actSaveAsFile_, &QAction::triggered, mw_, &MainWindow::saveAsFileFromMenu);
+    connect(actSaveAll_, &QAction::triggered, mw_, &MainWindow::saveAllFromMenu);
+    connect(actCloseFile_, &QAction::triggered, mw_, &MainWindow::closeFileFromMenu);
+    connect(actCloseAll_, &QAction::triggered, mw_, &MainWindow::closeAllFromMenu);
+    connect(actExit_, &QAction::triggered, qApp, &QApplication::quit);
 
     // View > Show Log
     showLogMenu_ = view_->addMenu("Show Log");

@@ -132,7 +132,9 @@ void MainWindow::wire()
 
     connect(shortcutMgr, &ShortcutManager::openRequested, modifyPage, &ModifyPage::openFile);
     connect(shortcutMgr, &ShortcutManager::saveRequested, modifyPage, &ModifyPage::saveFile);
-    connect(shortcutMgr, &ShortcutManager::saveAsRequested, modifyPage, &ModifyPage::saveAsFile);
+    connect(shortcutMgr, &ShortcutManager::saveAsRequested, this, [this]() {
+        modifyPage->saveAsFile();
+    });
     connect(shortcutMgr,
             &ShortcutManager::closeRequested,
             modifyPage,
@@ -195,6 +197,49 @@ void MainWindow::createNewDocument()
         LogManager::append("New document created: untitled");
     }
 }
+void MainWindow::openFileFromMenu()
+{
+    if (center_) {
+        auto *modify = center_->getModifyPage();
+        modify->openFile();
+    }
+}
+void MainWindow::saveFileFromMenu()
+{
+    if (center_) {
+        auto *modify = center_->getModifyPage();
+        modify->saveFile();
+    }
+}
+void MainWindow::saveAsFileFromMenu()
+{
+    if (center_) {
+        auto *modify = center_->getModifyPage();
+        modify->saveAsFile();
+    }
+}
+void MainWindow::saveAllFromMenu()
+{
+    if (center_) {
+        auto *modify = center_->getModifyPage();
+        modify->saveAll();
+    }
+}
+void MainWindow::closeFileFromMenu()
+{
+    if (center_) {
+        auto *modify = center_->getModifyPage();
+        modify->closeFile();
+    }
+}
+void MainWindow::closeAllFromMenu()
+{
+    if (center_) {
+        auto *modify = center_->getModifyPage();
+        modify->closeAll();
+    }
+}
+
 void MainWindow::closeEvent(QCloseEvent *event)
 {
     QMainWindow::closeEvent(event);

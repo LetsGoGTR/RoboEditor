@@ -524,6 +524,23 @@ void ModifyPage::closeDocument(Document *doc)
         documents.removeAt(idx);
     }
 }
+
+void ModifyPage::closeFile()
+{
+    if (documents.isEmpty() || currentDocumentIndex < 0 || currentDocumentIndex >= documents.size())
+        return;
+
+    int index = currentDocumentIndex;
+
+    closeFile(index);
+}
+void ModifyPage::closeAll()
+{
+    for (auto d : documents) {
+        closeFile();
+    }
+}
+
 void ModifyPage::closeFile(int index)
 {
     if (documents.isEmpty())
@@ -684,12 +701,14 @@ void ModifyPage::saveFile()
 }
 void ModifyPage::saveAsFile()
 {
-    if (documents.isEmpty() || currentDocumentIndex < 0 ||
-        currentDocumentIndex >= documents.size()) {
+    saveAsFile(currentDocumentIndex);
+}
+void ModifyPage::saveAsFile(int index)
+{
+    if (index < 0 || index >= documents.size())
         return;
-    }
 
-    Document *doc = documents[currentDocumentIndex];
+    Document *doc = documents[index];
     if (!doc)
         return;
 
@@ -729,24 +748,49 @@ void ModifyPage::saveAsFile()
     QString shortAfter  = shortenBackupPath(newFilePath);
 
     QString msg = QString("[%1] is saved to [%2]").arg(shortBefore).arg(shortAfter);
-
     LogManager::append(msg);
 
     doc->setFilePath(newFilePath);
     doc->setModified(false);
     updateTitle();
     file.close();
-
-    qDebug() << "File saved as:" << newFilePath;
-
-    if (comparePane_) {
-        ComparePage *pane = comparePane_;
-        if (pane == comparePane_) {
-            pane->recalcDiff(currentLeftText(), currentLeftPath());
-        }
-    }
 }
+void ModifyPage::saveAll()
+{
+    if (documents.isEmpty())
+        return;
 
+    for (int curIdx = 0; curIdx < documents.size(); curIdx++) {
+        Document *doc = documents[curIdx];
+        if (!doc)
+            continue;  // return이 아닌 continue
+
+        QString filePath = doc->gfilePath();
+
+        // untitled 파일 별도 처리
+        if (filePath.isEmpty()) {
+            saveAsFile(curIdx);
+            continue;
+        }
+
+        // 파일 저장 시도
+        QFile file(filePath);
+        if (!file.open(QFile::WriteOnly | QFile::Text)) {
+            qWarning() << "Failed to open file:" << filePath;
+            QString msg = QString("Save Failed : [%1] cant open").arg(filePath);
+            LogManager::append(msg);
+            continue;  // 다음 파일 계속 저장
+        }
+
+        QTextStream out(&file);
+        out << doc->gcontent();
+        file.close();
+
+        doc->setModified(false);
+    }
+
+    updateTitle();
+}
 bool ModifyPage::hasUnsavedChanges(Document *doc)
 {
     if (!doc)
