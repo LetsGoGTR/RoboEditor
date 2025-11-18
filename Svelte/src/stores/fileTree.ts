@@ -13,27 +13,35 @@ export function resetFileTree() {
 	fileTree.set(null);
 }
 
+function cloneFolder(node: FolderNode): FolderNode {
+	return {
+		...node,
+		children: node.children.map((c) => (c.type === 'directory' ? cloneFolder(c) : { ...c }))
+	};
+}
+
 /* 특정 경로에 File 삽입 */
 export function insertFileNode(parentPath: string, newFile: FileNode) {
 	fileTree.update((root) => {
 		if (!root) return root;
 
-		function dfs(node: FolderNode): boolean {
+		const cloned = cloneFolder(root);
+
+		function dfs(node: FolderNode): FolderNode {
 			if (node.path === parentPath) {
-				node.children = [...node.children, newFile];
-				return true;
+				return {
+					...node,
+					children: [...node.children, newFile]
+				};
 			}
 
-			for (const child of node.children) {
-				if (child.type === 'directory') {
-					if (dfs(child)) return true;
-				}
-			}
-			return false;
+			return {
+				...node,
+				children: node.children.map((c) => (c.type === 'directory' ? dfs(c) : c))
+			};
 		}
 
-		dfs(root);
-		return root;
+		return dfs(cloned);
 	});
 }
 
@@ -42,22 +50,23 @@ export function insertFolderNode(parentPath: string, newNode: FolderNode) {
 	fileTree.update((root) => {
 		if (!root) return root;
 
-		function dfs(node: FolderNode): boolean {
+		const cloned = cloneFolder(root);
+
+		function dfs(node: FolderNode): FolderNode {
 			if (node.path === parentPath) {
-				// 하위 children에 삽입
-				node.children = [...node.children, newNode];
-				return true;
+				return {
+					...node,
+					children: [...node.children, newNode]
+				};
 			}
-			for (const child of node.children) {
-				if (child.type === 'directory') {
-					if (dfs(child)) return true;
-				}
-			}
-			return false;
+
+			return {
+				...node,
+				children: node.children.map((c) => (c.type === 'directory' ? dfs(c) : c))
+			};
 		}
 
-		dfs(root);
-		return root;
+		return dfs(cloned);
 	});
 }
 
@@ -66,21 +75,18 @@ export function removeFileNode(targetPath: string) {
 	fileTree.update((root) => {
 		if (!root) return root;
 
-		function dfs(folder: FolderNode): FolderNode {
-			folder.children = folder.children.filter((child) => {
-				if (child.type === 'file') {
-					return child.path !== targetPath; // 삭제
-				}
-				if (child.type === 'directory') {
-					dfs(child); // 재귀 탐색
-				}
-				return true;
-			});
+		const cloned = cloneFolder(root);
 
-			return folder;
+		function dfs(node: FolderNode): FolderNode {
+			return {
+				...node,
+				children: node.children
+					.map((c) => (c.type === 'directory' ? dfs(c) : c))
+					.filter((c) => (c.type === 'file' ? c.path !== targetPath : true))
+			};
 		}
 
-		return dfs(root);
+		return dfs(cloned);
 	});
 }
 
@@ -89,30 +95,23 @@ export function removeFolderNode(targetPath: string) {
 	fileTree.update((root) => {
 		if (!root) return root;
 
-		function dfs(folder: FolderNode): FolderNode {
-			folder.children = folder.children.filter((child) => {
-				// 폴더 삭제 대상
-				if (child.type === 'directory' && child.path === targetPath) {
-					return false;
-				}
+		const cloned = cloneFolder(root);
 
-				// 재귀 탐색
-				if (child.type === 'directory') {
-					dfs(child);
-				}
-
-				return true;
-			});
-
-			return folder;
+		function dfs(node: FolderNode): FolderNode {
+			return {
+				...node,
+				children: node.children
+					.filter((c) => (c.type === 'directory' ? c.path !== targetPath : true))
+					.map((c) => (c.type === 'directory' ? dfs(c) : c))
+			};
 		}
 
-		return dfs(root);
+		return dfs(cloned);
 	});
 }
 
 /** 트리 전체 새로고침을 위한 헬퍼 */
 export async function refreshFileTree(loader: () => Promise<FolderNode>) {
 	const updated = await loader();
-	fileTree.set(updated);
+	fileTree.set(structuredClone(updated));
 }
