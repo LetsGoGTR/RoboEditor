@@ -662,6 +662,13 @@ bool ControllerManager::send(const QString     &serialNumber,
         return false;
     }
 
+    // 호스트와 포트 분리
+    QPair<QString, quint16> hostPort = parseHostPort(controller.ip, controller.sftpPort);
+    QString                 host     = hostPort.first;
+    quint16                 port     = hostPort.second;
+
+    qDebug() << "[send] Parsed host:" << host << "port:" << port;
+
     // 2. 임시 디렉토리에서 tgz 생성
     QTemporaryDir tempDir;
     if (!tempDir.isValid()) {
@@ -676,19 +683,17 @@ bool ControllerManager::send(const QString     &serialNumber,
     qDebug() << "Creating tgz:" << tarGzPath;
     if (!FileCompressor::createTarGz(localPaths, tarGzPath)) {
         qWarning() << "Failed to create tgz";
-
         QString msg = QString("Failed to create create tgz");
         LogManager::append(msg);
         return false;
     }
 
     // 3. SFTP 연결 및 업로드
-    SFTPClient client(controller.ip, controller.sftpPort, controller.username, controller.pswd);
+    SFTPClient client(host, port, controller.username, controller.pswd);
 
     if (!client.connectToServer()) {
-        qWarning() << "SFTP connection failed:" << controller.ip;
-
-        QString msg = QString("SFTP connection failed: [%1]").arg(controller.ip);
+        qWarning() << "SFTP connection failed:" << host << ":" << port;
+        QString msg = QString("SFTP connection failed: [%1:%2]").arg(host).arg(port);
         LogManager::append(msg);
         return false;
     }
@@ -700,7 +705,7 @@ bool ControllerManager::send(const QString     &serialNumber,
     client.disconnect();
 
     if (!uploadSuccess) {
-        QString msg = QString("SFTP upload failed: [%1]").arg(controller.ip);
+        QString msg = QString("SFTP upload failed: [%1:%2]").arg(host).arg(port);
         LogManager::append(msg);
         qWarning() << "Upload failed";
         return false;
@@ -709,11 +714,10 @@ bool ControllerManager::send(const QString     &serialNumber,
     qDebug() << "Send completed successfully";
     return true;
 }
-
-bool ControllerManager::ControllerManager::receive(const QString &serialNumber,
-                                                   const QString &remoteTarGz,
-                                                   const QString &parentDir,
-                                                   const QString &targetDirName)
+bool ControllerManager::receive(const QString &serialNumber,
+                                const QString &remoteTarGz,
+                                const QString &parentDir,
+                                const QString &targetDirName)
 {
     // 1. 제어기 정보 가져오기
     ControllerInfo controller = getController(serialNumber);
@@ -722,17 +726,23 @@ bool ControllerManager::ControllerManager::receive(const QString &serialNumber,
         return false;
     }
 
-    // 2. SFTP 연결 및 다운로드
-    SFTPClient client(controller.ip, controller.sftpPort, controller.username, controller.pswd);
-    if (!client.connectToServer()) {
-        qWarning() << "SFTP connection failed:" << controller.ip;
+    // 호스트와 포트 분리
+    QPair<QString, quint16> hostPort = parseHostPort(controller.ip, controller.sftpPort);
+    QString                 host     = hostPort.first;
+    quint16                 port     = hostPort.second;
 
-        QString msg = QString("SFTP connection failed: [%1]").arg(controller.ip);
+    qDebug() << "[receive] Parsed host:" << host << "port:" << port;
+
+    // 2. SFTP 연결 및 다운로드
+    SFTPClient client(host, port, controller.username, controller.pswd);
+    if (!client.connectToServer()) {
+        qWarning() << "SFTP connection failed:" << host << ":" << port;
+        QString msg = QString("SFTP connection failed: [%1:%2]").arg(host).arg(port);
         LogManager::append(msg);
         return false;
     }
 
-    QTemporaryDir tempDir;  // 세션 임시폴더
+    QTemporaryDir tempDir;
     if (!tempDir.isValid()) {
         qWarning() << "Cannot create temporary directory";
         LogManager::append("Failed to create temporary directory");
@@ -747,13 +757,12 @@ bool ControllerManager::ControllerManager::receive(const QString &serialNumber,
     client.disconnect();
     if (!downloadSuccess) {
         qWarning() << "Download failed";
-
-        QString msg = QString("SFTP download failed: [%1]").arg(controller.ip);
+        QString msg = QString("SFTP download failed: [%1:%2]").arg(host).arg(port);
         LogManager::append(msg);
         return false;
     }
 
-    // 3. 임시 추출
+    // 3~5. 압축 해제 및 최종 경로 이동 (기존 코드 유지)
     const QString tempExtractRoot = tempDir.path() + "/extract";
     qDebug() << "Extracting to:" << tempExtractRoot;
     if (!FileCompressor::extractTarGz(localTarPath, tempExtractRoot)) {
@@ -762,24 +771,19 @@ bool ControllerManager::ControllerManager::receive(const QString &serialNumber,
         return false;
     }
 
-    // 4. 압축 내부 최상위가 'workspace'인지 확인
     const QString srcWorkspace = QDir(tempExtractRoot).filePath("workspace");
     if (!QDir(srcWorkspace).exists()) {
         qWarning() << "Missing 'workspace' root in archive";
-
         return false;
     }
 
-    // 5. 최종 경로: C:\backup\<SN>\<SN>_YYYY-MM-DD_HHMMSS
     if (!QDir().mkpath(parentDir)) {
         qWarning() << "Cannot mkpath parentDir:" << parentDir;
         return false;
     }
     const QString finalPath = QDir(parentDir).filePath(targetDirName);
 
-    // 동일 드라이브면 rename이 가장 안전/빠름
     if (!QDir().rename(srcWorkspace, finalPath)) {
-        // rename 실패 시 간단 복사 fallback (최소 구현)
         auto copyDirRecursive = [](const QString &src, const QString &dst, auto &&self) -> bool {
             QDir s(src);
             if (!s.exists())
@@ -805,7 +809,6 @@ bool ControllerManager::ControllerManager::receive(const QString &serialNumber,
 
         if (!copyDirRecursive(srcWorkspace, finalPath, copyDirRecursive)) {
             qWarning() << "Failed to place extracted content to final dest:" << finalPath;
-            // 실패 시 최종 폴더 생성되지 않거나 내용 없음 → 빈 폴더 남지 않음
             return false;
         }
     }
@@ -1036,4 +1039,30 @@ void ControllerManager::resumeStateUpdates()
 
     // 즉시 한 번 업데이트
     QTimer::singleShot(0, this, &ControllerManager::updateControllersStates);
+}
+QPair<QString, quint16> ControllerManager::parseHostPort(const QString &hostString,
+                                                         quint16        defaultPort)
+{
+    QString host = hostString.trimmed();
+
+    // 프로토콜 제거
+    if (host.startsWith("https://"))
+        host.remove(0, 8);
+    else if (host.startsWith("http://"))
+        host.remove(0, 7);
+
+    // 경로 제거
+    int slashIndex = host.indexOf('/');
+    if (slashIndex != -1) {
+        host = host.left(slashIndex);
+    }
+
+    // SFTP는 포트 parsing 하지 않음 (API와 분리)
+    // ip:port 입력이어도 ip만 추출
+    int colonIndex = host.indexOf(':');
+    if (colonIndex != -1) {
+        host = host.left(colonIndex);
+    }
+
+    return qMakePair(host, defaultPort);
 }

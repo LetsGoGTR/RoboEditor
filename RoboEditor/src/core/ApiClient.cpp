@@ -34,19 +34,33 @@ QString ApiClient::normalizeBaseUrl(const QString &baseUrl)
 {
     QString input = baseUrl.trimmed();
 
-    if (input.startsWith("https://")) {
-        input.remove(0, 8);  // "https://" 제거
+    // 1) 프로토콜 제거
+    input.remove(QRegularExpression("^https?://", QRegularExpression::CaseInsensitiveOption));
+
+    // 2) 경로 제거 (example.com/api -> example.com)
+    int slashIndex = input.indexOf('/');
+    if (slashIndex != -1) {
+        input = input.left(slashIndex);
     }
 
-    QUrl url("https://" + input);
-
-    // URL 유효성 검사
-    if (!url.isValid() || url.host().isEmpty()) {
-        qWarning() << "[normalizeBaseUrl] Invalid URL:" << baseUrl;
+    if (input.isEmpty()) {
+        qWarning() << "[normalizeBaseUrl] Empty URL:" << baseUrl;
         return baseUrl;
     }
 
-    QString result = QString("https://%1").arg(url.host());
+    // 3) IP인지 도메인인지 판별
+    //  - 숫자/점/콜론만 존재하면 IP로 판단
+    bool isIp = input.contains(QRegularExpression("^[0-9\\.]+(:[0-9]+)?$"));
+
+    QString protocol;
+    if (isIp) {
+        protocol = "http://";  // IP는 HTTP
+    } else {
+        protocol = "https://";  // 도메인은 HTTPS
+    }
+
+    QString result = protocol + input;
+
     qDebug() << "[normalizeBaseUrl]" << baseUrl << "->" << result;
     return result;
 }
