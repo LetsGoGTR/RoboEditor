@@ -74,8 +74,8 @@ void api::v1::Repo::create(const drogon::HttpRequestPtr                         
         metadata.name         = (*json)["name"].asString();
         metadata.description =
                 json->isMember("description") ? (*json)["description"].asString() : "";
-        metadata.api      = json->isMember("api") ? (*json)["api"].asString() : "";
-        metadata.sftpHost = json->isMember("sftpHost") ? (*json)["sftpHost"].asString() : "";
+        metadata.ip       = json->isMember("ip") ? (*json)["ip"].asString() : "";
+        metadata.apiPort  = json->isMember("apiPort") ? (*json)["apiPort"].asInt() : 80;
         metadata.sftpPort = json->isMember("sftpPort") ? (*json)["sftpPort"].asInt() : 22;
         metadata.sftpPassword =
                 json->isMember("sftpPassword") ? (*json)["sftpPassword"].asString() : "";
@@ -168,10 +168,10 @@ void api::v1::Repo::update(const drogon::HttpRequestPtr                         
         metadata.description  = json->isMember("description")
                                         ? (*json)["description"].asString()
                                         : existingResult.data["description"].asString();
-        metadata.api          = json->isMember("api") ? (*json)["api"].asString()
-                                                      : existingResult.data["api"].asString();
-        metadata.sftpHost     = json->isMember("sftpHost") ? (*json)["sftpHost"].asString()
-                                                           : existingResult.data["sftpHost"].asString();
+        metadata.ip           = json->isMember("ip") ? (*json)["ip"].asString()
+                                                     : existingResult.data["ip"].asString();
+        metadata.apiPort      = json->isMember("apiPort") ? (*json)["apiPort"].asInt()
+                                                          : existingResult.data["apiPort"].asInt();
         metadata.sftpPort     = json->isMember("sftpPort") ? (*json)["sftpPort"].asInt()
                                                            : existingResult.data["sftpPort"].asInt();
         metadata.sftpPassword = json->isMember("sftpPassword")
@@ -252,10 +252,10 @@ void api::v1::Repo::apply(const drogon::HttpRequestPtr                          
         return sendError(callback, drogon::k404NotFound, "Device not found", deviceId);
     }
 
-    // Get API URL from device metadata
-    std::string ip = deviceResult.data["api"].asString();
+    // Get IP from device metadata
+    std::string ip = deviceResult.data["ip"].asString();
     if (ip.empty()) {
-        ip = "localhost:80";
+        ip = "localhost";
     }
 
     // Wrap callback in shared_ptr for lambda capture
@@ -337,10 +337,10 @@ void api::v1::Repo::backup(const drogon::HttpRequestPtr                         
         return sendError(callback, drogon::k404NotFound, "Device not found", deviceId);
     }
 
-    // Get IP from device metadata (default: localhost:80)
+    // Get IP from device metadata
     std::string ip = deviceResult.data["ip"].asString();
     if (ip.empty()) {
-        ip = "localhost:80";
+        ip = "localhost";
     }
 
     // Wrap callback in shared_ptr for lambda capture

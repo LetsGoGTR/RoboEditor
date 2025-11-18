@@ -30,17 +30,19 @@ services::ServiceResult FileTransferService::backupFromRemote(const std::string 
         }
 
         // 2. Device metadata에서 SFTP 및 API 정보 추출
-        std::string api          = deviceResult.data["api"].asString();
-        std::string sftpHost     = deviceResult.data["sftpHost"].asString();
+        std::string ip           = deviceResult.data["ip"].asString();
+        int         apiPort      = deviceResult.data["apiPort"].asInt();
         int         sftpPort     = deviceResult.data["sftpPort"].asInt();
         std::string sftpPassword = deviceResult.data["sftpPassword"].asString();
         std::string sftpUser     = deviceResult.data["sftpUser"].asString();
 
-        utils::logging::info("Device info: api=" + api + ", sftpHost=" + sftpHost +
+        std::string sftpHost = ip;  // ip를 sftpHost로 사용
+        std::string apiUrl = "http://" + ip + ":" + std::to_string(apiPort);
+
+        utils::logging::info("Device info: apiUrl=" + apiUrl + ", sftpHost=" + sftpHost +
                              ", sftpUser=" + sftpUser);
 
         // 3. 원격 서버의 workspace compress API 호출
-        std::string apiUrl = api.empty() ? ("https://" + sftpHost) : api;
         utils::logging::info("원격 서버 압축 API 호출: " + apiUrl + "/api/workspace/compress");
 
         auto compressResult = compressWorkspace(sftpUser, apiUrl);
@@ -140,11 +142,14 @@ services::ServiceResult FileTransferService::applyWorkspace(const std::string &w
         }
 
         // 2. Device metadata에서 SFTP 및 API 정보 추출
-        std::string api          = deviceResult.data["api"].asString();
-        std::string sftpHost     = deviceResult.data["sftpHost"].asString();
+        std::string ip           = deviceResult.data["ip"].asString();
+        int         apiPort      = deviceResult.data["apiPort"].asInt();
         int         sftpPort     = deviceResult.data["sftpPort"].asInt();
         std::string sftpPassword = deviceResult.data["sftpPassword"].asString();
         std::string sftpUser     = deviceResult.data["sftpUser"].asString();
+
+        std::string sftpHost = ip;  // ip를 sftpHost로 사용
+        std::string api = "http://" + ip + ":" + std::to_string(apiPort);
 
         utils::logging::info("Device info: api=" + api + ", sftpHost=" + sftpHost +
                              ", sftpUser=" + sftpUser);
