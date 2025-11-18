@@ -115,8 +115,9 @@ void ApplyPage::showPasswordUI()
                     &ConfirmSelection::applyRequested,
                     this,
                     [this]() {
-                        // 비밀번호 + 최종 확인 후, 여기서부터 실제 Apply 시작
-                        startApplyQueue();
+                        // 비밀번호 + 최종 확인 후, 여기서부터 실제 처리 시작
+                        // 1단계: 먼저 대상 제어기들의 현재 상태를 백업
+                        startPreBackup();
                     },
                     Qt::SingleShotConnection);
 
@@ -133,10 +134,255 @@ void ApplyPage::showPasswordUI()
     }
 }
 
+QString ApplyPage::determineBackupRoot() const
+{
+    if (selectedBackupDir.isEmpty()) {
+        return QStringLiteral("C:/backup");
+    }
+
+    QDir dir(selectedBackupDir);
+
+    // 선택된 경로가 이미 backup 루트라면 그대로 사용
+    if (dir.dirName().compare("backup", Qt::CaseInsensitive) == 0) {
+        return dir.path();
+    }
+
+    // 일반 구조: C:/backup/<serial>/<serial>_timestamp
+    QDir tmp = dir;
+    bool ok1 = tmp.cdUp(); // → <serial>
+    bool ok2 = tmp.cdUp(); // → backup
+
+    if (ok1 && ok2)
+        return tmp.path(); // ex) C:/backup
+
+    // 안전장치: 실패 시 그냥 현재 경로 반환
+    return dir.absolutePath();
+}
+
+void ApplyPage::startPreBackup()
+{
+    if (selectedControllerList.isEmpty()) {
+        QMessageBox::warning(this, "오류", "선택된 제어기가 없습니다.");
+        return;
+    }
+
+    if (preBackupInProgress_) {
+        qWarning() << "[ApplyPage] Pre-backup already in progress.";
+        return;
+    }
+
+    ControllerManager *manager = ControllerManager::instance();
+
+    // 상태 검증 (Apply 때와 동일)
+    QStringList disconnectedControllers;
+    QStringList unknownControllers;
+    QStringList runningControllers;
+
+    for (const QString &sn : selectedControllerList) {
+        ControllerInfo info = manager->getController(sn);
+        if (info.serialNumber.isEmpty()) {
+            unknownControllers.append(sn);
+            continue;
+        }
+        if (!info.isConnected) {
+            disconnectedControllers.append(sn);
+            continue;
+        }
+        if (info.isRunning) {
+            runningControllers.append(sn);
+            continue;
+        }
+    }
+
+    if (!unknownControllers.isEmpty()) {
+        QMessageBox::warning(
+                this,
+                "오류",
+                QString("등록 정보가 없는 제어기가 선택되었습니다:\n%1")
+                        .arg(unknownControllers.join(", ")));
+        return;
+    }
+    if (!disconnectedControllers.isEmpty()) {
+        QMessageBox::warning(
+                this,
+                "오류",
+                QString("다음 제어기가 오프라인 상태입니다:\n%1")
+                        .arg(disconnectedControllers.join(", ")));
+        return;
+    }
+    if (!runningControllers.isEmpty()) {
+        QMessageBox::warning(
+                this,
+                "오류",
+                QString("제어기가 동작중입니다. 적용을 진행할 수 없습니다:\n%1")
+                        .arg(runningControllers.join(", ")));
+        return;
+    }
+
+    // 사전 백업 초기화
+    preBackupInProgress_         = true;
+    preBackupTotal_              = selectedControllerList.size();
+    preBackupCompleted_          = 0;
+    preBackupFailed_             = 0;
+    preBackupSuccessControllers_.clear();
+    preBackupFailedControllers_.clear();
+
+    QString backupRoot = determineBackupRoot();
+    qDebug() << "[ApplyPage] Pre-backup root:" << backupRoot;
+
+    // 시그널 연결
+    connect(manager,
+            &ControllerManager::backupCompleted,
+            this,
+            &ApplyPage::onPreBackupCompleted,
+            Qt::UniqueConnection);
+    connect(manager,
+            &ControllerManager::backupFailed,
+            this,
+            &ApplyPage::onPreBackupFailed,
+            Qt::UniqueConnection);
+
+    // 각 제어기에 대해 백업 요청
+    for (const QString &sn : selectedControllerList) {
+        qDebug() << "[ApplyPage] Pre-backup request for:" << sn;
+        bool ok = manager->backupRequest(sn, backupRoot);
+        if (!ok) {
+            preBackupFailed_++;
+            preBackupFailedControllers_.append(sn);
+            LogManager::append(
+                    QString("[ApplyPage] Pre-backup start failed: %1").arg(sn));
+        }
+    }
+
+    int started = preBackupTotal_ - preBackupFailed_;
+    if (started == 0) {
+        preBackupInProgress_ = false;
+
+        ControllerManager *m = ControllerManager::instance();
+        disconnect(m, &ControllerManager::backupCompleted, this, &ApplyPage::onPreBackupCompleted);
+        disconnect(m, &ControllerManager::backupFailed, this, &ApplyPage::onPreBackupFailed);
+
+        QMessageBox::warning(
+                this,
+                "백업 오류",
+                "적용 전에 수행할 백업 요청을 시작하지 못했습니다.\n적용을 취소합니다.");
+    }
+}
+
+void ApplyPage::onPreBackupCompleted(const QString &serialNumber)
+{
+    if (!preBackupInProgress_)
+        return;
+
+    preBackupCompleted_++;
+    preBackupSuccessControllers_.append(serialNumber);
+
+    QString msg = QString("[ApplyPage] Pre-backup completed: %1 (%2/%3)")
+                          .arg(serialNumber)
+                          .arg(preBackupCompleted_)
+                          .arg(preBackupTotal_);
+    LogManager::append(msg);
+
+    int doneCount = preBackupCompleted_ + preBackupFailed_;
+    if (doneCount < preBackupTotal_)
+        return;
+
+    // 모든 사전 백업 응답 수신 완료
+    preBackupInProgress_ = false;
+
+    ControllerManager *manager = ControllerManager::instance();
+    disconnect(manager, &ControllerManager::backupCompleted, this, &ApplyPage::onPreBackupCompleted);
+    disconnect(manager, &ControllerManager::backupFailed, this, &ApplyPage::onPreBackupFailed);
+
+    // 성공한 제어기가 하나도 없으면 → Apply 자체 불가
+    if (preBackupSuccessControllers_.isEmpty()) {
+        QMessageBox::warning(
+                this,
+                "백업 오류",
+                "모든 제어기의 사전 백업이 실패했습니다.\n적용을 진행할 수 없습니다.");
+        return;
+    }
+
+    // 일부만 성공한 경우:
+    //   - 성공한 제어기만 apply 대상으로 사용
+    //   - 실패한 제어기는 Log + 안내 메시지
+    applyTargetControllers_ = preBackupSuccessControllers_;
+
+    if (!preBackupFailedControllers_.isEmpty()) {
+        QString failList = preBackupFailedControllers_.join(", ");
+        QString warnMsg  = QString(
+                                  "일부 제어기의 사전 백업이 실패했습니다.\n"
+                                  "다음 제어기는 적용 대상에서 제외됩니다:\n%1")
+                                  .arg(failList);
+        QMessageBox::warning(this, "사전 백업 경고", warnMsg);
+
+        LogManager::append(
+                QString("[ApplyPage] Pre-backup failed controllers (skipped in apply): %1")
+                        .arg(failList));
+    }
+
+    // 이제 실제 Apply 큐 시작
+    startApplyQueue();
+}
+
+void ApplyPage::onPreBackupFailed(const QString &serialNumber, const QString &error)
+{
+    if (!preBackupInProgress_)
+        return;
+
+    preBackupFailed_++;
+    preBackupFailedControllers_.append(serialNumber);
+
+    QString msg = QString("[ApplyPage] Pre-backup failed: %1 (%2/%3) - %4")
+                          .arg(serialNumber)
+                          .arg(preBackupFailed_)
+                          .arg(preBackupTotal_)
+                          .arg(error);
+    LogManager::append(msg);
+
+    int doneCount = preBackupCompleted_ + preBackupFailed_;
+    if (doneCount < preBackupTotal_)
+        return;
+
+    // 🔚 전체 사전 백업 응답 완료 → 최종 처리는 onPreBackupCompleted 쪽에서 공통 처리
+    preBackupInProgress_ = false;
+
+    ControllerManager *manager = ControllerManager::instance();
+    disconnect(manager, &ControllerManager::backupCompleted, this, &ApplyPage::onPreBackupCompleted);
+    disconnect(manager, &ControllerManager::backupFailed, this, &ApplyPage::onPreBackupFailed);
+
+    if (preBackupSuccessControllers_.isEmpty()) {
+        // 전부 실패
+        QMessageBox::warning(
+                this,
+                "백업 실패",
+                "적용 전에 수행한 사전 백업이 모두 실패했습니다.\n적용을 진행할 수 없습니다.");
+        return;
+    }
+
+    // 일부 성공한 경우는 onPreBackupCompleted에서 처리되므로 여기선 따로 안 건드려도 됨
+    applyTargetControllers_ = preBackupSuccessControllers_;
+
+    if (!preBackupFailedControllers_.isEmpty()) {
+        QString failList = preBackupFailedControllers_.join(", ");
+        QString warnMsg  = QString(
+                                  "일부 제어기의 사전 백업이 실패했습니다.\n"
+                                  "다음 제어기는 적용 대상에서 제외됩니다:\n%1")
+                                  .arg(failList);
+        QMessageBox::warning(this, "사전 백업 경고", warnMsg);
+
+        LogManager::append(
+                QString("[ApplyPage] Pre-backup failed controllers (skipped in apply): %1")
+                        .arg(failList));
+    }
+
+    startApplyQueue();
+}
+
 // 큐 시작
 void ApplyPage::startApplyQueue()
 {
-    if (selectedControllerList.isEmpty() || selectedBackupDir.isEmpty()) {
+    if (applyTargetControllers_.isEmpty() || selectedBackupDir.isEmpty()) {
         QMessageBox::warning(this, "오류", "선택된 제어기 또는 백업 파일 정보가 없습니다.");
         return;
     }
@@ -148,7 +394,7 @@ void ApplyPage::startApplyQueue()
 
     manager->pauseStateUpdates();
 
-    for (const QString &sn : selectedControllerList) {
+    for (const QString &sn : applyTargetControllers_) {
         ControllerInfo info = manager->getController(sn);
         if (info.serialNumber.isEmpty()) {
             unknownControllers.append(sn);
