@@ -592,6 +592,56 @@ void ModifyPage::openFile()
         return;
 }
 
+void ModifyPage::createNewFile()
+{
+    Document *doc = new Document("");
+    doc->setContent("");
+    doc->setModified(true);
+
+    // 2) 탭 페이지 생성
+    QWidget     *tabPage = new QWidget(tabWidget);
+    QVBoxLayout *layout  = new QVBoxLayout(tabPage);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(0);
+
+    // 3) 상단 경로 라벨
+    QLabel *pathLabel = new QLabel("untitled", tabPage);
+    pathLabel->setObjectName("pathLabel");
+
+    // 4) CodeEditor 생성
+    CodeEditor *editor = new CodeEditor(tabPage);
+    editor->setPlainText("");
+    layout->addWidget(editor);
+
+    // 5) 탭 추가
+    int index = tabWidget->addTab(tabPage, "untitled");
+    tabWidget->setCurrentIndex(index);
+
+    // 6) signal 연결
+    connect(editor, &QPlainTextEdit::textChanged, [this, doc, editor]() {
+        doc->setContent(editor->toPlainText());
+        doc->setModified(true);
+        updateTitle();
+        if (comparePane_) {
+            emit editorTextChangedForDiff();
+        }
+    });
+
+    connect(editor, &DropTextEdit::fileDropped, this, [this](const QString &path) {
+        openDocument(path);
+    });
+
+    // 7) 내부 관리 변수 업데이트
+    currentDoc = doc;
+    editor_    = editor;
+    documents.append(doc);
+    setCurrentDocument(documents.size() - 1);
+
+    updateTitle();  // 탭 제목 갱신
+
+    LogManager::append("New document created: untitled");
+}
+
 void ModifyPage::saveFile()
 {
     if (documents.isEmpty() || currentDocumentIndex < 0 ||
@@ -605,7 +655,7 @@ void ModifyPage::saveFile()
 
     QString filePath = doc->gfilePath();
     if (filePath.isEmpty()) {
-        qWarning() << "File path is empty";
+        saveAsFile();
         return;
     }
 

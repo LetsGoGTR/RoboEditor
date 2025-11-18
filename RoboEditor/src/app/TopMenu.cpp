@@ -8,10 +8,11 @@
 #include <QMenuBar>
 
 #include "ControllerManager.h"
+#include "LogManager.h"
 #include "PasswordManager.h"
 #include "mainwindow.h"
 
-TopMenu::TopMenu(QMainWindow *mw) : QObject(mw), mw_(mw)
+TopMenu::TopMenu(MainWindow *mw) : QObject(mw), mw_(mw)
 {
     build();
 }
@@ -21,22 +22,32 @@ void TopMenu::build()
     auto *mb = mw_->menuBar();
     file_    = mb->addMenu("File");
     edit_    = mb->addMenu("Edit");
+    ctrl_    = mb->addMenu("Controllers");
     view_    = mb->addMenu("View");
+    tools_   = mb->addMenu("Tools");
     help_    = mb->addMenu("Help");
-    sett_    = mb->addMenu("Setting");
 
     // add file actions
-    newFile_    = file_->addAction("New File");
-    openFile_   = file_->addAction("Open File");
-    openFolder_ = file_->addAction("Open Folder");
+    actNewFile_    = file_->addAction("New File");
+    actOpenFile_   = file_->addAction("Open File");
+    actSaveFile_   = file_->addAction("Save File");
+    actSaveAsFile_ = file_->addAction("Save as File");
+    actSaveAll_    = file_->addAction("Save All");
+    actCloseFile_  = file_->addAction("Close File");
+    actCloseAll_   = file_->addAction("Close All");
+    actExit_       = file_->addAction("Exit");
 
-    // View > Show Log ▶
+    connect(actNewFile_, &QAction::triggered, mw_, &MainWindow::createNewDocument);
+
+    // View > Show Log
     showLogMenu_ = view_->addMenu("Show Log");
 
-    actLogVisible_ = new QAction("Visible", this);
-    actLogVisible_->setCheckable(true);
-    actLogVisible_->setChecked(true);
-    showLogMenu_->addAction(actLogVisible_);
+    actToggleLog_ = new QAction("Show Log Viewer", this);
+    actToggleLog_->setCheckable(true);
+    actToggleLog_->setChecked(true);
+    actToggleLog_->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_L));
+
+    showLogMenu_->addAction(actToggleLog_);
     showLogMenu_->addSeparator();
 
     posGroup_ = new QActionGroup(this);
@@ -47,6 +58,7 @@ void TopMenu::build()
         posGroup_->addAction(a);
         return a;
     };
+
     showLogMenu_->addAction(mk("Log → Bottom"));
     showLogMenu_->addAction(mk("Log → Right"));
     showLogMenu_->addAction(mk("Log → Left"));
@@ -54,25 +66,21 @@ void TopMenu::build()
     showLogMenu_->addAction(mk("Log → Float"));
     posGroup_->actions().front()->setChecked(true);
 
-    actToggle_ = new QAction("Toggle Log", this);
-    actToggle_->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_L));
-
     themeToggle_ = new QAction("Toggle Dark/Light", this);
 
-    changePassword_ = new QAction("Change Password", this);
+    actChangePswd_ = new QAction("Change Password", this);
 
-    sett_->addAction(changePassword_);
+    //sett_->addAction(actChangePswd_);
     //sett_->addAction(themeToggle_);
-    view_->addAction(actToggle_);
 
-    connect(actToggle_, &QAction::triggered, actLogVisible_, &QAction::toggle);
-    connect(changePassword_, &QAction::triggered, this, &TopMenu::onChangePasswordTriggered);
-
-    // MainWindow* mw = qobject_cast<MainWindow*>(parent());
-    // if (mw) {
-    //     connect(themeToggle_, &QAction::triggered, mw, &MainWindow::toggleTheme);
-    // }
+    connect(actToggleLog_, &QAction::toggled, this, [this](bool checked) {
+        if (LogManager::instance()) {
+            LogManager::instance()->setVisible(checked);
+        }
+    });
+    connect(actChangePswd_, &QAction::triggered, this, &TopMenu::onChangePasswordTriggered);
 }
+
 void TopMenu::onChangePasswordTriggered()
 {
     PasswordManager manager(mw_);

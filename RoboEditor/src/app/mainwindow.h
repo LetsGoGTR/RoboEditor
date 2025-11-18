@@ -31,6 +31,7 @@ class MainWindow : public QMainWindow
 
       public slots:
         void toggleTheme();
+        void createNewDocument();
 
       protected:
         void closeEvent(QCloseEvent * event) override;

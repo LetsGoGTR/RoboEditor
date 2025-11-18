@@ -186,6 +186,15 @@ void MainWindow::toggleTheme()
     }
 }
 
+void MainWindow::createNewDocument()
+{
+    if (center_) {
+        auto *modify = center_->getModifyPage();
+        modify->createNewFile();
+
+        LogManager::append("New document created: untitled");
+    }
+}
 void MainWindow::closeEvent(QCloseEvent *event)
 {
     QMainWindow::closeEvent(event);

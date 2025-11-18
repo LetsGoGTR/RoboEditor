@@ -119,6 +119,7 @@ class ModifyPage : public QWidget
         // 외부에서 접근 가능한 메서드들
         Document *openDocument(const QString &path);
         Document *currentDocument();  // private에서 public으로 이동
+        void      createNewFile();
         void      closeFile(int index);
         void      openFile();
         void      saveFile();
