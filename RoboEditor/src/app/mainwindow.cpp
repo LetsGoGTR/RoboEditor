@@ -17,13 +17,16 @@
 #include "ShortcutManager.h"
 #include "TopMenu.h"
 
-bool MainWindow::dark = false;
+bool MainWindow::dark       = false;
+bool MainWindow::manualMode = false;
 MainWindow::~MainWindow()
 {
     LogManager::destroy();
 }
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 {
+    qApp->installEventFilter(this);
+
     // 컴포넌트 초기화
     ensureCenter();  // 중앙 위젯 (파일 트리 + 에디터)
     ensureMenu();    // 상단 메뉴
@@ -150,18 +153,23 @@ void MainWindow::wire()
 bool MainWindow::eventFilter(QObject *obj, QEvent *event)
 {
     if (event->type() == QEvent::ApplicationPaletteChange || event->type() == QEvent::ThemeChange) {
-        qDebug() << "System theme changed → reloading stylesheet...";
-        applyStyleSheet();
-        return true;  // 이벤트 처리됐다고 알려서 재귀 방지
+        if (!manualMode) {
+            qDebug() << "manual entered";
+            dark = (qApp->styleHints()->colorScheme() == Qt::ColorScheme::Dark);
+            applyStyleSheet();
+        }
+        //return true;
     }
 
     return QMainWindow::eventFilter(obj, event);
 }
 void MainWindow::applyStyleSheet()
 {
-    dark = qApp->styleHints()->colorScheme() == Qt::ColorScheme::Dark;
+    //dark = qApp->styleHints()->colorScheme() == Qt::ColorScheme::Dark;
 
-    QString stylePath = dark ? ":/styles/dark.qss" : ":/styles/light.qss";
+    QString fileName = dark ? "dark.qss" : "light.qss";
+
+    QString stylePath = QApplication::applicationDirPath() + "/../../src/styles/" + fileName;
 
     QFile f(stylePath);
     if (f.open(QFile::ReadOnly)) {
@@ -174,16 +182,11 @@ void MainWindow::applyStyleSheet()
 }
 void MainWindow::toggleTheme()
 {
-    dark = !dark;
+    qDebug() << "toggle clicked";
+    manualMode = true;
+    dark       = !dark;
 
-    QString stylePath = dark ? ":/styles/dark.qss" : ":/styles/light.qss";
-
-    QFile f(stylePath);
-    if (f.open(QFile::ReadOnly)) {
-        QString css = QString::fromUtf8(f.readAll());
-        qApp->setStyleSheet(css);
-        qDebug() << "User toggled theme:" << (dark ? "Dark" : "Light");
-    }
+    applyStyleSheet();
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)

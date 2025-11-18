@@ -9,6 +9,7 @@
 
 #include "ControllerManager.h"
 #include "PasswordManager.h"
+#include "mainwindow.h"
 
 TopMenu::TopMenu(QMainWindow *mw) : QObject(mw), mw_(mw)
 {
@@ -56,13 +57,21 @@ void TopMenu::build()
     actToggle_ = new QAction("Toggle Log", this);
     actToggle_->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_L));
 
+    themeToggle_ = new QAction("Toggle Dark/Light", this);
+
     changePassword_ = new QAction("Change Password", this);
 
     sett_->addAction(changePassword_);
+    //sett_->addAction(themeToggle_);
     view_->addAction(actToggle_);
 
     connect(actToggle_, &QAction::triggered, actLogVisible_, &QAction::toggle);
     connect(changePassword_, &QAction::triggered, this, &TopMenu::onChangePasswordTriggered);
+
+    // MainWindow* mw = qobject_cast<MainWindow*>(parent());
+    // if (mw) {
+    //     connect(themeToggle_, &QAction::triggered, mw, &MainWindow::toggleTheme);
+    // }
 }
 void TopMenu::onChangePasswordTriggered()
 {

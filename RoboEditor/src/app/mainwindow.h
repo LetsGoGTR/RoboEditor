@@ -27,6 +27,7 @@ class MainWindow : public QMainWindow
         explicit MainWindow(QWidget *parent = nullptr);
         ~MainWindow();
         static bool dark;
+        static bool manualMode;
 
       public slots:
         void toggleTheme();
