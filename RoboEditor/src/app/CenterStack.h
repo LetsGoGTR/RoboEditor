@@ -56,10 +56,6 @@ class CenterStack : public QWidget
         QString getWorkspacePath() const;
         void    setBackupPath(const QString &path);
 
-        // 설정 저장/복원
-        QByteArray saveSplitterState() const;
-        void       restoreSplitterState(const QByteArray &state);
-
       signals:
         // 메인윈도우가 받을 시그널
         void compareRequested(const QString &left, const QString &right);
