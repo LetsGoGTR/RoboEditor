@@ -13,6 +13,8 @@ namespace Ui
     class ApplyPage;
 }
 
+class ProgressDialog;
+
 class ApplyPage : public QWidget
 {
     Q_OBJECT
@@ -39,6 +41,9 @@ class ApplyPage : public QWidget
         int totalApplyRequests_;
         int completedApplyRequests_;
         int failedApplyRequests_;
+
+        ProgressDialog *applyProgressDialog_ = nullptr;
+        bool applyInProgress_ = false;
 
       signals:
         void uiApplyClicked(const QString &target);

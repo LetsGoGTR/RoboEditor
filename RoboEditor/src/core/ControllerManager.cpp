@@ -13,11 +13,15 @@
 
 #include "ControllerSetting.h"
 #include "FileCompressor.h"
+#include "LogManager.h"
+#include "PasswordManager.h"
 #include "SftpClient.h"
 
 static ControllerManager *getinstance = nullptr;
 
-ControllerManager::ControllerManager(QObject *parent) : QObject(parent)
+ControllerManager::ControllerManager(QObject *parent) :
+    QObject(parent),
+    pm_(new PasswordManager(nullptr))
 {
     loadFromFile();
 }
@@ -52,6 +56,9 @@ void ControllerManager::registerController()
 
         // 동일한 SN이 있으면 에러
         if (isDuplicatedSN(newConInfo.serialNumber)) {
+            QString msg = QString("Registration failed : [%1] already exists")
+                                  .arg(newConInfo.serialNumber);
+            LogManager::append(msg);
             QMessageBox::warning(nullptr, "등록 실패", "이미 동일한 제어기가 등록되어 있습니다.");
             return;
         }
@@ -83,6 +90,8 @@ void ControllerManager::registerController()
         qDebug() << "Username:" << newConInfo.username;
 
         saveToFile(newConInfo.serialNumber);
+        QString msg = QString("[%1] registred").arg(newConInfo.serialNumber);
+        LogManager::append(msg);
 
         setupApiClient(newConInfo.serialNumber);
 
@@ -99,10 +108,10 @@ void ControllerManager::removeController(int index)
         cleanupApiClient(sn);
 
         controllers_.removeAt(index);
+        QString msg = QString("[%1] removed").arg(sn);
+        LogManager::append(msg);
         saveToFile();
         emit controllerListChanged();
-
-        qDebug() << "controllers[" << index << "] (" << sn << ") removed";
     }
 }
 
@@ -120,8 +129,8 @@ void ControllerManager::removeController(const ControllerInfo *curCon)
             locker.relock();
 
             controllers_.removeAt(idx);
-            qDebug() << "controllers[" << idx << "] removed";
-
+            QString msg = QString("[%1] is removed").arg(sn);
+            LogManager::append(msg);
             saveToFile();
             emit controllerListChanged();
             break;
@@ -151,12 +160,8 @@ void ControllerManager::updateInfo(const ControllerInfo &newInfo)
                     c.pswd     = updated.pswd;
                     c.wsPath   = updated.wsPath;
 
-                    qDebug() << "[updateInfo] Controller updated:";
-                    qDebug() << "SN:" << c.serialNumber;
-                    qDebug() << "IP:" << c.ip;
-                    qDebug() << "Username:" << c.username;
-                    qDebug() << "workspace Path:" << c.wsPath;
-                    qDebug() << "SFTP:" << c.sftpPort;
+                    QString msg = QString("[%1] state has been updated").arg(c.serialNumber);
+                    LogManager::append(msg);
 
                     break;
                 }
@@ -211,6 +216,9 @@ void ControllerManager::setupApiClient(const QString &serialNumber)
                 qWarning() << "[ControllerManager]" << serialNumber << " " << url << " "
                            << "request failed:" << error;
 
+                QString msg = QString("[%1] API request failed: %2").arg(info.serialNumber, error);
+                LogManager::append(msg);
+
                 updateConnectionState(serialNumber, false);
                 updateRunningState(serialNumber, false);
             });
@@ -250,6 +258,10 @@ void ControllerManager::cleanupApiClient(const QString &serialNumber)
 // 모든 제어기 상태 업데이트
 void ControllerManager::updateControllersStates()
 {
+    if (stateUpdatesPaused_) {
+        return;
+    }
+
     QList<ControllerInfo>      controllersCopy;
     QMap<QString, ApiClient *> clientsCopy;
 
@@ -258,17 +270,11 @@ void ControllerManager::updateControllersStates()
         controllersCopy = controllers_;
         clientsCopy     = apiClients_;
     }
-
-    qDebug() << "[ControllerManager] Processing" << controllersCopy.size() << "controllers";
-
-    // mutex 없이 순회
-
     for (const auto &c : controllersCopy) {
         ApiClient *client = clientsCopy.value(c.serialNumber, nullptr);
 
         // URL이 틀리거나, ApiClient가 없으면 재생성
         if (!client) {
-            updateConnectionState(c.serialNumber, false);  // 즉시 끊김 표시
             setupApiClient(c.serialNumber);
             continue;
         }
@@ -282,33 +288,12 @@ void ControllerManager::updateControllersStates()
             qDebug() << "exp : " << expectedUrl;
             qDebug() << "cur : " << currentUrl;
 
-            updateConnectionState(c.serialNumber, false);  // 즉시 끊김 표시
             cleanupApiClient(c.serialNumber);
             setupApiClient(c.serialNumber);
             continue;
         }
-        updateConnectionState(c.serialNumber, false);
 
         client->get("/api/robot/running");
-        if (c.serialNumber == "SN1") {
-            ControllerManager *manager = ControllerManager::instance();
-
-            QStringList localFiles;
-            localFiles << "C:/Users/SSAFY/workspace.tgz";  // 로컬 파일 (Windows 경로)
-
-            QString remoteDir = "/workspace/";  // 원격 디렉토리 (리눅스 경로)
-
-            // bool success = manager->send("SN1",       // 시리얼 번호
-            // localFiles,  // 로컬 파일들 (압축할 파일 목록)
-            // remoteDir    // 원격 저장 경로
-            // );
-
-            // bool success = manager->receive(
-            // "SN1",                      // 시리얼 번호
-            // "/workspace/test.tgz",   // 원격 파일 경로
-            // "C:/Download"               // 로컬 폴더 경로
-            // );
-        }
     }
 }
 
@@ -408,6 +393,8 @@ void ControllerManager::saveToFile(const QString &serialNumber)
                 successCount++;
             } else {
                 failCount++;
+                QString msg = QString("[%1] status save failed").arg(c.serialNumber);
+                LogManager::append(msg);
                 qWarning() << "[saveToFile] Failed to save:" << c.serialNumber;
             }
         }
@@ -507,33 +494,35 @@ bool ControllerManager::backupRequest(const QString &serialNumber, const QString
     }
     if (!QDir().mkpath(snDir)) {
         qWarning() << "[backupRequest] cannot mkpath:" << snDir;
+
         return false;
     }
 
     // 타임스탬프 이름 계산 (폴더명 & 내부 workspace rename 용)
     const QString ts            = QDateTime::currentDateTime().toString("yyyy-MM-dd_HHmmss");
     const QString targetDirName = sn + "_" + ts;  // 예: 123_2025-11-12_153723
-    const QString remoteTarGz   = info.wsPath + "/workspace.tgz";
+    const QString remoteTarGz   = info.wsPath + "/output.tgz";
 
-    // compress 완료 콜백에서만 받기
-    QMetaObject::Connection okConn, failConn;
-    okConn = connect(
+    QObject *context = new QObject(this);
+
+    connect(
             client,
             &ApiClient::requestSucceeded,
-            this,
-            [=](const QString &endpoint, const QJsonObject &) {
+            context,  // ← context 추가
+            [this, serialNumber, remoteTarGz, snDir, targetDirName, context](
+                    const QString &endpoint, const QJsonObject &) {
                 if (endpoint != "/api/workspace/compress")
                     return;
-                QObject::disconnect(okConn);
-                QObject::disconnect(failConn);
+
+                // context 삭제 (자동으로 모든 연결 해제)
+                context->deleteLater();
 
                 // receive는 snDir(부모 폴더) + targetDirName(원하는 최상위 폴더명)으로 호출
                 bool ok = receive(serialNumber, remoteTarGz, snDir, targetDirName);
                 if (!ok) {
                     qWarning() << "[backupRequest] receive failed for" << serialNumber;
                     emit backupFailed(serialNumber, QStringLiteral("SFTP 수신 실패"));
-                }
-                else {
+                } else {
                     qDebug() << "[backupRequest] completed at"
                              << QDir(snDir).filePath(targetDirName);
                     emit backupCompleted(serialNumber);
@@ -541,31 +530,34 @@ bool ControllerManager::backupRequest(const QString &serialNumber, const QString
             },
             Qt::QueuedConnection);
 
-    failConn = connect(
+    connect(
             client,
             &ApiClient::requestFailed,
-            this,
-            [=](const QString &endpoint, const QString &err, const QString &) {
+            context,  // ← context 추가
+            [this, serialNumber, context, info](
+                    const QString &endpoint, const QString &err, const QString &) {
                 if (endpoint != "/api/workspace/compress")
                     return;
-                QObject::disconnect(okConn);
-                QObject::disconnect(failConn);
-                qWarning() << "[backupRequest] compress failed:" << err;
 
-                emit backupFailed(serialNumber,
-                                  QStringLiteral("압축 요청 실패: ") + err);
+                // context 삭제 (자동으로 모든 연결 해제)
+                context->deleteLater();
+
+                QString msg =
+                        QString("[%1] compress request failed: %2").arg(info.serialNumber, err);
+                LogManager::append(msg);
+                qWarning() << "[backupRequest] compress failed:" << err;
+                emit backupFailed(serialNumber, QStringLiteral("압축 요청 실패: ") + err);
             },
             Qt::QueuedConnection);
 
     if (!client->postWorkspaceCompress(info.username)) {
-        QObject::disconnect(okConn);
-        QObject::disconnect(failConn);
+        // 요청 전송 실패 시 context 정리
+        context->deleteLater();
         qWarning() << "[backupRequest] failed to send compress request";
-
-        emit backupFailed(serialNumber,
-                          QStringLiteral("압축 요청 전송 실패"));
+        emit backupFailed(serialNumber, QStringLiteral("압축 요청 전송 실패"));
         return false;
     }
+
     return true;
 }
 
@@ -583,6 +575,8 @@ bool ControllerManager::applyRequest(const QString &serialNumber,
     ControllerInfo info = getController(serialNumber);
     if (info.serialNumber.isEmpty()) {
         qWarning() << "[ControllerManager][applyRequest] Controller not found:" << serialNumber;
+        QString msg = QString("[%1] not found").arg(info.serialNumber);
+        LogManager::append(msg);
         return false;
     }
 
@@ -590,6 +584,9 @@ bool ControllerManager::applyRequest(const QString &serialNumber,
     ApiClient *client = getApiClient(serialNumber);
     if (!client) {
         qWarning() << "[ControllerManager][applyRequest] ApiClient not found for:" << serialNumber;
+        QString msg = QString("[%1] ApiClient not found").arg(info.serialNumber);
+        LogManager::append(msg);
+
         return false;
     }
 
@@ -603,10 +600,49 @@ bool ControllerManager::applyRequest(const QString &serialNumber,
         return false;
     }
 
-    // 4) 서버에 압축 해제 요청
-    if (!client->postWorkspaceExtract(info.username, apiPassword)) {
-        qWarning() << "[ControllerManager][applyRequest] extract request failed for"
+    // 2) /api/workspace/extract 결과 비동기 감시
+    QObject *context = new QObject(this);
+
+    connect(
+            client,
+            &ApiClient::requestSucceeded,
+            context,
+            [this, serialNumber, context](const QString &endpoint, const QJsonObject &) {
+                if (endpoint != "/api/workspace/extract")
+                    return;
+
+                context->deleteLater();  // 자동으로 모든 연결 해제
+
+                qDebug() << "[applyRequest] extract completed for" << serialNumber;
+                emit applyCompleted(serialNumber);
+            },
+            Qt::QueuedConnection);
+
+    connect(
+            client,
+            &ApiClient::requestFailed,
+            context,  // ← context 추가
+            [this, serialNumber, context, info](
+                    const QString &endpoint, const QString &err, const QString &) {
+                if (endpoint != "/api/workspace/extract")
+                    return;
+
+                context->deleteLater();  // 자동으로 모든 연결 해제
+
+                QString msg =
+                        QString("[%1] extract request failed: %2").arg(info.serialNumber, err);
+                LogManager::append(msg);
+                qWarning() << "[applyRequest] extract failed:" << err;
+                emit applyFailed(serialNumber, QStringLiteral("압축 해제 요청 실패: ") + err);
+            },
+            Qt::QueuedConnection);
+
+    if (!client->postWorkspaceExtract(info.username, "0000")) {
+        context->deleteLater();
+        qWarning() << "[ControllerManager][applyRequest] extract request send failed for"
                    << serialNumber;
+
+        emit applyFailed(serialNumber, QStringLiteral("압축 해제 요청 전송 실패"));
         return false;
     }
 
@@ -621,13 +657,24 @@ bool ControllerManager::send(const QString     &serialNumber,
     ControllerInfo controller = getController(serialNumber);
     if (controller.serialNumber.isEmpty()) {
         qWarning() << "Controller not found:" << serialNumber;
+        QString msg = QString("[%1] is not found").arg(serialNumber);
+        LogManager::append(msg);
         return false;
     }
+
+    // 호스트와 포트 분리
+    QPair<QString, quint16> hostPort = parseHostPort(controller.ip, controller.sftpPort);
+    QString                 host     = hostPort.first;
+    quint16                 port     = hostPort.second;
+
+    qDebug() << "[send] Parsed host:" << host << "port:" << port;
 
     // 2. 임시 디렉토리에서 tgz 생성
     QTemporaryDir tempDir;
     if (!tempDir.isValid()) {
         qWarning() << "Cannot create temporary directory";
+        QString msg = QString("Failed to create temporary directory");
+        LogManager::append(msg);
         return false;
     }
 
@@ -636,24 +683,30 @@ bool ControllerManager::send(const QString     &serialNumber,
     qDebug() << "Creating tgz:" << tarGzPath;
     if (!FileCompressor::createTarGz(localPaths, tarGzPath)) {
         qWarning() << "Failed to create tgz";
+        QString msg = QString("Failed to create create tgz");
+        LogManager::append(msg);
         return false;
     }
 
     // 3. SFTP 연결 및 업로드
-    SFTPClient client(controller.ip, controller.sftpPort, controller.username, controller.pswd);
+    SFTPClient client(host, port, controller.username, controller.pswd);
 
     if (!client.connectToServer()) {
-        qWarning() << "SFTP connection failed:" << controller.ip;
+        qWarning() << "SFTP connection failed:" << host << ":" << port;
+        QString msg = QString("SFTP connection failed: [%1:%2]").arg(host).arg(port);
+        LogManager::append(msg);
         return false;
     }
 
-    QString remotePath = remoteDir + "/workspace.tgz";
+    QString remotePath = remoteDir + "/input.tgz";
     qDebug() << "Uploading to:" << remotePath;
 
     bool uploadSuccess = client.uploadFile(tarGzPath, remotePath);
     client.disconnect();
 
     if (!uploadSuccess) {
+        QString msg = QString("SFTP upload failed: [%1:%2]").arg(host).arg(port);
+        LogManager::append(msg);
         qWarning() << "Upload failed";
         return false;
     }
@@ -661,11 +714,10 @@ bool ControllerManager::send(const QString     &serialNumber,
     qDebug() << "Send completed successfully";
     return true;
 }
-
-bool ControllerManager::ControllerManager::receive(const QString &serialNumber,
-                                                   const QString &remoteTarGz,
-                                                   const QString &parentDir,
-                                                   const QString &targetDirName)
+bool ControllerManager::receive(const QString &serialNumber,
+                                const QString &remoteTarGz,
+                                const QString &parentDir,
+                                const QString &targetDirName)
 {
     // 1. 제어기 정보 가져오기
     ControllerInfo controller = getController(serialNumber);
@@ -674,16 +726,26 @@ bool ControllerManager::ControllerManager::receive(const QString &serialNumber,
         return false;
     }
 
+    // 호스트와 포트 분리
+    QPair<QString, quint16> hostPort = parseHostPort(controller.ip, controller.sftpPort);
+    QString                 host     = hostPort.first;
+    quint16                 port     = hostPort.second;
+
+    qDebug() << "[receive] Parsed host:" << host << "port:" << port;
+
     // 2. SFTP 연결 및 다운로드
-    SFTPClient client(controller.ip, controller.sftpPort, controller.username, controller.pswd);
+    SFTPClient client(host, port, controller.username, controller.pswd);
     if (!client.connectToServer()) {
-        qWarning() << "SFTP connection failed:" << controller.ip;
+        qWarning() << "SFTP connection failed:" << host << ":" << port;
+        QString msg = QString("SFTP connection failed: [%1:%2]").arg(host).arg(port);
+        LogManager::append(msg);
         return false;
     }
 
-    QTemporaryDir tempDir;  // 세션 임시폴더
+    QTemporaryDir tempDir;
     if (!tempDir.isValid()) {
         qWarning() << "Cannot create temporary directory";
+        LogManager::append("Failed to create temporary directory");
         client.disconnect();
         return false;
     }
@@ -695,34 +757,33 @@ bool ControllerManager::ControllerManager::receive(const QString &serialNumber,
     client.disconnect();
     if (!downloadSuccess) {
         qWarning() << "Download failed";
+        QString msg = QString("SFTP download failed: [%1:%2]").arg(host).arg(port);
+        LogManager::append(msg);
         return false;
     }
 
-    // 3. 임시 추출
+    // 3~5. 압축 해제 및 최종 경로 이동 (기존 코드 유지)
     const QString tempExtractRoot = tempDir.path() + "/extract";
     qDebug() << "Extracting to:" << tempExtractRoot;
     if (!FileCompressor::extractTarGz(localTarPath, tempExtractRoot)) {
         qWarning() << "Failed to extract tgz";
+        LogManager::append("Failed to extract tgz");
         return false;
     }
 
-    // 4. 압축 내부 최상위가 'workspace'인지 확인
     const QString srcWorkspace = QDir(tempExtractRoot).filePath("workspace");
     if (!QDir(srcWorkspace).exists()) {
         qWarning() << "Missing 'workspace' root in archive";
         return false;
     }
 
-    // 5. 최종 경로: C:\backup\<SN>\<SN>_YYYY-MM-DD_HHMMSS
     if (!QDir().mkpath(parentDir)) {
         qWarning() << "Cannot mkpath parentDir:" << parentDir;
         return false;
     }
     const QString finalPath = QDir(parentDir).filePath(targetDirName);
 
-    // 동일 드라이브면 rename이 가장 안전/빠름
     if (!QDir().rename(srcWorkspace, finalPath)) {
-        // rename 실패 시 간단 복사 fallback (최소 구현)
         auto copyDirRecursive = [](const QString &src, const QString &dst, auto &&self) -> bool {
             QDir s(src);
             if (!s.exists())
@@ -748,7 +809,6 @@ bool ControllerManager::ControllerManager::receive(const QString &serialNumber,
 
         if (!copyDirRecursive(srcWorkspace, finalPath, copyDirRecursive)) {
             qWarning() << "Failed to place extracted content to final dest:" << finalPath;
-            // 실패 시 최종 폴더 생성되지 않거나 내용 없음 → 빈 폴더 남지 않음
             return false;
         }
     }
@@ -779,7 +839,7 @@ bool ControllerManager::saveController(const ControllerInfo &controller)
     obj["ip"]           = controller.ip;
     obj["sftpPort"]     = controller.sftpPort;
     obj["username"]     = controller.username;
-    obj["pswd"]         = pm.encrypt(controller.pswd);
+    obj["pswd"]         = pm_->encrypt(controller.pswd);
     obj["wsPath"]       = controller.wsPath;
     obj["createdAt"]    = controller.birth;
     obj["lastModified"] = QDateTime::currentDateTime().toString(Qt::ISODate);
@@ -830,14 +890,13 @@ bool ControllerManager::loadController(const QString &serialNumber)
     }
 
     QJsonObject obj = doc.object();
-
     // 6. ControllerInfo 생성
     ControllerInfo c;
     c.serialNumber = obj["serialNumber"].toString();
     c.ip           = obj["ip"].toString();
     c.sftpPort     = obj["sftpPort"].toInt();
     c.username     = obj["username"].toString();
-    c.pswd         = pm.decrypt(obj["pswd"].toString());
+    c.pswd         = pm_->decrypt(obj["pswd"].toString());
     c.birth        = obj["createdAt"].toString();
     c.wsPath       = obj["wsPath"].toString();
     c.isConnected  = false;  // 시작 시 연결 안됨
@@ -954,4 +1013,56 @@ void ControllerManager::loadControllerList()
 
     qDebug() << "[loadControllerList] Loaded successfully:" << successCount
              << "Failed:" << failCount;
+}
+void ControllerManager::onMasterPasswordChanged()
+{
+    if (!pm_)
+        return;
+
+    QString msg = QString("Master Key is changed");
+    LogManager::append(msg);
+    pm_->loadPasswordFromConfig();
+
+    saveToFile();  // 모든 컨트롤러 정보 재저장
+}
+
+void ControllerManager::pauseStateUpdates()
+{
+    stateUpdatesPaused_ = true;
+    qDebug() << "[ControllerManager] State updates paused";
+}
+
+void ControllerManager::resumeStateUpdates()
+{
+    stateUpdatesPaused_ = false;
+    qDebug() << "[ControllerManager] State updates resumed";
+
+    // 즉시 한 번 업데이트
+    QTimer::singleShot(0, this, &ControllerManager::updateControllersStates);
+}
+QPair<QString, quint16> ControllerManager::parseHostPort(const QString &hostString,
+                                                         quint16        defaultPort)
+{
+    QString host = hostString.trimmed();
+
+    // 프로토콜 제거
+    if (host.startsWith("https://"))
+        host.remove(0, 8);
+    else if (host.startsWith("http://"))
+        host.remove(0, 7);
+
+    // 경로 제거
+    int slashIndex = host.indexOf('/');
+    if (slashIndex != -1) {
+        host = host.left(slashIndex);
+    }
+
+    // SFTP는 포트 parsing 하지 않음 (API와 분리)
+    // ip:port 입력이어도 ip만 추출
+    int colonIndex = host.indexOf(':');
+    if (colonIndex != -1) {
+        host = host.left(colonIndex);
+    }
+
+    return qMakePair(host, defaultPort);
 }

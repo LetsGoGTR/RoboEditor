@@ -17,7 +17,7 @@ ControllerSetting::ControllerSetting(QWidget *parent) :
     ui->sftpSpinBox->setValue(22);
     ui->sftpSpinBox->setRange(1, 65535);
 
-    ui->pswdBox->setEchoMode(QLineEdit::NoEcho);
+    ui->pswdBox->setEchoMode(QLineEdit::Password);
 }
 
 ControllerSetting::~ControllerSetting()
