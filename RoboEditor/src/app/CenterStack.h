@@ -30,7 +30,6 @@ class CenterStack : public QWidget
 
         // 페이지 전환
         void showCompare();
-        void showModify();
         void showModifyWithCompare();
         void openCompareResult(const QString &left, const QString &right);
         void startPolling(int intervalMs = 5000);
@@ -44,14 +43,17 @@ class CenterStack : public QWidget
         {
             return modifyPage_;
         }
-
+        ComparePage *comparePage() const
+        {
+            return comparePage_;
+        }
+        ComparePage *getComparePage() const
+        {
+            return comparePage_;
+        }
         // 경로 관련
         QString getWorkspacePath() const;
         void    setBackupPath(const QString &path);
-
-        // 설정 저장/복원
-        QByteArray saveSplitterState() const;
-        void       restoreSplitterState(const QByteArray &state);
 
       signals:
         // 메인윈도우가 받을 시그널
@@ -92,6 +94,7 @@ class CenterStack : public QWidget
         QFileSystemModel   *workspaceModel_;
 
         ModifyPage        *modifyPage_;
+        ComparePage       *comparePage_;
         ControllerManager *controllerManager_;
 
         // 경로

@@ -167,3 +167,44 @@ QSpinBox::up-arrow, QSpinBox::down-arrow {
     width: 16px;
     height: 10px;
 }
+#ComparePageRoot QLabel#pathLabel {
+    padding: 4px 8px;
+    background-color: #f0f0f0;;
+    border-bottom: 1px solid #d0d0d0;
+    font-size: 9pt;
+    color: #666;
+}
+
+#ComparePageRoot #topBar{
+    background-color: #e8eaff;
+    border-bottom: 1px solid #c0c8ff;
+}
+
+#ComparePageRoot QPushButton#fileBtn,
+#ComparePageRoot QPushButton#folderBtn {
+    background-color: #f0f0f0;
+    color: #000000;
+    border: 1px solid #b0b0b0;
+    border-radius: 3px;
+    padding: 4px 8px;
+    font-size: 9pt;
+}
+
+#ComparePageRoot QPushButton:hover {
+    background-color: #e0e0e0;
+    border: 1px solid #909090;
+}
+
+#ComparePageRoot QPushButton:pressed {
+    background-color: #d0d0d0;
+}
+
+QPushButton:checked {
+    background-color: #4a67d6;   /* 기본 파란색 */
+    color: white;
+    border: 1px solid #3a54b0;
+}
+
+QPushButton:checked:hover {
+    background-color: #5e7aed;
+}

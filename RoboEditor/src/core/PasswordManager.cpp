@@ -44,8 +44,10 @@ QString PasswordManager::hashPassword(const QString &pwd) const
 QString PasswordManager::getConfigFilePath() const
 {
     // 애플리케이션 데이터 저장 경로
+
     QString configPath = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
 
+    qDebug() << configPath;
     // 디렉토리가 없으면 생성
     QDir dir(configPath);
     if (!dir.exists()) {
@@ -92,7 +94,8 @@ void PasswordManager::loadPasswordFromConfig()
 void PasswordManager::savePasswordToConfig(const QString &hashedPwd)
 {
     QString configFile = getConfigFilePath();
-    QFile   file(configFile);
+
+    QFile file(configFile);
 
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
         qWarning() << "설정 파일에 쓸 수 없습니다:" << configFile;
@@ -164,48 +167,43 @@ void PasswordManager::changePassword()
     hashedPswd = hashPassword(newPwd);
     savePasswordToConfig(hashedPswd);
 
+    //신호 발생 : 제어기 config에 있는 비밀번호 업데이트
+    emit masterPasswordChanged();
+
     QMessageBox::information(this, tr("완료"), tr("비밀번호가 변경되었습니다."));
 }
-
+QByteArray PasswordManager::deriveKey() const
+{
+    // hashedPswd(64 hex) → raw 32 bytes
+    return QByteArray::fromHex(hashedPswd.toUtf8());
+}
 QString PasswordManager::encrypt(QString pswd)
 {
-    //제어기 시리얼 넘버에 저장하기, hased password : 마스터 비밀번호
+    QByteArray key = deriveKey();
+    if (key.isEmpty())
+        return QString();
 
-    std::string master = hashedPswd.toStdString();
+    QByteArray data = pswd.toUtf8();
+    QByteArray out  = data;
 
-    unsigned char key = 0;
-    for (auto i : master) {
-        key ^= i;
-    }
-    if (key == 0)
-        key = 1;
-
-    std::string encryptedPswd = pswd.toUtf8().toStdString();
-    for (int i = 0; i < pswd.size(); i++) {
-        encryptedPswd[i] ^= key;
-        encryptedPswd[i] = ((encryptedPswd[i] << 1) | ((encryptedPswd[i] & 0x40) >> 6)) & 0x7F;
+    for (int i = 0; i < data.size(); i++) {
+        out[i] = data[i] ^ key[i % key.size()];
     }
 
-    return QString::fromUtf8(encryptedPswd.c_str());
+    return QString(out.toBase64());
 }
-QString PasswordManager::decrypt(QString pswd)
+QString PasswordManager::decrypt(const QString &encrypted)
 {
-    std::string master = hashedPswd.toStdString();
+    QByteArray key = deriveKey();
+    if (key.isEmpty())
+        return QString();
 
-    unsigned char key = 0;
-    for (auto i : master) {
-        key ^= i;
-    }
-    if (key == 0)
-        key = 1;
+    QByteArray data = QByteArray::fromBase64(encrypted.toUtf8());
+    QByteArray out  = data;
 
-    // 제어기 비밀번호 해독
-
-    std::string decryptedPswd = pswd.toUtf8().toStdString();
-    for (int i = 0; i < decryptedPswd.size(); i++) {
-        decryptedPswd[i] = ((decryptedPswd[i] >> 1) | ((decryptedPswd[i] & 0x1) << 6));
-        decryptedPswd[i] ^= key;
+    for (int i = 0; i < data.size(); i++) {
+        out[i] = data[i] ^ key[i % key.size()];
     }
 
-    return QString::fromUtf8(decryptedPswd.c_str());
+    return QString::fromUtf8(out);
 }

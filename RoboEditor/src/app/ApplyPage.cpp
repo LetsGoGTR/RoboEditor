@@ -1,5 +1,7 @@
 #include "ApplyPage.h"
 
+#include <QTimer>
+
 #include <QDir>
 #include <QFile>
 #include <QFileDialog>
@@ -9,7 +11,9 @@
 
 #include "ConfirmSelection.h"
 #include "ControllerManager.h"
+#include "LogManager.h"
 #include "PasswordManager.h"
+#include "ProgressDialog.h"
 #include "ui_ApplyPage.h"
 #include "ui_ConfirmSelection.h"
 
@@ -41,6 +45,10 @@ ApplyPage::ApplyPage(QWidget *parent) :
                 ui->selectedDir->setText(selectedBackupDir);
                 qDebug() << "ApplyPage received:" << selectedBackupDir;
             });
+
+    ControllerManager *manager = ControllerManager::instance();
+    connect(manager, &ControllerManager::applyCompleted, this, &ApplyPage::onApplyCompleted);
+    connect(manager, &ControllerManager::applyFailed, this, &ApplyPage::onApplyFailed);
 }
 
 //refresh : 제어기 목록 새로고침
@@ -69,7 +77,6 @@ void ApplyPage::confirmSelection()
     }
 
     showPasswordUI();
-    qDebug() << "apply clicked";
 }
 
 //import : 다른 백업 스페이스 폴더 찾기
@@ -114,16 +121,15 @@ void ApplyPage::showPasswordUI()
                     Qt::SingleShotConnection);
 
             if (confirmDialog.exec() == QDialog::Accepted) {
-                qDebug() << "User confirmed";
             }
         } else {
             // 비밀번호 틀림
-
+            LogManager::append("Apply password not match");
             QMessageBox::warning(this, tr("오류"), tr("비밀번호가 올바르지 않습니다."));
         }
     } else {
         // 사용자가 취소함
-        qDebug() << "Password dialog cancelled";
+        LogManager::append("Password dialog cancelled");
     }
 }
 
@@ -139,6 +145,8 @@ void ApplyPage::startApplyQueue()
     QStringList        disconnectedControllers;
     QStringList        unknownControllers;
     QStringList        runningControllers;
+
+    manager->pauseStateUpdates();
 
     for (const QString &sn : selectedControllerList) {
         ControllerInfo info = manager->getController(sn);
@@ -163,6 +171,20 @@ void ApplyPage::startApplyQueue()
                              "오류",
                              QString("등록 정보가 없는 제어기가 선택되었습니다:\n%1")
                                      .arg(unknownControllers.join(", ")));
+
+        // 로그 추가
+        for (const QString &sn : unknownControllers) {
+            QString msg = QString("[%1] Apply canceled: Controller is NOT REGISTERED").arg(sn);
+            LogManager::append(msg);
+        }
+
+        // 전체 메시지
+        {
+            QString msg = QString("Apply aborted: Unknown controller(s) selected (%1)")
+                                  .arg(unknownControllers.join(", "));
+            LogManager::append(msg);
+        }
+
         return;
     }
 
@@ -171,6 +193,20 @@ void ApplyPage::startApplyQueue()
                              "오류",
                              QString("다음 제어기가 오프라인 상태입니다:\n%1")
                                      .arg(disconnectedControllers.join(", ")));
+
+        // 로그 추가
+        for (const QString &sn : disconnectedControllers) {
+            QString msg = QString("[%1] Apply canceled: Controller is OFFLINE").arg(sn);
+            LogManager::append(msg);
+        }
+
+        // 전체 메시지
+        {
+            QString msg = QString("Apply aborted: Offline controller(s) detected (%1)")
+                                  .arg(disconnectedControllers.join(", "));
+            LogManager::append(msg);
+        }
+
         return;
     }
 
@@ -179,6 +215,20 @@ void ApplyPage::startApplyQueue()
                              "오류",
                              QString("제어기가 동작중입니다. 전체 적용을 취소합니다:\n%1")
                                      .arg(runningControllers.join(", ")));
+
+        // 로그 추가
+        for (const auto &sn : runningControllers) {
+            QString msg = QString("[%1] Apply canceled: Controller is RUNNING").arg(sn);
+            LogManager::append(msg);
+        }
+
+        // 전체 적용 취소 로그
+        {
+            QString msg = QString("Apply aborted: %1 controller(s) running (%2)")
+                                  .arg(runningControllers.size())
+                                  .arg(runningControllers.join(", "));
+            LogManager::append(msg);
+        }
         return;
     }
 
@@ -187,21 +237,41 @@ void ApplyPage::startApplyQueue()
     totalApplyRequests_     = selectedControllerList.size();
     completedApplyRequests_ = 0;
     failedApplyRequests_    = 0;
+    applyInProgress_        = true;
+
+    // 진행 다이얼로그 새로 생성
+    if (applyProgressDialog_) {
+        applyProgressDialog_->close();
+        applyProgressDialog_->deleteLater();
+        applyProgressDialog_ = nullptr;
+    }
+
+    applyProgressDialog_ = new ProgressDialog(this);
+    applyProgressDialog_->setWindowTitle("적용 진행 중...");
+    applyProgressDialog_->setTotalCount(totalApplyRequests_);
+    applyProgressDialog_->setCurrentIndex(0);
+    applyProgressDialog_->setSerialNumber("-");
+    applyProgressDialog_->setProgress(0);
+    applyProgressDialog_->setFinishedMode(false);
+    applyProgressDialog_->show();
+
+    QApplication::processEvents();
+
+    connect(applyProgressDialog_, &ProgressDialog::cancelRequested, this, [this]() {
+        if (applyProgressDialog_) {
+            applyProgressDialog_->close();
+        }
+    });
 
     // Disable controls during apply
     if (ui->applyBtn)
         ui->applyBtn->setEnabled(false);
-    if (ui->refreshBtn)
-        ui->refreshBtn->setEnabled(false);
-    if (ui->importBtn)
-        ui->importBtn->setEnabled(false);
 
     for (const QString &sn : selectedControllerList) {
         applyQueue_.enqueue(sn);
     }
 
-    // 큐 처리 시작
-    processNextApply();
+    QTimer::singleShot(0, this, &ApplyPage::processNextApply);
 }
 
 // 큐 처리
@@ -210,6 +280,7 @@ void ApplyPage::processNextApply()
     // 큐가 비어있으면 완료 처리
     if (applyQueue_.isEmpty()) {
         qDebug() << "[ApplyPage] Apply queue finished.";
+
         onAllAppliesCompleted();
         return;
     }
@@ -218,21 +289,39 @@ void ApplyPage::processNextApply()
 
     qDebug() << "[ApplyPage] Applying to:" << serialNumber << "backup dir:" << selectedBackupDir;
 
+    if (applyProgressDialog_) {
+        applyProgressDialog_->setSerialNumber(serialNumber);
+    }
+
     bool ok = ControllerManager::instance()->applyRequest(
             serialNumber, selectedBackupDir, apiPassword_);
-    if (ok) {
-        onApplyCompleted(serialNumber);
-    } else {
-        onApplyFailed(serialNumber, tr("SFTP 적용 실패"));
+    if (!ok) {
+        QString msg = QString("[%1] Apply request could not be started").arg(serialNumber);
+        LogManager::append(msg);
+        onApplyFailed(serialNumber, tr("적용 요청을 시작하지 못했습니다."));
     }
 }
 
 // 개별 적용 성공
 void ApplyPage::onApplyCompleted(const QString &serialNumber)
 {
+    if (!applyInProgress_)
+        return;
+
     completedApplyRequests_++;
-    qDebug() << "[ApplyPage] Apply completed:" << serialNumber << "(" << completedApplyRequests_
-             << "/" << totalApplyRequests_ << ")";
+    QString msg = QString("Apply completed: %1 (%2/%3)")
+                          .arg(serialNumber)
+                          .arg(completedApplyRequests_)
+                          .arg(totalApplyRequests_);
+    LogManager::append(msg);
+
+    int doneCount = completedApplyRequests_ + failedApplyRequests_;
+
+    if (applyProgressDialog_ && totalApplyRequests_ > 0) {
+        applyProgressDialog_->setCurrentIndex(doneCount);
+        int percent = (doneCount * 100) / totalApplyRequests_;
+        applyProgressDialog_->setProgress(percent);
+    }
 
     // 다음 작업 처리
     processNextApply();
@@ -241,8 +330,24 @@ void ApplyPage::onApplyCompleted(const QString &serialNumber)
 // 개별 적용 실패
 void ApplyPage::onApplyFailed(const QString &serialNumber, const QString &error)
 {
+    if (!applyInProgress_)
+        return;
+
     failedApplyRequests_++;
     qWarning() << "[ApplyPage] Apply failed:" << serialNumber << error;
+    QString msg = QString("[Apply failed: %1 (%2/%3)")
+                          .arg(serialNumber)
+                          .arg(failedApplyRequests_)
+                          .arg(totalApplyRequests_);
+    LogManager::append(msg);
+
+    int doneCount = completedApplyRequests_ + failedApplyRequests_;
+
+    if (applyProgressDialog_ && totalApplyRequests_ > 0) {
+        applyProgressDialog_->setCurrentIndex(doneCount);
+        int percent = (doneCount * 100) / totalApplyRequests_;
+        applyProgressDialog_->setProgress(percent);
+    }
 
     // 다음 작업 처리
     processNextApply();
@@ -252,18 +357,23 @@ void ApplyPage::onApplyFailed(const QString &serialNumber, const QString &error)
 void ApplyPage::onAllAppliesCompleted()  //
 {
     qDebug() << "[ApplyPage] All applies processed.";
+    LogManager::append("All applies processed");
+    applyInProgress_ = false;
+    ControllerManager::instance()->resumeStateUpdates();
 
-    // BackupPage.cpp의 완료 로직을 참고하여 수정
-    QString message;
-    if (failedApplyRequests_ > 0) {
-        message = QString("적용 완료!\n성공: %1개, 실패: %2개")
-                          .arg(completedApplyRequests_)
-                          .arg(failedApplyRequests_);
-        QMessageBox::warning(this, "적용 완료", message);
-    } else {
-        message = QString("모든 제어기에 성공적으로 적용되었습니다!\n완료: %1개")
-                          .arg(completedApplyRequests_);
-        QMessageBox::information(this, "적용 완료", message);
+    if (applyProgressDialog_) {
+        applyProgressDialog_->setFinishedMode(true);
+
+        QString statusText;
+        if (failedApplyRequests_ > 0) {
+            statusText = QString("적용이 완료되었습니다.\n성공: %1대, 실패: %2대")
+                                 .arg(completedApplyRequests_)
+                                 .arg(failedApplyRequests_);
+        } else {
+            statusText = QString("적용이 완료되었습니다. (총 %1대, 모두 성공)")
+                                 .arg(completedApplyRequests_);
+        }
+        applyProgressDialog_->setStatusText(statusText);
     }
 
     // 창을 자동으로 닫지 않고 사용자가 계속 작업할 수 있도록 유지
@@ -273,10 +383,6 @@ void ApplyPage::onAllAppliesCompleted()  //
     // Re-enable controls after processing
     if (ui->applyBtn)
         ui->applyBtn->setEnabled(true);
-    if (ui->refreshBtn)
-        ui->refreshBtn->setEnabled(true);
-    if (ui->importBtn)
-        ui->importBtn->setEnabled(true);
 }
 
 ApplyPage::~ApplyPage()

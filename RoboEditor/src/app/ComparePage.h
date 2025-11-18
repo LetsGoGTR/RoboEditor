@@ -2,149 +2,88 @@
 #define COMPAREPAGE_H
 #pragma once
 
-#include <QList>
-#include <QPair>
 #include <QSplitter>
-#include <QString>
-#include <QStringList>
 #include <QWidget>
 
-// Core services 포함
-#include "./services/DiffService.h"
-#include "DiffHighlighter.h"
+#include "../core/FileTypeHelper.h"
+#include "CodeEditor.h"
+#include "DiffTablePanel.h"
 
-class QComboBox;
-class QPushButton;
-class QLabel;
-class QLineEdit;
-class QCheckBox;
-class QTableWidget;
-class QFileSystemModel;
-class QTreeView;
-class QTreeWidget;
-class QTreeWidgetItem;
 class QTabWidget;
-class DropTextEdit;
-class CodeEditor;
 
 class ComparePage : public QWidget
 {
     Q_OBJECT
       public:
         explicit ComparePage(QWidget *parent = nullptr);
-        ~ComparePage();  // 소멸자 추가 (임시 폴더 정리)
+        ~ComparePage();
 
-        void setTargetPath(const QString &path);      // 파일 선택 시 1회 호출
-        void setLeftEditor(CodeEditor * leftEditor);  // 좌측 편집기 설정
-        void clearHighlights();                       // 하이라이트 제거
+        void setTargetPath(const QString &path);
+        void setLeftEditor(CodeEditor * leftEditor);
+        void clearHighlights();
 
-        QWidget *buildDiffPanel();
-        struct DiffRow
-        {
-            int     line;             // 라인 번호 (YAML용, 호환성 유지)
-            int     leftLineNumber;   // 좌측(Compare) 파일의 라인 번호
-            int     rightLineNumber;  // 우측(Base) 파일의 라인 번호
-            QString key;
-            QString origin;
-            QString target;
-            QString state;  // "SAME", "CHANGED", "ADDED", "REMOVED"
-
-            DiffRow() : line(-1), leftLineNumber(-1), rightLineNumber(-1) {}
-        };
-
-        // 폴더 비교 관련
-        void performFolderDiff(const QString &leftPath, const QString &rightPath);
-
-        // 설정 저장/복원
-        QByteArray saveSplitterState() const;
-        void       restoreSplitterState(const QByteArray &state);
-
-      public slots:
-        void recalcDiff(const QString &leftText,
-                        const QString &leftPath = QString());  // 좌 텍스트 받아 재계산
+        void       performDiff(const QString &leftPath, const QString &rightPath);
+        void       performFolderDiff(const QString &leftPath, const QString &rightPath);
+        void       applyTheme(bool dark);
 
       signals:
-        // 메인/센터스택 쪽으로 전달할 로그용 이벤트
+        void closed();
+        void targetPathChanged(const QString &newPath);
+        void requestOpenFile(const QString &filePath);
         void uiCompareClicked(const QString &leftPath, const QString &rightPath);
-        void closed();                                   // [X] 클릭
-        void targetPathChanged(const QString &newPath);  // 비교 대상 파일 변경됨
+        void themeChangeRequested(bool dark);
+
+      public slots:
+        void recalcDiff(const QString &leftText, const QString &leftPath = QString());
 
       private slots:
-        void onCloseClicked();
+        void onFolderFileClicked(const QString &path);
+        void onDiffRowClicked(const DiffRow &row);  // 스크롤 동기화용 슬롯
 
       private:
-        QWidget    *dock_{nullptr};              // 헤더+[X]+rightSplit
-        QSplitter  *rightSplit_{nullptr};        // (좌) rightText_ | (우) diffPanel_
-        QTabWidget *compareTabWidget_{nullptr};  // 비교 파일들을 탭으로 관리
-        CodeEditor *rightText_{nullptr};  // 읽기 전용 (비교대상) - 현재 활성 탭 (라인 번호 포함)
-        CodeEditor   *leftText_{nullptr};   // 좌측 편집기 (ModifyPage의 현재 탭)
-        QWidget      *diffPanel_{nullptr};  // 기존 "테이블+상단 버튼" 위젯
-        QTableWidget *diffTable_      = nullptr; // 좌/우 폴더 트리 & 스플리터
-        QSplitter   *folderSplit_      = nullptr;
-        QTreeWidget *leftFolderTree_   = nullptr;
-        QTreeWidget *rightFolderTree_  = nullptr;
-        QLabel       *statLabel_      = nullptr;
-        QString       targetPath_;
-        QString       cachedLeftPath_;
-        QString       cachedLeftText_;
+        QWidget    *dock_{nullptr};
+        QSplitter  *rightSplit_{nullptr};
+        QTabWidget *compareTabWidget_{nullptr};
 
-        // DiffHighlighter 객체 (양쪽 편집기 공유)
-        core::DiffHighlighter *leftDiffHighlighter_{nullptr};   // 좌측 편집기용
-        core::DiffHighlighter *rightDiffHighlighter_{nullptr};  // 우측 편집기용
+        // 로직 처리를 위해 포인터는 유지하되, UI 구성시에는 컨테이너 안에 넣습니다.
+        DiffTablePanel *diffPanel_{nullptr};
 
-        // 폴더 비교 관련
-        bool        isFolderMode_{false};  // 파일 비교 vs 폴더 비교 모드
-        QStringList tempFolders_;  // 임시 폴더 목록 (압축 해제 시 생성, 정리용)
+        CodeEditor *rightText_{nullptr};
+        CodeEditor *leftText_{nullptr};
 
-        // 폴더 비교 시 마지막 좌/우 경로 저장 (루트 이름 계산용)
+        core::DiffHighlighter *leftDiffHighlighter_{nullptr};
+        core::DiffHighlighter *rightDiffHighlighter_{nullptr};
+
+        QString     targetPath_;
+        QString     cachedLeftPath_;
+        QString     cachedLeftText_;
+        QStringList tempFolders_;
+
         QString lastLeftFolderPath_;
         QString lastRightFolderPath_;
 
+        bool isDarkMode_ = false;
+
         QWidget *buildDock();
 
-        // 현재 필터 상태
-        QString        currentFilter_;  // "All", "Added", "Removed", "Changed"
-        QList<DiffRow> allDiffRows_;    // 필터링 전 전체 데이터
+        // 버튼 + 패널을 포함한 우측 영역 전체를 생성하는 함수
+        QWidget *buildRightPanel();
 
-        // 내부 유틸
-        void setDiffRows(const QList<DiffRow> &rows);
-        void refreshDiffTable(const QList<DiffRow> &rows);
-
-        // Diff 수행 (DiffService 사용)
-        void performDiff(const QString &leftPath, const QString &rightPath);
-
-        // DiffService 결과를 DiffRow로 변환
         QList<DiffRow> parseDiffResult(const Json::Value &result, const QString &fileType);
+        QString        extractArchiveToTemp(const QString &archivePath);
+        void           cleanupTempFolders();
+        QString        formatPathForCompare(const QString &fullPath) const;
 
-        // 테이블 컬럼 조정
-        void updateTableColumns(const QString &fileType,
-                                const QString &leftHeaderOverride  = QString(),
-                                const QString &rightHeaderOverride = QString());
-
-        // 필터 관련
-        void           applyFilter(const QString &filterType);
-        QList<DiffRow> filterRows(const QList<DiffRow> &rows, const QString &filterType) const;
-
-        void    displayFolderDiffResult(const Json::Value &result,
-                                        const QString     &leftRootPath,
-                                        const QString     &rightRootPath);
-        QString extractArchiveToTemp(const QString &archivePath);
-        void    cleanupTempFolders();
-        QColor  getColorForDiffState(const QString &state) const;
-
-        QString detectFileType(const QString &path) const;
-        bool    areFileTypesCompatible(const QString &leftType, const QString &rightType) const;
+        // 하이라이터 갱신 및 테이블 업데이트 통합 함수
+        void setDiffRows(const QList<DiffRow> &rows);
 
         struct ControllerPathInfo
         {
             QString serial;
             QString detail;
         };
-
         ControllerPathInfo      extractControllerInfo(const QString &path) const;
         QPair<QString, QString> determineColumnHeaders(const QString &leftPath,
                                                        const QString &rightPath) const;
-        QString                 formatPathForCompare(const QString &fullPath) const;
 };
-
 #endif  // COMPAREPAGE_H

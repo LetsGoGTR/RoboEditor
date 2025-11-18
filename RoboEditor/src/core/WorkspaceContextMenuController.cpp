@@ -1,32 +1,32 @@
 #include "WorkspaceContextMenuController.h"
 
 #include <QTreeView>
-#include <QFileSystemModel>
-#include <QFileInfo>
+
+#include <QDebug>
 #include <QDir>
-#include <QMenu>
-#include <QWidget>
+#include <QEvent>
+#include <QFile>
+#include <QFileInfo>
+#include <QFileSystemModel>
 #include <QHBoxLayout>
+#include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
+#include <QMenu>
 #include <QMessageBox>
-#include <QEvent>
-#include <QKeyEvent>
-#include <QDebug>
-#include <QFile>
+#include <QWidget>
 
 #include "services/FileService.h"
 #include "services/FolderService.h"
 
-WorkspaceContextMenuController::WorkspaceContextMenuController(
-        QTreeView *treeView,
-        QFileSystemModel *model,
-        const QString &workspaceRoot,
-        QObject *parent)
-    : QObject(parent)
-    , treeView_(treeView)
-    , model_(model)
-    , workspaceRoot_(workspaceRoot)
+WorkspaceContextMenuController::WorkspaceContextMenuController(QTreeView        *treeView,
+                                                               QFileSystemModel *model,
+                                                               const QString    &workspaceRoot,
+                                                               QObject          *parent) :
+    QObject(parent),
+    treeView_(treeView),
+    model_(model),
+    workspaceRoot_(workspaceRoot)
 {
     Q_ASSERT(treeView_);
     Q_ASSERT(model_);
@@ -35,8 +35,10 @@ WorkspaceContextMenuController::WorkspaceContextMenuController(
     // 1) 트리 우클릭 컨텍스트 메뉴 연결
     ///////////////////////////////////////
     treeView_->setContextMenuPolicy(Qt::CustomContextMenu);
-    connect(treeView_, &QTreeView::customContextMenuRequested,
-            this, &WorkspaceContextMenuController::onContextMenuRequested);
+    connect(treeView_,
+            &QTreeView::customContextMenuRequested,
+            this,
+            &WorkspaceContextMenuController::onContextMenuRequested);
 
     ///////////////////////////////////////
     // 2) 상단 입력바 생성 (파일/폴더 생성 + 이름 변경에 사용)
@@ -59,8 +61,10 @@ WorkspaceContextMenuController::WorkspaceContextMenuController(
     layout->addWidget(inputLabel_);
     layout->addWidget(nameEdit_);
 
-    connect(nameEdit_, &QLineEdit::returnPressed,
-            this, &WorkspaceContextMenuController::onInlineEditAccepted);
+    connect(nameEdit_,
+            &QLineEdit::returnPressed,
+            this,
+            &WorkspaceContextMenuController::onInlineEditAccepted);
 
     nameEdit_->installEventFilter(this);
     treeView_->installEventFilter(this);
@@ -84,8 +88,7 @@ bool WorkspaceContextMenuController::eventFilter(QObject *obj, QEvent *event)
             QRect g = treeView_->geometry();
             inputBar_->setGeometry(g.x(), g.y(), g.width(), inputBar_->height());
         }
-    }
-    else if (obj == nameEdit_ && event->type() == QEvent::KeyPress) {
+    } else if (obj == nameEdit_ && event->type() == QEvent::KeyPress) {
         auto *e = static_cast<QKeyEvent *>(event);
         if (e->key() == Qt::Key_Escape) {
             hideInlineEditor();
@@ -103,9 +106,9 @@ void WorkspaceContextMenuController::onContextMenuRequested(const QPoint &pos)
 {
     QModelIndex index = treeView_->indexAt(pos);
 
-    QString  targetPath;
+    QString   targetPath;
     QFileInfo info;
-    bool hasItem = index.isValid();
+    bool      hasItem = index.isValid();
 
     if (hasItem) {
         targetPath = model_->filePath(index);
@@ -121,7 +124,6 @@ void WorkspaceContextMenuController::onContextMenuRequested(const QPoint &pos)
     QMenu menu(treeView_);
 
     if (!hasItem || info.isDir()) {
-
         QAction *newFileAct = menu.addAction("새 파일 생성");
         QAction *newDirAct  = menu.addAction("새 디렉토리 생성");
         QAction *renameAct  = nullptr;
@@ -136,36 +138,32 @@ void WorkspaceContextMenuController::onContextMenuRequested(const QPoint &pos)
         }
 
         QAction *chosen = menu.exec(treeView_->viewport()->mapToGlobal(pos));
-        if (!chosen) return;
+        if (!chosen)
+            return;
 
         if (chosen == newFileAct) {
             onCreateFile(targetPath);
-        }
-        else if (chosen == newDirAct) {
+        } else if (chosen == newDirAct) {
             onCreateFolder(targetPath);
-        }
-        else if (renameAct && chosen == renameAct) {
+        } else if (renameAct && chosen == renameAct) {
             onRenamePath(targetPath);
-        }
-        else if (deleteAct && chosen == deleteAct) {
+        } else if (deleteAct && chosen == deleteAct) {
             onDeleteFolder(targetPath);
-        }
-        else if (dupAct && chosen == dupAct) {
+        } else if (dupAct && chosen == dupAct) {
             onDuplicateFolder(targetPath);
         }
-    }
-    else if (info.isFile()) {
+    } else if (info.isFile()) {
         QAction *renameAct = menu.addAction("이름 변경");
         QAction *deleteAct = menu.addAction("삭제");
         QAction *dupAct    = menu.addAction("복사");
 
         QAction *chosen = menu.exec(treeView_->viewport()->mapToGlobal(pos));
-        if (!chosen) return;
+        if (!chosen)
+            return;
 
         if (chosen == renameAct) {
             onRenamePath(targetPath);
-        }
-        else if (chosen == deleteAct) {
+        } else if (chosen == deleteAct) {
             onDeleteFile(targetPath);
         } else if (chosen == dupAct) {
             onDuplicateFile(targetPath);
@@ -177,11 +175,11 @@ void WorkspaceContextMenuController::onContextMenuRequested(const QPoint &pos)
 // 상단 입력바 제어
 // --------------------------------------------------
 
-void WorkspaceContextMenuController::showInlineEditor(PendingAction action,
+void WorkspaceContextMenuController::showInlineEditor(PendingAction  action,
                                                       const QString &target,
                                                       const QString &defaultText)
 {
-    pendingAction_   = action;
+    pendingAction_ = action;
 
     switch (action) {
     case PendingAction::CreateFile:
@@ -198,7 +196,7 @@ void WorkspaceContextMenuController::showInlineEditor(PendingAction action,
 
     case PendingAction::Rename:
         inputLabel_->setText("이름 변경:");
-        pendingOldPath_    = target;
+        pendingOldPath_ = target;
         pendingTargetDir_.clear();
         break;
 
@@ -217,7 +215,7 @@ void WorkspaceContextMenuController::showInlineEditor(PendingAction action,
 
 void WorkspaceContextMenuController::hideInlineEditor(bool clearText)
 {
-    pendingAction_   = PendingAction::None;
+    pendingAction_ = PendingAction::None;
     pendingOldPath_.clear();
     pendingTargetDir_.clear();
 
@@ -255,20 +253,18 @@ void WorkspaceContextMenuController::onRenamePath(const QString &oldPath)
 void WorkspaceContextMenuController::onDeleteFile(const QString &filePath)
 {
     QFileInfo info(filePath);
-    if (!info.isFile()) return;
+    if (!info.isFile())
+        return;
 
-    auto reply = QMessageBox::question(treeView_, "파일 삭제",
-                                       QString("'%1' 파일을 삭제할까요?")
-                                               .arg(info.fileName()));
+    auto reply = QMessageBox::question(
+            treeView_, "파일 삭제", QString("'%1' 파일을 삭제할까요?").arg(info.fileName()));
     if (reply != QMessageBox::Yes)
         return;
 
-    services::ServiceResult result =
-            services::FileService::deleteFile(filePath.toStdString());
+    services::ServiceResult result = services::FileService::deleteFile(filePath.toStdString());
 
     if (!result.success) {
-        QMessageBox::warning(treeView_, "삭제 실패",
-                             QString::fromStdString(result.errorMessage));
+        QMessageBox::warning(treeView_, "삭제 실패", QString::fromStdString(result.errorMessage));
         return;
     }
 
@@ -279,17 +275,18 @@ void WorkspaceContextMenuController::onDeleteFile(const QString &filePath)
 void WorkspaceContextMenuController::onDeleteFolder(const QString &folderPath)
 {
     QFileInfo info(folderPath);
-    if (!info.isDir()) return;
+    if (!info.isDir())
+        return;
 
     if (folderPath == workspaceRoot_) {
-        QMessageBox::warning(treeView_, "삭제 불가",
-                             "워크스페이스 루트는 삭제할 수 없습니다.");
+        QMessageBox::warning(treeView_, "삭제 불가", "워크스페이스 루트는 삭제할 수 없습니다.");
         return;
     }
 
-    auto reply = QMessageBox::question(treeView_, "폴더 삭제",
-                                       QString("'%1' 폴더 및 하위 항목이 모두 삭제됩니다.\n삭제할까요?")
-                                               .arg(info.fileName()));
+    auto reply = QMessageBox::question(
+            treeView_,
+            "폴더 삭제",
+            QString("'%1' 폴더 및 하위 항목이 모두 삭제됩니다.\n삭제할까요?").arg(info.fileName()));
 
     if (reply != QMessageBox::Yes)
         return;
@@ -298,8 +295,7 @@ void WorkspaceContextMenuController::onDeleteFolder(const QString &folderPath)
             services::FolderService::deleteFolder(folderPath.toStdString());
 
     if (!result.success) {
-        QMessageBox::warning(treeView_, "삭제 실패",
-                             QString::fromStdString(result.errorMessage));
+        QMessageBox::warning(treeView_, "삭제 실패", QString::fromStdString(result.errorMessage));
         return;
     }
 
@@ -329,10 +325,10 @@ void WorkspaceContextMenuController::onInlineEditAccepted()
             ok = false;
         } else {
             // 사용자가 입력한 원래 이름
-            QString originalName = text;
+            QString   originalName = text;
             QFileInfo fi(originalName);
-            QString baseName = fi.completeBaseName();   // "new_file"
-            QString suffix   = fi.suffix();             // "txt" (없으면 "")
+            QString   baseName = fi.completeBaseName();  // "new_file"
+            QString   suffix   = fi.suffix();            // "txt" (없으면 "")
 
             // 처음엔 사용자가 입력한 그대로를 시도
             QString uniqueName  = originalName;
@@ -359,8 +355,8 @@ void WorkspaceContextMenuController::onInlineEditAccepted()
                     services::FileService::createFile(newFilePath.toStdString(), "");
 
             if (!r.success) {
-                QMessageBox::warning(treeView_, "파일 생성 실패",
-                                     QString::fromStdString(r.errorMessage));
+                QMessageBox::warning(
+                        treeView_, "파일 생성 실패", QString::fromStdString(r.errorMessage));
                 ok = false;
             } else {
                 // 성공 시 워크스페이스 갱신
@@ -377,8 +373,8 @@ void WorkspaceContextMenuController::onInlineEditAccepted()
         if (!dir.exists()) {
             ok = false;
         } else {
-            QString baseName   = text;          // "NewFolder"
-            QString uniqueName = baseName;
+            QString baseName      = text;  // "NewFolder"
+            QString uniqueName    = baseName;
             QString newFolderPath = dir.filePath(uniqueName);
 
             int counter = 1;
@@ -392,8 +388,8 @@ void WorkspaceContextMenuController::onInlineEditAccepted()
                     services::FolderService::createFolder(newFolderPath.toStdString());
 
             if (!r.success) {
-                QMessageBox::warning(treeView_, "폴더 생성 실패",
-                                     QString::fromStdString(r.errorMessage));
+                QMessageBox::warning(
+                        treeView_, "폴더 생성 실패", QString::fromStdString(r.errorMessage));
                 ok = false;
             } else {
                 refreshWorkspace(pendingTargetDir_);
@@ -407,31 +403,26 @@ void WorkspaceContextMenuController::onInlineEditAccepted()
     // =============================
     else if (pendingAction_ == PendingAction::Rename) {
         QFileInfo info(pendingOldPath_);
-        QDir parentDir  = info.dir();
-        QString newPath = parentDir.filePath(text);
+        QDir      parentDir = info.dir();
+        QString   newPath   = parentDir.filePath(text);
 
         // 이미 존재하는 이름이면 에러 (원하면 여기에도 (1) 붙이는 로직 넣을 수 있음)
         if (QFileInfo::exists(newPath) && newPath != pendingOldPath_) {
-            QMessageBox::warning(treeView_,
-                                 "이름 변경 실패",
-                                 "이미 존재하는 이름입니다.");
+            QMessageBox::warning(treeView_, "이름 변경 실패", "이미 존재하는 이름입니다.");
             ok = false;
         } else {
             services::ServiceResult r;
             if (info.isDir()) {
-                r = services::FolderService::updateFolder(
-                        pendingOldPath_.toStdString(),
-                        newPath.toStdString());
+                r = services::FolderService::updateFolder(pendingOldPath_.toStdString(),
+                                                          newPath.toStdString());
             } else {
-                r = services::FileService::moveFile(
-                        pendingOldPath_.toStdString(),
-                        newPath.toStdString());
+                r = services::FileService::moveFile(pendingOldPath_.toStdString(),
+                                                    newPath.toStdString());
             }
 
             if (!r.success) {
-                QMessageBox::warning(treeView_,
-                                     "이름 변경 실패",
-                                     QString::fromStdString(r.errorMessage));
+                QMessageBox::warning(
+                        treeView_, "이름 변경 실패", QString::fromStdString(r.errorMessage));
                 ok = false;
             } else {
                 refreshWorkspace(parentDir.absolutePath());
@@ -450,8 +441,10 @@ void WorkspaceContextMenuController::refreshWorkspace(const QString &path)
 {
     Q_UNUSED(path);
 
-    if (!model_ || !treeView_) return;
-    if (workspaceRoot_.isEmpty()) return;
+    if (!model_ || !treeView_)
+        return;
+    if (workspaceRoot_.isEmpty())
+        return;
 
     QModelIndex rootIdx = model_->index(workspaceRoot_);
     if (rootIdx.isValid())
@@ -467,9 +460,9 @@ void WorkspaceContextMenuController::onDuplicateFile(const QString &filePath)
     QDir parentDir = info.dir();
 
     // 원래 이름과 확장자 분리
-    QString originalName = info.fileName();            // ex: "new_file.txt"
-    QString baseName     = info.completeBaseName();    // ex: "new_file"
-    QString suffix       = info.suffix();              // ex: "txt" (없으면 "")
+    QString originalName = info.fileName();          // ex: "new_file.txt"
+    QString baseName     = info.completeBaseName();  // ex: "new_file"
+    QString suffix       = info.suffix();            // ex: "txt" (없으면 "")
 
     // 첫 후보는 원래 이름 뒤에 "(1)" 붙이기
     auto makeName = [&](int c) {
@@ -494,12 +487,10 @@ void WorkspaceContextMenuController::onDuplicateFile(const QString &filePath)
     }
 
     // 원본 파일 읽기 (서비스 사용)
-    services::ServiceResult readRes =
-            services::FileService::readFile(filePath.toStdString());
+    services::ServiceResult readRes = services::FileService::readFile(filePath.toStdString());
     if (!readRes.success) {
-        QMessageBox::warning(treeView_,
-                             "파일 복사 실패",
-                             QString::fromStdString(readRes.errorMessage));
+        QMessageBox::warning(
+                treeView_, "파일 복사 실패", QString::fromStdString(readRes.errorMessage));
         return;
     }
 
@@ -513,9 +504,8 @@ void WorkspaceContextMenuController::onDuplicateFile(const QString &filePath)
             services::FileService::createFile(newPath.toStdString(), content);
 
     if (!createRes.success) {
-        QMessageBox::warning(treeView_,
-                             "파일 복사 실패",
-                             QString::fromStdString(createRes.errorMessage));
+        QMessageBox::warning(
+                treeView_, "파일 복사 실패", QString::fromStdString(createRes.errorMessage));
         return;
     }
 
@@ -529,9 +519,9 @@ void WorkspaceContextMenuController::onDuplicateFolder(const QString &folderPath
     if (!info.isDir())
         return;
 
-    QDir parentDir = info.dir();
-    QString baseName   = info.fileName();          // ex: "NewFolder"
-    QString uniqueName = baseName;
+    QDir    parentDir     = info.dir();
+    QString baseName      = info.fileName();  // ex: "NewFolder"
+    QString uniqueName    = baseName;
     QString newFolderPath = parentDir.filePath(uniqueName);
 
     // NewFolder, NewFolder(1), NewFolder(2) ... 형식으로 고유 이름 찾기
@@ -570,9 +560,7 @@ void WorkspaceContextMenuController::onDuplicateFolder(const QString &folderPath
     };
 
     if (!copyDirRecursively(folderPath, newFolderPath)) {
-        QMessageBox::warning(treeView_,
-                             "폴더 복사 실패",
-                             "폴더 복사 중 오류가 발생했습니다.");
+        QMessageBox::warning(treeView_, "폴더 복사 실패", "폴더 복사 중 오류가 발생했습니다.");
         return;
     }
 

@@ -13,12 +13,14 @@
 #include <QPainter>
 #include <QPixmap>
 #include <QStackedWidget>
+#include <QStyleHints>
 #include <QVBoxLayout>
 
 #include "ApplyPage.h"
 #include "BackupPage.h"
 #include "ComparePage.h"
 #include "ControllerManager.h"
+#include "LogManager.h"
 #include "ModifyPage.h"
 #include "WorkspaceContextMenuController.h"
 
@@ -86,12 +88,6 @@ void CenterStack::openCompareResult(const QString &left, const QString &right)
 void CenterStack::showCompare()
 {
     stack_->setCurrentIndex(idxC_);
-}
-
-void CenterStack::showModify()
-{
-    // modifyPage_는 항상 splitter에 표시되므로 별도 전환 불필요
-    // 필요 시 modifyPage_를 포커스하거나 다른 작업 수행 가능
 }
 
 void CenterStack::showModifyWithCompare()
@@ -193,9 +189,8 @@ void CenterStack::setupUI()
     workspaceMenuController_ = new WorkspaceContextMenuController(
             workspaceTree_,
             workspaceModel_,
-            workspaceModel_->rootPath(),   // 초기 root는 "C:/backup"
-            this
-    );
+            workspaceModel_->rootPath(),  // 초기 root는 "C:/backup"
+            this);
 
     // ===== 탭 추가 =====
     treeTabWidget_->addTab(tab1, "Controller");
@@ -330,20 +325,34 @@ void CenterStack::updateControllerList()
         QStandardItem *item = new QStandardItem(c.serialNumber);
         item->setEditable(false);
         item->setData(QString("C:/backup/%1").arg(c.serialNumber), Qt::UserRole + 1);
-        item->setToolTip(QString("IP: %1\nSFTP: %2\nAPI: %3\nUser: %4\nWorkspace: %5")
+        item->setToolTip(QString("IP: %1\nSFTP: %2\nUser: %3\nWorkspace: %4")
                                  .arg(c.ip)
                                  .arg(c.sftpPort)
-                                 .arg(c.username));
+                                 .arg(c.username)
+                                 .arg(c.wsPath));
+        bool isDark = (qApp->styleHints()->colorScheme() == Qt::ColorScheme::Dark);
 
-        QColor iconColor;
-        if (!c.isConnected) {
-            iconColor = Qt::gray;
-            item->setForeground(QBrush(Qt::gray));
+        if (!isDark) {
+            QColor iconColor;
+            if (!c.isConnected) {
+                iconColor = Qt::gray;
+                item->setForeground(QBrush(Qt::gray));
+            } else {
+                iconColor = c.isRunning ? Qt::red : Qt::green;
+                item->setForeground(QBrush(Qt::black));
+            }
+            item->setIcon(makeCircleIcon(iconColor, 10));
         } else {
-            iconColor = c.isRunning ? Qt::red : Qt::green;
-            item->setForeground(QBrush(Qt::black));
+            QColor iconColor;
+            if (!c.isConnected) {
+                iconColor = Qt::gray;
+                item->setForeground(QBrush(Qt::gray));
+            } else {
+                iconColor = c.isRunning ? Qt::red : Qt::green;
+                item->setForeground(QBrush(Qt::white));
+            }
+            item->setIcon(makeCircleIcon(iconColor, 10));
         }
-        item->setIcon(makeCircleIcon(iconColor, 10));
 
         controllerModel_->appendRow(item);
     }
@@ -421,7 +430,8 @@ void CenterStack::onRemoveController(const QString &serialNumber)
             QMessageBox::information(
                     this, "삭제 완료", QString("'%1'이(가) 삭제되었습니다.").arg(serialNumber));
 
-            qDebug() << "[CenterStack] Controller removed:" << serialNumber;
+            QString msg = QString("Controller removed: %1").arg(serialNumber);
+            LogManager::append(msg);
             break;
         }
     }
@@ -432,8 +442,6 @@ void CenterStack::startPolling(int intervalMs)
         qWarning() << "[CenterStack] Polling already started";
         return;
     }
-
-    qDebug() << "[CenterStack] Starting polling with interval:" << intervalMs << "ms";
 
     // 즉시 한 번 실행
     updateControllerList();
@@ -446,7 +454,6 @@ void CenterStack::stopPolling()
 {
     if (m_pollingTimer->isActive()) {
         m_pollingTimer->stop();
-        qDebug() << "[CenterStack] Polling stopped";
     }
 }
 
@@ -454,21 +461,6 @@ void CenterStack::onPollingTimeout()
 {
     qDebug() << "timeout";
     ControllerManager::instance()->updateControllersStates();
-}
-
-QByteArray CenterStack::saveSplitterState() const
-{
-    if (splitter_) {
-        return splitter_->saveState();
-    }
-    return QByteArray();
-}
-
-void CenterStack::restoreSplitterState(const QByteArray &state)
-{
-    if (splitter_ && !state.isEmpty()) {
-        splitter_->restoreState(state);
-    }
 }
 
 CenterStack::~CenterStack()

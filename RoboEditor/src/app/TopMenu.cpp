@@ -7,6 +7,10 @@
 #include <QMenu>
 #include <QMenuBar>
 
+#include "ControllerManager.h"
+#include "PasswordManager.h"
+#include "mainwindow.h"
+
 TopMenu::TopMenu(QMainWindow *mw) : QObject(mw), mw_(mw)
 {
     build();
@@ -53,16 +57,30 @@ void TopMenu::build()
     actToggle_ = new QAction("Toggle Log", this);
     actToggle_->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_L));
 
+    themeToggle_ = new QAction("Toggle Dark/Light", this);
+
     changePassword_ = new QAction("Change Password", this);
 
     sett_->addAction(changePassword_);
+    //sett_->addAction(themeToggle_);
     view_->addAction(actToggle_);
 
     connect(actToggle_, &QAction::triggered, actLogVisible_, &QAction::toggle);
     connect(changePassword_, &QAction::triggered, this, &TopMenu::onChangePasswordTriggered);
+
+    // MainWindow* mw = qobject_cast<MainWindow*>(parent());
+    // if (mw) {
+    //     connect(themeToggle_, &QAction::triggered, mw, &MainWindow::toggleTheme);
+    // }
 }
 void TopMenu::onChangePasswordTriggered()
 {
-    PasswordManager manager(mw_);  // 다이얼로그 객체 생성
-    manager.changePassword();      // ✅ 직접 changePassword() 호출
+    PasswordManager manager(mw_);
+
+    QObject::connect(&manager,
+                     &PasswordManager::masterPasswordChanged,
+                     ControllerManager::instance(),
+                     &ControllerManager::onMasterPasswordChanged);
+
+    manager.changePassword();
 }
