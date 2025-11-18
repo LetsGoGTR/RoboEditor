@@ -29,15 +29,15 @@ export async function handleDiffFiles(leftFile: FileNode, rightFile: FileNode) {
 
 		fileDiffStore.applyFileDiffContent(leftContent, rightContent);
 
-		const diffRes = await _diffFiles(leftFile.path, rightFile.path);
+		const apiRes = await _diffFiles(leftFile.path, rightFile.path);
 
-		if (!diffRes?.success) {
-			console.warn('[diff-files] diff API 실패:', diffRes);
+		if (!apiRes?.success) {
+			console.warn('[diff-files] diff API 실패:', apiRes);
 			return;
 		}
-		console.log(diffRes);
+		console.log(apiRes);
 
-		fileDiffStore.setApiDiffResult(diffRes);
+		fileDiffStore.setApiDiffResult(apiRes);
 	} catch (err) {
 		console.error('[diff-files] 오류 발생:', err);
 		alert('파일 비교 중 오류가 발생했습니다.');

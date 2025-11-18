@@ -8,11 +8,9 @@
 	import { currentFile } from '@/stores/currentFile';
 	import { gotoPage } from '@/stores/currentPage';
 	import { selectedDirectory } from '@/stores/selectedDirectory';
-	import { get } from 'svelte/store';
 
-	let tree = $derived(get(fileTree));
-
-	let activeId: 'left' | 'right' = $state('left');
+	let tree: TreeNode | null = null;
+	let activeId: 'left' | 'right' = 'left';
 
 	// 파일 클릭 시 store 저장 및 routing
 	function handleSelect(node: TreeNode) {

@@ -115,13 +115,10 @@ export interface BackupRoot extends FolderNode {
 /* ============================================================
  * 7. Diff 타입 — Monaco Diff 및 Drogon Diff API 기반
  * ============================================================ */
-export type DiffState = 'added' | 'removed' | 'changed';
+export type DiffState = 'added' | 'removed' | 'modified';
 export type DiffFilter = 'all' | DiffState;
 
 export interface FileDiffItem {
-	line: number;
-	path: string;
-
 	oldLineNumber: number;
 	oldLineCount: number;
 	oldValue: string | number | null;
@@ -130,7 +127,8 @@ export interface FileDiffItem {
 	newLineCount: number;
 	newValue: string | number | null;
 
-	state: DiffState;
+	path: string;
+	type: DiffState;
 }
 
 export interface FileDiffResult {
@@ -145,6 +143,25 @@ export interface FileDiffResult {
 		modified: number;
 		removed: number;
 		totalChanges: number;
-		fileType: string;
 	};
+}
+
+export interface ApiDiffResponse {
+	success: boolean;
+
+	data?: {
+		file1: string;
+		file2: string;
+
+		changes: FileDiffItem[];
+
+		statistics: {
+			added: number;
+			deleted: number;
+			modified: number;
+			totalChanges: number;
+		};
+	};
+
+	message?: string; // 실패 시 존재
 }
