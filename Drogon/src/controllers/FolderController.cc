@@ -11,11 +11,7 @@ using utils::config::getBaseDir;
 void api::v1::Folder::folderRead(const drogon::HttpRequestPtr                          &req,
                                  std::function<void(const drogon::HttpResponsePtr &)> &&callback)
 {
-    auto path = req->getParameter("path");
-
-    if (path.empty()) {
-        return sendError(callback, drogon::k400BadRequest, "Missing 'path' query parameter");
-    }
+    std::string path = req->getParameter("path");
 
     auto result = services::FolderService::readFolder(path);
 
@@ -31,11 +27,12 @@ void api::v1::Folder::folderRead(const drogon::HttpRequestPtr                   
 void api::v1::Folder::folderCreate(const drogon::HttpRequestPtr                          &req,
                                    std::function<void(const drogon::HttpResponsePtr &)> &&callback)
 {
-    auto path = req->getParameter("path");
-
-    if (path.empty()) {
-        return sendError(callback, drogon::k400BadRequest, "Missing 'path' query parameter");
+    auto json = req->getJsonObject();
+    if (!json || !json->isMember("path")) {
+        return sendError(callback, drogon::k400BadRequest, "Missing 'path' field in request body");
     }
+
+    std::string path = (*json)["path"].asString();
 
     auto result = services::FolderService::createFolder(path);
 
@@ -51,18 +48,14 @@ void api::v1::Folder::folderCreate(const drogon::HttpRequestPtr                 
 void api::v1::Folder::folderUpdate(const drogon::HttpRequestPtr                          &req,
                                    std::function<void(const drogon::HttpResponsePtr &)> &&callback)
 {
-    auto oldPath = req->getParameter("path");
-
-    if (oldPath.empty()) {
-        return sendError(callback, drogon::k400BadRequest, "Missing 'path' query parameter");
-    }
-
     auto json = req->getJsonObject();
-    if (!json || !json->isMember("newPath")) {
-        return sendError(
-                callback, drogon::k400BadRequest, "Missing 'newPath' field in request body");
+    if (!json || !json->isMember("path") || !json->isMember("newPath")) {
+        return sendError(callback,
+                         drogon::k400BadRequest,
+                         "Missing 'path' or 'newPath' field in request body");
     }
 
+    std::string oldPath = (*json)["path"].asString();
     std::string newPath = (*json)["newPath"].asString();
 
     auto result = services::FolderService::updateFolder(oldPath, newPath);
@@ -79,11 +72,12 @@ void api::v1::Folder::folderUpdate(const drogon::HttpRequestPtr                 
 void api::v1::Folder::folderDelete(const drogon::HttpRequestPtr                          &req,
                                    std::function<void(const drogon::HttpResponsePtr &)> &&callback)
 {
-    auto path = req->getParameter("path");
-
-    if (path.empty()) {
-        return sendError(callback, drogon::k400BadRequest, "Missing 'path' query parameter");
+    auto json = req->getJsonObject();
+    if (!json || !json->isMember("path")) {
+        return sendError(callback, drogon::k400BadRequest, "Missing 'path' field in request body");
     }
+
+    std::string path = (*json)["path"].asString();
 
     auto result = services::FolderService::deleteFolder(path);
 

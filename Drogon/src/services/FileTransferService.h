@@ -7,28 +7,45 @@
 #include "../utils/sftp/SFTPConfig.h"
 #include "ServiceResult.h"
 
+struct RemoteApiResult
+{
+    bool        success;
+    std::string errorMessage;       // Drogon 레벨 에러 메시지
+    std::string remoteMessage;      // 제어기 서버의 message 필드
+};
+
 class FileTransferService
 {
   public:
-    // 원격에서 백업 다운로드 (SFTP)
-    services::ServiceResult backupFromRemote(const SFTPConfig  &sftpConfig,
-                                             const std::string &user,
-                                             const std::string &remotePath,
-                                             const std::string &localPath,
-                                             const std::string &api = "");
+    // 원격에서 백업 다운로드 (output.tgz 고정)
+    services::ServiceResult backupFromRemote(const std::string &deviceId);
 
-    // 워크스페이스 복원 (HTTP 업로드)
-    services::ServiceResult applyWorkspace(const std::string &uploadedFilePath,
-                                           const std::string &user,
-                                           const std::string &password,
-                                           const std::string &sftpPassword,
-                                           const std::string &sftpHost,
-                                           int                sftpPort,
-                                           const std::string &api);
+    // 워크스페이스 적용 (input.tgz 고정)
+    services::ServiceResult applyWorkspace(const std::string &workspaceId,
+                                           const std::string &deviceId,
+                                           const std::string &password);
+
+    // 비밀번호 검증
+    static bool verifyPassword(const std::string &password);
+
+    // 비밀번호 변경
+    static services::ServiceResult changePassword(const std::string &oldPassword,
+                                                  const std::string &newPassword);
 
   private:
     // Workspace API 호출 메서드
-    std::pair<bool, std::string> extractWorkspace(const std::string &user,
-                                                   const std::string &password,
-                                                   const std::string &api);
+    RemoteApiResult compressWorkspace(const std::string &user, const std::string &api);
+    RemoteApiResult extractWorkspace(const std::string &user, const std::string &api);
+
+    // 비밀번호 파일 경로 가져오기
+    static std::string getPasswordFilePath();
+
+    // 비밀번호 해시 읽기
+    static std::string readPasswordHash();
+
+    // 비밀번호 해시 쓰기
+    static bool writePasswordHash(const std::string &hash);
+
+    // 초기 비밀번호 생성 (0000)
+    static void ensurePasswordFileExists();
 };

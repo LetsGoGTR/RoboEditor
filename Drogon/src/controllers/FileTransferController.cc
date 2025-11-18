@@ -12,128 +12,73 @@ using namespace drogon;
 
 void FT::apply(const HttpRequestPtr &req, std::function<void(const HttpResponsePtr &)> &&callback)
 {
-    // multipart/form-data로 파일 업로드 받기
-    drogon::MultiPartParser fileUpload;
-    if (fileUpload.parse(req) != 0) {
+    auto jsonBody = req->getJsonObject();
+    if (!jsonBody) {
         Json::Value error;
         error["success"] = false;
-        error["error"]   = "Invalid multipart/form-data";
+        error["message"] = "Invalid JSON";
         auto resp        = HttpResponse::newHttpJsonResponse(error);
         resp->setStatusCode(k400BadRequest);
         callback(resp);
         return;
     }
 
-    auto &files = fileUpload.getFiles();
-    if (files.empty()) {
+    // 필수 파라미터 검증
+    if (!jsonBody->isMember("workspaceId") || (*jsonBody)["workspaceId"].asString().empty()) {
         Json::Value error;
         error["success"] = false;
-        error["error"]   = "No file uploaded";
+        error["message"] = "Missing required field: workspaceId";
         auto resp        = HttpResponse::newHttpJsonResponse(error);
         resp->setStatusCode(k400BadRequest);
         callback(resp);
         return;
     }
 
-    // form-data에서 user와 password 파라미터 가져오기
-    auto &parameters = fileUpload.getParameters();
-
-    auto userIt = parameters.find("user");
-    if (userIt == parameters.end() || userIt->second.empty()) {
+    if (!jsonBody->isMember("deviceId") || (*jsonBody)["deviceId"].asString().empty()) {
         Json::Value error;
         error["success"] = false;
-        error["error"]   = "Missing required field: user";
+        error["message"] = "Missing required field: deviceId";
         auto resp        = HttpResponse::newHttpJsonResponse(error);
         resp->setStatusCode(k400BadRequest);
         callback(resp);
         return;
     }
 
-    auto passwordIt = parameters.find("password");
-    if (passwordIt == parameters.end() || passwordIt->second.empty()) {
+    if (!jsonBody->isMember("password") || (*jsonBody)["password"].asString().empty()) {
         Json::Value error;
         error["success"] = false;
-        error["error"]   = "Missing required field: password";
+        error["message"] = "Missing required field: password";
         auto resp        = HttpResponse::newHttpJsonResponse(error);
         resp->setStatusCode(k400BadRequest);
         callback(resp);
         return;
     }
 
-    auto sftpPasswordIt = parameters.find("sftpPassword");
-    if (sftpPasswordIt == parameters.end() || sftpPasswordIt->second.empty()) {
+    std::string workspaceId = (*jsonBody)["workspaceId"].asString();
+    std::string deviceId    = (*jsonBody)["deviceId"].asString();
+    std::string password    = (*jsonBody)["password"].asString();
+
+    // 비밀번호 검증
+    if (!FileTransferService::verifyPassword(password)) {
         Json::Value error;
         error["success"] = false;
-        error["error"]   = "Missing required field: sftpPassword";
+        error["message"] = "Invalid password";
         auto resp        = HttpResponse::newHttpJsonResponse(error);
-        resp->setStatusCode(k400BadRequest);
+        resp->setStatusCode(k401Unauthorized);
         callback(resp);
         return;
     }
 
-    auto sftpHostIt = parameters.find("sftpHost");
-    if (sftpHostIt == parameters.end() || sftpHostIt->second.empty()) {
-        Json::Value error;
-        error["success"] = false;
-        error["error"]   = "Missing required field: sftpHost";
-        auto resp        = HttpResponse::newHttpJsonResponse(error);
-        resp->setStatusCode(k400BadRequest);
-        callback(resp);
-        return;
-    }
-
-    auto sftpPortIt = parameters.find("sftpPort");
-    if (sftpPortIt == parameters.end() || sftpPortIt->second.empty()) {
-        Json::Value error;
-        error["success"] = false;
-        error["error"]   = "Missing required field: sftpPort";
-        auto resp        = HttpResponse::newHttpJsonResponse(error);
-        resp->setStatusCode(k400BadRequest);
-        callback(resp);
-        return;
-    }
-
-    auto apiIt = parameters.find("api");
-    if (apiIt == parameters.end() || apiIt->second.empty()) {
-        Json::Value error;
-        error["success"] = false;
-        error["error"]   = "Missing required field: api";
-        auto resp        = HttpResponse::newHttpJsonResponse(error);
-        resp->setStatusCode(k400BadRequest);
-        callback(resp);
-        return;
-    }
-
-    std::string user         = userIt->second;
-    std::string password     = passwordIt->second;
-    std::string sftpPassword = sftpPasswordIt->second;
-    std::string sftpHost     = sftpHostIt->second;
-    int         sftpPort     = std::stoi(sftpPortIt->second);
-    std::string api          = apiIt->second;
-
-    // 첫 번째 파일 가져오기
-    auto &file = files[0];
-
-    // 업로드된 파일을 임시 경로에 저장
-    std::string tmpPath = "/tmp/uploaded_workspace_" + std::to_string(std::time(nullptr)) + ".tgz";
-    file.saveAs(tmpPath);
-
-    auto task = [tmpPath, user, password, sftpPassword, sftpHost, sftpPort, api, callback]() {
+    auto task = [workspaceId, deviceId, password, callback]() {
         FileTransferService service;
-        auto                result = service.applyWorkspace(tmpPath, user, password, sftpPassword, sftpHost, sftpPort, api);
-
-        // 처리 후 임시 파일 삭제
-        try {
-            std::filesystem::remove(tmpPath);
-        } catch (...) {
-        }
+        auto                result = service.applyWorkspace(workspaceId, deviceId, password);
 
         Json::Value response;
         response["success"] = result.success;
         if (result.success) {
             response["data"] = result.data;
         } else {
-            response["error"] = result.errorMessage;
+            response["message"] = result.errorMessage;
         }
 
         auto resp = HttpResponse::newHttpJsonResponse(response);
@@ -150,7 +95,7 @@ void FT::backup(const HttpRequestPtr &req, std::function<void(const HttpResponse
     if (!jsonBody) {
         Json::Value error;
         error["success"] = false;
-        error["error"]   = "Invalid JSON";
+        error["message"] = "Invalid JSON";
         auto resp        = HttpResponse::newHttpJsonResponse(error);
         resp->setStatusCode(k400BadRequest);
         callback(resp);
@@ -158,95 +103,88 @@ void FT::backup(const HttpRequestPtr &req, std::function<void(const HttpResponse
     }
 
     // 필수 파라미터 검증
-    if (!jsonBody->isMember("sftpHost") || (*jsonBody)["sftpHost"].asString().empty()) {
+    if (!jsonBody->isMember("deviceId") || (*jsonBody)["deviceId"].asString().empty()) {
         Json::Value error;
         error["success"] = false;
-        error["error"]   = "Missing required field: sftpHost";
-        auto resp        = HttpResponse::newHttpJsonResponse(error);
-        resp->setStatusCode(k400BadRequest);
-        callback(resp);
-        return;
-    }
-    if (!jsonBody->isMember("sftpPassword")) {
-        Json::Value error;
-        error["success"] = false;
-        error["error"]   = "Missing required field: sftpPassword";
-        auto resp        = HttpResponse::newHttpJsonResponse(error);
-        resp->setStatusCode(k400BadRequest);
-        callback(resp);
-        return;
-    }
-    if (!jsonBody->isMember("user") || (*jsonBody)["user"].asString().empty()) {
-        Json::Value error;
-        error["success"] = false;
-        error["error"]   = "Missing required field: user";
-        auto resp        = HttpResponse::newHttpJsonResponse(error);
-        resp->setStatusCode(k400BadRequest);
-        callback(resp);
-        return;
-    }
-    if (!jsonBody->isMember("remotePath") || (*jsonBody)["remotePath"].asString().empty()) {
-        Json::Value error;
-        error["success"] = false;
-        error["error"]   = "Missing required field: remotePath";
+        error["message"] = "Missing required field: deviceId";
         auto resp        = HttpResponse::newHttpJsonResponse(error);
         resp->setStatusCode(k400BadRequest);
         callback(resp);
         return;
     }
 
-    // sftpPort 기본값 22
-    int sftpPort = 22;
-    if (jsonBody->isMember("sftpPort")) {
-        sftpPort = (*jsonBody)["sftpPort"].asInt();
-    }
+    std::string deviceId = (*jsonBody)["deviceId"].asString();
 
-    SFTPConfig config((*jsonBody)["sftpHost"].asString(),
-                      sftpPort,
-                      (*jsonBody)["user"].asString(),
-                      (*jsonBody)["sftpPassword"].asString());
-
-    std::string user       = (*jsonBody)["user"].asString();
-    std::string remotePath = (*jsonBody)["remotePath"].asString();
-    std::string api        = jsonBody->isMember("api") ? (*jsonBody)["api"].asString() : "";
-
-    // localPath는 선택적 파라미터
-    std::string localPath;
-    if (jsonBody->isMember("localPath") && !(*jsonBody)["localPath"].asString().empty()) {
-        localPath = (*jsonBody)["localPath"].asString();
-    }
-
-    auto task = [config, user, remotePath, localPath, api, callback]() {
+    auto task = [deviceId, callback]() {
         FileTransferService service;
-        auto                result = service.backupFromRemote(config, user, remotePath, localPath, api);
+        auto                result = service.backupFromRemote(deviceId);
+
+        Json::Value response;
+        response["success"] = result.success;
 
         if (!result.success) {
-            Json::Value error;
-            error["success"] = false;
-            error["error"]   = result.errorMessage;
-            auto resp        = HttpResponse::newHttpJsonResponse(error);
+            response["message"] = result.errorMessage;
+            auto resp = HttpResponse::newHttpJsonResponse(response);
             resp->setStatusCode(k500InternalServerError);
             callback(resp);
             return;
         }
 
-        // localPath가 지정되어 있으면 JSON 응답
-        if (!localPath.empty()) {
-            Json::Value response;
-            response["success"] = true;
-            response["data"]    = result.data;
-
-            auto resp = HttpResponse::newHttpJsonResponse(response);
-            resp->setStatusCode(k200OK);
-            callback(resp);
-        } else {
-            // localPath가 없으면 HTTP 다운로드
-            std::string downloadPath = result.data["downloadPath"].asString();
-            auto        resp = HttpResponse::newFileResponse(downloadPath, "", drogon::CT_APPLICATION_OCTET_STREAM);
-            resp->addHeader("Content-Disposition", "attachment; filename=\"workspace.tgz\"");
-            callback(resp);
-        }
+        response["data"] = result.data;
+        auto resp = HttpResponse::newHttpJsonResponse(response);
+        resp->setStatusCode(k200OK);
+        callback(resp);
     };
 
     std::thread(task).detach();
+}
+
+void FT::changePassword(const HttpRequestPtr                          &req,
+                        std::function<void(const HttpResponsePtr &)> &&callback)
+{
+    auto jsonBody = req->getJsonObject();
+    if (!jsonBody) {
+        Json::Value error;
+        error["success"] = false;
+        error["message"] = "Invalid JSON";
+        auto resp        = HttpResponse::newHttpJsonResponse(error);
+        resp->setStatusCode(k400BadRequest);
+        callback(resp);
+        return;
+    }
+
+    // 필수 파라미터 검증
+    if (!jsonBody->isMember("oldPassword") || (*jsonBody)["oldPassword"].asString().empty()) {
+        Json::Value error;
+        error["success"] = false;
+        error["message"] = "Missing required field: oldPassword";
+        auto resp        = HttpResponse::newHttpJsonResponse(error);
+        resp->setStatusCode(k400BadRequest);
+        callback(resp);
+        return;
+    }
+
+    if (!jsonBody->isMember("newPassword") || (*jsonBody)["newPassword"].asString().empty()) {
+        Json::Value error;
+        error["success"] = false;
+        error["message"] = "Missing required field: newPassword";
+        auto resp        = HttpResponse::newHttpJsonResponse(error);
+        resp->setStatusCode(k400BadRequest);
+        callback(resp);
+        return;
+    }
+
+    std::string oldPassword = (*jsonBody)["oldPassword"].asString();
+    std::string newPassword = (*jsonBody)["newPassword"].asString();
+
+    // 비밀번호 변경
+    auto result = FileTransferService::changePassword(oldPassword, newPassword);
+
+    Json::Value response;
+    response["success"] = result.success;
+    response["message"] = result.errorMessage;  // 성공/실패 모두 message 사용
+
+    auto resp = HttpResponse::newHttpJsonResponse(response);
+    resp->setStatusCode(result.success ? k200OK : k401Unauthorized);
+    callback(resp);
 }
