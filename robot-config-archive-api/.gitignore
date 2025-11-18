@@ -1,0 +1,44 @@
+# C/C++ Build Artifacts
+*.o
+*.a
+*.so
+*.so.*
+*.dylib
+*.out
+*.gch
+*.pch
+
+# Executables
+workspace-controller
+*.exe
+
+# CMake Build
+build/
+cmake-build-*/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+compile_commands.json
+*.cmake
+!CMakeLists.txt
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Runtime Data
+*.log
+*.tgz
+/home/*/tmp/password
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Backup Files
+*.bak
+*.orig
