@@ -257,10 +257,16 @@ target_link_libraries(RoboEditor PRIVATE
     ${OPENSSL_CRYPTO_LIBRARY}
     ${OPENSSL_SSL_LIBRARY}
     zlibstatic
-    ws2_32
-    crypt32
-    ssp
 )
+
+# 2. Windows일 때만 추가 라이브러리 링크
+if(WIN32)
+    target_link_libraries(RoboEditor PRIVATE
+        ws2_32
+        crypt32
+        ssp
+    )
+endif()
 
 if(${QT_VERSION} VERSION_LESS 6.1.0)
     set(BUNDLE_ID_OPTION MACOSX_BUNDLE_GUI_IDENTIFIER com.example.RoboEditor)
