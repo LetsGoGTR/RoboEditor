@@ -15,6 +15,7 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets LinguistTools)
 find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets LinguistTools)
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Network)
+<<<<<<< HEAD
 
 # pkg-config 제거 - Windows에서는 직접 경로 지정이 더 안정적
 
@@ -102,6 +103,8 @@ if(WIN32 AND NOT EXISTS "${LIBSSH2_LIBRARY}")
     )
 endif()
 
+=======
+>>>>>>> origin/master
 set(CMAKE_AUTOUIC_SEARCH_PATHS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ui
 )
@@ -138,6 +141,7 @@ set(PROJECT_SOURCES
         src/app/SelectController.h
         src/app/SelectStorage.h
 
+<<<<<<< HEAD
         src/core/ApiClient.cpp
         src/core/ApiClient.h
         src/core/ControllerManager.cpp
@@ -202,6 +206,8 @@ set(PROJECT_SOURCES
         src/core/utils/diff/DiffTree.cc
 
 
+=======
+>>>>>>> origin/master
         src/ui/mainwindow.ui
         src/ui/ApplyPage.ui
         src/ui/ConfirmSelection.ui
@@ -246,6 +252,7 @@ target_include_directories(RoboEditor PRIVATE
     ${LIBSSH2_INCLUDE_DIR}
 )
 
+<<<<<<< HEAD
 target_link_libraries(RoboEditor PRIVATE
     Qt${QT_VERSION_MAJOR}::Widgets
     Qt6::Network
@@ -266,6 +273,14 @@ if(WIN32)
         crypt32
         ssp
     )
+=======
+
+# Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
+# If you are developing for iOS or macOS you should consider setting an
+# explicit, fixed bundle identifier manually though.
+if(${QT_VERSION} VERSION_LESS 6.1.0)
+  set(BUNDLE_ID_OPTION MACOSX_BUNDLE_GUI_IDENTIFIER com.example.RoboEditor)
+>>>>>>> origin/master
 endif()
 
 if(${QT_VERSION} VERSION_LESS 6.1.0)
