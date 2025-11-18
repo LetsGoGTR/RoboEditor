@@ -2,8 +2,8 @@
 #define CONFIRMSELECTION_H
 #pragma once
 #include <QDialog>
-#include <QQueue>
 #include <QPair>
+#include <QQueue>
 
 namespace Ui
 {
@@ -30,7 +30,7 @@ class ConfirmSelection : public QDialog
 
       private:
         Ui::ConfirmSelection *ui;
-        ApplyPage            *applyPage = nullptr;  // ✅ 소문자로 시작 (카멜케이스)
+        ApplyPage            *applyPage = nullptr;
 };
 
 #endif

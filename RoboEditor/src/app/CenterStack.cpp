@@ -90,12 +90,6 @@ void CenterStack::showCompare()
     stack_->setCurrentIndex(idxC_);
 }
 
-void CenterStack::showModify()
-{
-    // modifyPage_는 항상 splitter에 표시되므로 별도 전환 불필요
-    // 필요 시 modifyPage_를 포커스하거나 다른 작업 수행 가능
-}
-
 void CenterStack::showModifyWithCompare()
 {
     // ModifyPage의 Compare 기능 활성화
