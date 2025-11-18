@@ -2,9 +2,14 @@
 
 #include <QTextBlock>
 
+#include <QDebug>
+#include <QFont>
 #include <QPaintEvent>
 #include <QPainter>
 #include <QResizeEvent>
+#include <QWheelEvent>
+
+#include "mainwindow.h"
 
 LineNumberArea::LineNumberArea(CodeEditor *e) : QWidget(e), editor_(e) {}
 QSize LineNumberArea::sizeHint() const
@@ -22,6 +27,10 @@ CodeEditor::CodeEditor(QWidget *parent) :
 {
     // CodeEditor는 편집 가능해야 함 (DropTextEdit는 기본 readOnly)
     setReadOnly(false);
+    isDarkMode_ = MainWindow::dark;
+
+    font_.setPointSize(10);
+    setFont(font_);
 
     connect(this, &QPlainTextEdit::blockCountChanged, this, &CodeEditor::updateLineNumberAreaWidth);
     connect(this, &QPlainTextEdit::updateRequest, this, &CodeEditor::updateLineNumberArea);
@@ -30,7 +39,23 @@ CodeEditor::CodeEditor(QWidget *parent) :
     updateLineNumberAreaWidth(0);
     highlightCurrentLine();
 }
+void CodeEditor::applyTheme(bool isDark)
+{
+    isDarkMode_ = isDark;
 
+    // DiffHighlighter 색상 업데이트
+    if (diffHighlighter_) {
+        diffHighlighter_->updateColorsForTheme(isDark);
+    }
+
+    // 라인 번호 영역 다시 그리기
+    if (lineNumberArea_) {
+        lineNumberArea_->update();
+    }
+
+    // 현재 라인 하이라이트 다시 그리기
+    updateAllHighlights();
+}
 int CodeEditor::lineNumberAreaWidth() const
 {
     int digits = 1, max = qMax(1, blockCount());
@@ -66,15 +91,30 @@ void CodeEditor::resizeEvent(QResizeEvent *ev)
 void CodeEditor::lineNumberAreaPaintEvent(QPaintEvent *ev)
 {
     QPainter p(lineNumberArea_);
-    // 팔레트 브러시는 QBrush라 darker가 없으니 color()로 꺼내세요
-    p.fillRect(ev->rect(), palette().base().color().darker(105));
+
+    QColor bgColor;
+    QColor textColor;
+
+    if (isDarkMode_) {
+        // 다크 모드: 약간 더 어두운 배경
+        bgColor   = palette().base().color().lighter(110);
+        textColor = QColor("#858585");  // 회색 텍스트
+    } else {
+        // 라이트 모드: 약간 더 어두운 배경
+        bgColor   = palette().base().color().darker(105);
+        textColor = palette().mid().color();
+    }
+
+    p.fillRect(ev->rect(), bgColor);
+
     QTextBlock blk    = firstVisibleBlock();
     int        bn     = blk.blockNumber();
     qreal      top    = blockBoundingGeometry(blk).translated(contentOffset()).top();
     qreal      bottom = top + blockBoundingRect(blk).height();
+
     while (blk.isValid() && top <= ev->rect().bottom()) {
         if (blk.isVisible() && bottom >= ev->rect().top()) {
-            p.setPen(palette().mid().color());
+            p.setPen(textColor);
             p.drawText(0,
                        int(top),
                        lineNumberArea_->width() - 4,
@@ -91,14 +131,136 @@ void CodeEditor::lineNumberAreaPaintEvent(QPaintEvent *ev)
 
 void CodeEditor::highlightCurrentLine()
 {
-    if (isReadOnly())
-        return;
+    updateAllHighlights();
+}
+
+void CodeEditor::updateAllHighlights()
+{
     QList<QTextEdit::ExtraSelection> extra;
-    QTextEdit::ExtraSelection        sel;
-    sel.format.setBackground(palette().alternateBase());
-    sel.format.setProperty(QTextFormat::FullWidthSelection, true);
-    sel.cursor = textCursor();
-    sel.cursor.clearSelection();
-    extra.append(sel);
+
+    // 1. Diff 하이라이트 추가 (DiffHighlighter 사용)
+    if (diffHighlighter_) {
+        QMap<int, QString> lineStates = diffHighlighter_->getLineStates();
+
+        if (!lineStates.isEmpty()) {
+            QTextBlock block      = document()->firstBlock();
+            int        lineNumber = 1;
+
+            while (block.isValid()) {
+                if (lineStates.contains(lineNumber)) {
+                    QString state = lineStates[lineNumber];
+                    QColor  color = diffHighlighter_->getColorForState(state);
+
+                    if (color.isValid()) {
+                        QTextEdit::ExtraSelection sel;
+                        sel.format.setProperty(QTextFormat::FullWidthSelection, true);
+                        sel.format.setBackground(color);
+
+                        sel.cursor = QTextCursor(block);
+                        sel.cursor.clearSelection();
+                        extra.append(sel);
+                    }
+                }
+
+                block = block.next();
+                lineNumber++;
+            }
+        }
+    }
+
+    // 2. 현재 커서 라인 하이라이트 (읽기 전용이 아닐 때만)
+    if (!isReadOnly()) {
+        QTextEdit::ExtraSelection sel;
+
+        QColor currentLineColor;
+        if (isDarkMode_) {
+            currentLineColor = QColor(45, 45, 48);  // 어두운 회색
+        } else {
+            currentLineColor = palette().alternateBase().color();
+        }
+
+        sel.format.setBackground(currentLineColor);
+        sel.format.setProperty(QTextFormat::FullWidthSelection, true);
+        sel.cursor = textCursor();
+        sel.cursor.clearSelection();
+        extra.append(sel);
+    }
+
     setExtraSelections(extra);
+}
+
+void CodeEditor::setDiffHighlighter(core::DiffHighlighter *highlighter)
+{
+    // 기존 연결 해제
+    if (diffHighlighter_) {
+        disconnect(diffHighlighter_,
+                   &core::DiffHighlighter::highlightChanged,
+                   this,
+                   &CodeEditor::updateAllHighlights);
+    }
+
+    diffHighlighter_ = highlighter;
+
+    // 새 연결 설정
+    if (diffHighlighter_) {
+        connect(diffHighlighter_,
+                &core::DiffHighlighter::highlightChanged,
+                this,
+                &CodeEditor::updateAllHighlights);
+
+        diffHighlighter_->updateColorsForTheme(isDarkMode_);
+    }
+
+    updateAllHighlights();
+}
+core::DiffHighlighter *CodeEditor::getDiffHighlighter() const
+{
+    return diffHighlighter_;
+}
+
+void CodeEditor::clearDiffHighlights()
+{
+    if (diffHighlighter_) {
+        diffHighlighter_->clearLineStates();
+    } else {
+        updateAllHighlights();
+    }
+}
+
+void CodeEditor::scrollToLine(int lineNumber)
+{
+    if (lineNumber < 1)
+        return;
+
+    QTextBlock block = document()->findBlockByLineNumber(lineNumber - 1);
+    if (block.isValid()) {
+        QTextCursor cursor(block);
+        setTextCursor(cursor);
+        centerCursor();
+    }
+}
+void CodeEditor::wheelEvent(QWheelEvent *ev)
+{
+    if (ev->modifiers() & Qt::ControlModifier) {
+        int delta    = ev->angleDelta().y();
+        int numSteps = delta / 120;
+
+        if (numSteps != 0) {  // 실제 변경이 있을 때만
+
+            int newSize = qBound(6, font_.pointSize() + numSteps, 40);
+
+            if (font_.pointSize() != newSize) {  // 크기가 실제로 바뀔 때만
+
+                font_.setPointSize(newSize);
+
+                setFont(font_);
+                lineNumberArea_->setFont(font_);
+                updateLineNumberAreaWidth(0);
+            }
+        }
+
+        ev->accept();
+    } else {
+        QPlainTextEdit::wheelEvent(ev);
+    }
 }

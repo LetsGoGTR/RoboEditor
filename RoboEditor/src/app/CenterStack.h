@@ -1,7 +1,8 @@
 #ifndef CENTERSTACK_H
 #define CENTERSTACK_H
-
+#pragma once
 #include <QTabWidget>
+#include <QTimer>
 #include <QTreeView>
 
 #include <QFileSystemModel>
@@ -11,13 +12,14 @@
 #include <QStandardItemModel>
 #include <QWidget>
 
+#include "ControllerManager.h"
+
 // Forward declarations
 class QMainWindow;
 class ComparePage;
 class BackupPage;
-class OpenFilePage;
 class ModifyPage;
-
+class WorkspaceContextMenuController;
 class CenterStack : public QWidget
 {
     Q_OBJECT
@@ -28,21 +30,27 @@ class CenterStack : public QWidget
 
         // 페이지 전환
         void showCompare();
-        void showOpenFile();
-        void showModify();
         void showModifyWithCompare();
         void openCompareResult(const QString &left, const QString &right);
-
+        void startPolling(int intervalMs = 5000);
+        void stopPolling();
         // 페이지 접근자
         ModifyPage *modifyPage() const
         {
-            return mfp_;
+            return modifyPage_;
         }
         ModifyPage *getModifyPage() const
         {
-            return mfp_;
+            return modifyPage_;
         }
-
+        ComparePage *comparePage() const
+        {
+            return comparePage_;
+        }
+        ComparePage *getComparePage() const
+        {
+            return comparePage_;
+        }
         // 경로 관련
         QString getWorkspacePath() const;
         void    setBackupPath(const QString &path);
@@ -50,13 +58,13 @@ class CenterStack : public QWidget
       signals:
         // 메인윈도우가 받을 시그널
         void compareRequested(const QString &left, const QString &right);
-        void openFileRequested(const QString &target);
         void modifyRequested(const QString &target);
         void workspaceSelected(const QString &path);
         void fileOpened(const QString &filePath);
 
       public slots:
         void updateControllerList();
+        void onPollingTimeout();
 
       private slots:
         void onControllerTreeClicked(const QModelIndex &index);
@@ -68,10 +76,8 @@ class CenterStack : public QWidget
 
         // 첫 번째 구조 (Compare/OpenFile/Modify 페이지용)
         QStackedWidget *stack_;
-        int             idxC_, idxO_, idxM_;
+        int             idxC_;
         ComparePage    *cmp_;
-        OpenFilePage   *ofp_;
-        ModifyPage     *mfp_;
 
         // 두 번째 구조 (Controller/Workspace 트리용)
         QStackedWidget *internalStack_;
@@ -87,12 +93,18 @@ class CenterStack : public QWidget
         QFileSystemModel   *backupModel_;
         QFileSystemModel   *workspaceModel_;
 
-        // 추가 ModifyPage (중복 제거 필요 시 위의 mfp_와 통합)
-        ModifyPage *modifyPage_;
+        ModifyPage        *modifyPage_;
+        ComparePage       *comparePage_;
+        ControllerManager *controllerManager_;
 
         // 경로
         QString workspacePath_;
         QString backupRootPath_;
+
+        WorkspaceContextMenuController *workspaceMenuController_ = nullptr;
+
+        //타이머
+        QTimer *m_pollingTimer;
 };
 
 #endif  // CENTERSTACK_H

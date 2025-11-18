@@ -13,14 +13,16 @@
 #include <QPainter>
 #include <QPixmap>
 #include <QStackedWidget>
+#include <QStyleHints>
 #include <QVBoxLayout>
 
 #include "ApplyPage.h"
 #include "BackupPage.h"
 #include "ComparePage.h"
 #include "ControllerManager.h"
+#include "LogManager.h"
 #include "ModifyPage.h"
-#include "OpenFilePage.h"
+#include "WorkspaceContextMenuController.h"
 
 static QIcon makeCircleIcon(const QColor &color, int size = 12)
 {
@@ -37,6 +39,7 @@ static QIcon makeCircleIcon(const QColor &color, int size = 12)
 
 CenterStack::CenterStack(QWidget *parent) :
     QWidget(parent),
+    m_pollingTimer(new QTimer(this)),
     splitter_(nullptr),
     treeTabWidget_(nullptr),
     controllerList_(nullptr),
@@ -49,12 +52,8 @@ CenterStack::CenterStack(QWidget *parent) :
 {
     stack_ = new QStackedWidget;
     cmp_   = new ComparePage;
-    ofp_   = new OpenFilePage;
-    mfp_   = new ModifyPage;
 
     idxC_ = stack_->addWidget(cmp_);
-    idxO_ = stack_->addWidget(ofp_);
-    idxM_ = stack_->addWidget(mfp_);
 
     // auto *layout = new QVBoxLayout(this);
     // layout->addWidget(stack_);
@@ -64,10 +63,16 @@ CenterStack::CenterStack(QWidget *parent) :
         emit compareRequested(L, R);
         openCompareResult(L, R);
     });
-    connect(ofp_, &OpenFilePage::uiOpenFileClicked, this, &CenterStack::openFileRequested);
-    connect(mfp_, &ModifyPage::uiModifyClicked, this, &CenterStack::modifyRequested);
+
+    connect(m_pollingTimer, &QTimer::timeout, this, &CenterStack::onPollingTimeout);
+
+    connect(ControllerManager::instance(),
+            &ControllerManager::controllerStateUpdated,
+            this,
+            &CenterStack::updateControllerList);
 
     setupUI();
+    startPolling(5000);
 }
 
 void CenterStack::openCompareResult(const QString &left, const QString &right)
@@ -85,21 +90,8 @@ void CenterStack::showCompare()
     stack_->setCurrentIndex(idxC_);
 }
 
-void CenterStack::showOpenFile()
-{
-    stack_->setCurrentIndex(idxO_);
-}
-
-void CenterStack::showModify()
-{
-    stack_->setCurrentIndex(idxM_);
-}
-
 void CenterStack::showModifyWithCompare()
 {
-    // ModifyPage로 전환
-    stack_->setCurrentIndex(idxM_);
-
     // ModifyPage의 Compare 기능 활성화
     if (modifyPage_) {
         modifyPage_->showCompare();
@@ -152,6 +144,7 @@ void CenterStack::setupUI()
 
     backupTree_ = new QTreeView;
     backupTree_->setModel(backupModel_);
+    backupTree_->header()->hide();
     backupTree_->setColumnHidden(1, true);
     backupTree_->setColumnHidden(2, true);
     backupTree_->setColumnHidden(3, true);
@@ -177,12 +170,14 @@ void CenterStack::setupUI()
 
     workspaceTree_ = new QTreeView;
     workspaceTree_->setModel(workspaceModel_);
+    workspaceTree_->header()->hide();
     workspaceTree_->setColumnHidden(1, true);
     workspaceTree_->setColumnHidden(2, true);
     workspaceTree_->setColumnHidden(3, true);
     workspaceTree_->setDragEnabled(true);
     workspaceTree_->setAcceptDrops(true);
     workspaceTree_->setDropIndicatorShown(true);
+    backupTree_->setExpandsOnDoubleClick(false);
     workspaceTree_->setDragDropMode(QAbstractItemView::DragDrop);
     workspaceTree_->setDefaultDropAction(Qt::MoveAction);
     workspaceTree_->setSelectionMode(QAbstractItemView::SingleSelection);
@@ -190,6 +185,12 @@ void CenterStack::setupUI()
 
     tab2Layout->addWidget(workspaceTree_);
     tab2->setLayout(tab2Layout);
+
+    workspaceMenuController_ = new WorkspaceContextMenuController(
+            workspaceTree_,
+            workspaceModel_,
+            workspaceModel_->rootPath(),  // 초기 root는 "C:/backup"
+            this);
 
     // ===== 탭 추가 =====
     treeTabWidget_->addTab(tab1, "Controller");
@@ -259,20 +260,31 @@ void CenterStack::setupUI()
         workspaceTree_->setRootIndex(workspaceModel_->index(workspacePath_));
         treeTabWidget_->setCurrentIndex(1);
 
+        if (workspaceMenuController_) {
+            workspaceMenuController_->setWorkspaceRoot(workspacePath_);
+        }
+
         emit workspaceSelected(workspacePath_);
         qDebug() << "Backup selected, switching to workspace:" << workspacePath_;
     });
 
     // [4] WorkspaceTree 더블클릭 → ModifyPage 열기
-    connect(workspaceTree_, &QTreeView::doubleClicked, this, [=](const QModelIndex &index) {
+    connect(workspaceTree_, &QTreeView::clicked, this, [=](const QModelIndex &index) {
         QString   path = workspaceModel_->filePath(index);
         QFileInfo info(path);
 
-        if (info.isFile()) {
+        if (info.isDir()) {
+            bool expanded = workspaceTree_->isExpanded(index);
+            workspaceTree_->setExpanded(index, !expanded);  // 한 번 클릭으로 토글
+        } else if (info.isFile()) {
             modifyPage_->openDocument(path);
             qDebug() << "Opened file in ModifyPage:" << path;
         }
     });
+
+    // [4-1] ModifyPage 시그널 연결
+    connect(modifyPage_, &ModifyPage::uiModifyClicked, this, &CenterStack::modifyRequested);
+
     // [5] 제어기 등록 -> 제어기 리스트 업데이트
     connect(ControllerManager::instance(),
             &ControllerManager::controllerListChanged,
@@ -281,6 +293,7 @@ void CenterStack::setupUI()
 
     // [6] refresh버튼 클릭 -> 제어기 리스트 업데이트
     connect(refreshButton, &QToolButton::clicked, this, [=]() {
+        ControllerManager::instance()->updateControllersStates();
         this->updateControllerList();
         qDebug() << "[CenterStack] Controller list refreshed.";
     });
@@ -296,7 +309,7 @@ void CenterStack::updateControllerList()
     // 1. ControllerManager의 싱글톤 인스턴스 가져오기
     ControllerManager *manager = ControllerManager::instance();
 
-    // 2. controllers_ 리스트 가져오기 (thread-safe 스냅샷)
+    // 2. controllers_ 리스트 가져오기
     QList<ControllerInfo> controllers = manager->getControllers();
 
     // 3. 리스트가 비어있는 경우
@@ -307,35 +320,39 @@ void CenterStack::updateControllerList()
         return;
     }
 
-    // 4. 제어기별 항목 추가
+    // 4. 제어기 상태 표시
     for (const auto &c : controllers) {
         QStandardItem *item = new QStandardItem(c.serialNumber);
-
-        // 상태 색상 결정
-        QColor color;
-        if (!c.isConnected)
-            item->setForeground(QBrush(Qt::gray));
-        else {
-            item->setForeground(QBrush(Qt::black));
-            if (c.isRunning) {
-                color = Qt::red;
-            } else {
-                color = Qt::green;
-            }
-
-            item->setIcon(makeCircleIcon(color, 10));
-        }
-        item->setData(QString("C:/backup/%1").arg(c.serialNumber), Qt::UserRole + 1);
         item->setEditable(false);
+        item->setData(QString("C:/backup/%1").arg(c.serialNumber), Qt::UserRole + 1);
+        item->setToolTip(QString("IP: %1\nSFTP: %2\nUser: %3\nWorkspace: %4")
+                                 .arg(c.ip)
+                                 .arg(c.sftpPort)
+                                 .arg(c.username)
+                                 .arg(c.wsPath));
+        bool isDark = (qApp->styleHints()->colorScheme() == Qt::ColorScheme::Dark);
 
-        // Tooltip에 상세 정보 표시
-        QString tip = QString("IP: %1\nSFTP: %2\nAPI: %3\nUser: %4\nWorkspace: %5")
-                              .arg(c.ip)
-                              .arg(c.sftpPort)
-                              .arg(c.apiPort)
-                              .arg(c.username)
-                              .arg(c.workspacePath);
-        item->setToolTip(tip);
+        if (!isDark) {
+            QColor iconColor;
+            if (!c.isConnected) {
+                iconColor = Qt::gray;
+                item->setForeground(QBrush(Qt::gray));
+            } else {
+                iconColor = c.isRunning ? Qt::red : Qt::green;
+                item->setForeground(QBrush(Qt::black));
+            }
+            item->setIcon(makeCircleIcon(iconColor, 10));
+        } else {
+            QColor iconColor;
+            if (!c.isConnected) {
+                iconColor = Qt::gray;
+                item->setForeground(QBrush(Qt::gray));
+            } else {
+                iconColor = c.isRunning ? Qt::red : Qt::green;
+                item->setForeground(QBrush(Qt::white));
+            }
+            item->setIcon(makeCircleIcon(iconColor, 10));
+        }
 
         controllerModel_->appendRow(item);
     }
@@ -358,6 +375,10 @@ void CenterStack::setBackupPath(const QString &path)
 
     backupModel_->setRootPath(backupRootPath_);
     workspaceModel_->setRootPath(backupRootPath_);
+
+    if (workspaceMenuController_) {
+        workspaceMenuController_->setWorkspaceRoot(backupRootPath_);
+    }
 }
 
 void CenterStack::onControllerTreeClicked(const QModelIndex &index)
@@ -409,9 +430,40 @@ void CenterStack::onRemoveController(const QString &serialNumber)
             QMessageBox::information(
                     this, "삭제 완료", QString("'%1'이(가) 삭제되었습니다.").arg(serialNumber));
 
-            qDebug() << "[CenterStack] Controller removed:" << serialNumber;
+            QString msg = QString("Controller removed: %1").arg(serialNumber);
+            LogManager::append(msg);
             break;
         }
     }
 }
-CenterStack::~CenterStack() = default;
+void CenterStack::startPolling(int intervalMs)
+{
+    if (m_pollingTimer->isActive()) {
+        qWarning() << "[CenterStack] Polling already started";
+        return;
+    }
+
+    // 즉시 한 번 실행
+    updateControllerList();
+
+    // 주기적으로 실행
+    m_pollingTimer->start(intervalMs);
+}
+
+void CenterStack::stopPolling()
+{
+    if (m_pollingTimer->isActive()) {
+        m_pollingTimer->stop();
+    }
+}
+
+void CenterStack::onPollingTimeout()
+{
+    qDebug() << "timeout";
+    ControllerManager::instance()->updateControllersStates();
+}
+
+CenterStack::~CenterStack()
+{
+    stopPolling();
+}

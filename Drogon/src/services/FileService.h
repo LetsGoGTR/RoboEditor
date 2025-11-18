@@ -1,0 +1,25 @@
+#pragma once
+
+#include <json/json.h>
+#include <string>
+
+#include "ServiceResult.h"
+
+namespace services
+{
+
+    class FileService
+    {
+      public:
+        // File CRUD operations
+        static ServiceResult createFile(const std::string &filePath, const std::string &content);
+        static ServiceResult readFile(const std::string &filePath);
+        static ServiceResult updateFile(const std::string &filePath, const std::string &content);
+        static ServiceResult deleteFile(const std::string &filePath);
+        static ServiceResult moveFile(const std::string &oldPath, const std::string &newPath);
+
+      private:
+        static Json::Value getFileInfo(const std::string &filePath);
+    };
+
+}  // namespace services

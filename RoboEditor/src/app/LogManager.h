@@ -1,44 +1,69 @@
 #ifndef LOGMANAGER_H
 #define LOGMANAGER_H
 #pragma once
-#include <QObject>
-#include <QMainWindow>
-#include <QPlainTextEdit>
-#include <QDockWidget>
-#include <QSplitter>
 #include <QAction>
 #include <QActionGroup>
-#include <QLayout>
-#include <QLabel>
-#include <QPushButton>
-class QMainWindow; class QPlainTextEdit; class QDockWidget; class QAction; class QActionGroup; class QSplitter;
+#include <QDockWidget>
+#include <QMainWindow>
+#include <QObject>
+#include <QPlainTextEdit>
+class QMainWindow;
+class QPlainTextEdit;
+class QDockWidget;
+class QAction;
+class QActionGroup;
 
-class LogManager : public QObject {
+class LogManager : public QObject
+{
     Q_OBJECT
-public:
-    explicit LogManager(QMainWindow* mw, QAction* actVisible, QActionGroup* posGroup, QAction* showLogParent);
-    QPlainTextEdit* view() const { return log_; }
-    QDockWidget* dock() const { return dock_; }
-    bool isEmbedded() const { return embedded_; }
+      public:
+        explicit LogManager(QMainWindow * mw,
+                            QAction * actVisible,
+                            QActionGroup * posGroup,
+                            QAction * showLogParent);
+        ~LogManager();
+        static LogManager *instance_;
+        static LogManager *instance();
+        static void        initialize(
+                QMainWindow * mw, QAction * vis, QActionGroup * grp, QAction * parent);
+        static void append(const QString &line);
+        static void destroy();
 
-    // public API
-    void placeBottom(); void placeRight(); void placeLeft(); void placeTop();
-    void placeFloat();  void placeEmbedded();
-    void setVisible(bool on);
-    void append(const QString& line);
-    void placeLogAsDock(Qt::DockWidgetArea area, bool floating=false);
+        QPlainTextEdit *view() const
+        {
+            return log_;
+        }
+        QDockWidget *dock() const
+        {
+            return dock_;
+        }
 
-private:
-    QMainWindow* mw_;
-    QPlainTextEdit* log_=nullptr; QDockWidget* dock_=nullptr; QSplitter* splitter_=nullptr;
-    QAction* actVisible_=nullptr; QActionGroup* posGroup_=nullptr; QAction* parentAction_=nullptr;
-    QWidget* embeddedPanel_ = nullptr;
-    QLabel*  embeddedTitle_ = nullptr;
-    bool embedded_=false;
+        // public API
+        void placeBottom();
+        void placeRight();
+        void placeLeft();
+        void placeTop();
+        void placeFloat();
+        void setVisible(bool on);
+        void placeLogAsDock(Qt::DockWidgetArea area, bool floating = false);
 
-    void buildDock(); void wire();
-    void syncChecks();  // 부모/자식 Visible 체크 동기화
-    void connectSignals();
+      private:
+        QMainWindow    *mw_;
+        QPlainTextEdit *log_          = nullptr;
+        QDockWidget    *dock_         = nullptr;
+        QAction        *actVisible_   = nullptr;
+        QActionGroup   *posGroup_     = nullptr;
+        QAction        *parentAction_ = nullptr;
+
+        void buildDock();
+        void wire();
+        void syncChecks();  // 부모/자식 Visible 체크 동기화
+
+        QFile       *file_   = nullptr;
+        QTextStream *stream_ = nullptr;
+        void         openLogFile();
+        void         closeLogFile();
+        void         connectSignals();
 };
 
-#endif // LOGMANAGER_H
+#endif  // LOGMANAGER_H

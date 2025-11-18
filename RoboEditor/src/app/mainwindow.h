@@ -1,6 +1,6 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
-
+#pragma once
 #include <QDir>
 #include <QFileDialog>
 #include <QMainWindow>
@@ -9,6 +9,7 @@
 
 // Forward declarations
 #include "BackupPage.h"
+#include "ComparePage.h"
 #include "ModifyPage.h"
 #include "ShortcutManager.h"
 
@@ -25,6 +26,16 @@ class MainWindow : public QMainWindow
       public:
         explicit MainWindow(QWidget *parent = nullptr);
         ~MainWindow();
+        static bool dark;
+        static bool manualMode;
+
+      public slots:
+        void toggleTheme();
+
+      protected:
+        void closeEvent(QCloseEvent * event) override;
+        bool eventFilter(QObject * obj, QEvent * event) override;
+        void applyStyleSheet();
 
       private:
         // lazy objects
@@ -32,6 +43,7 @@ class MainWindow : public QMainWindow
         ModifyPage      *modifyPage;
         BackupPage      *backupPage;
         ShortcutManager *shortcutMgr;
+        ComparePage     *comparePage = nullptr;
 
         QWidget *applyPopup_  = nullptr;
         QWidget *backupPopup_ = nullptr;
@@ -41,6 +53,10 @@ class MainWindow : public QMainWindow
         void ensureNav();
         void ensureLog();
         void wire();
+
+        void loadTheme(bool isDark);
+
+        bool isDarkMode_ = false;
 
         std::unique_ptr<TopMenu>     menu_;
         std::unique_ptr<CenterStack> center_;  // CenterStack → Center

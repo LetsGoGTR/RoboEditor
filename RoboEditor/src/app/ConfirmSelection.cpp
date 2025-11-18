@@ -14,7 +14,8 @@
 #include <QVBoxLayout>
 
 #include "ApplyPage.h"
-#include "ui_confirmselection.h"
+#include "ui_ConfirmSelection.h"
+#include "ControllerManager.h"
 
 ConfirmSelection::ConfirmSelection(QWidget *parent) :
     QDialog(parent),
@@ -82,10 +83,17 @@ void ConfirmSelection::requestApply()
         QMessageBox::warning(this, "Error", "No controllers selected!");
         return;
     }
-    if (backupDir.isEmpty()) {  // ✅ isEmpty()가 더 명확
+    if (backupDir.isEmpty()) {
         QMessageBox::warning(this, "Error", "No backup folder selected!");
         return;
     }
+
+    // 다이얼로그 닫기
+    accept();
+
+    // Apply 요청을 큐에 추가
+    emit applyRequested();
+
 }
 
 ConfirmSelection::~ConfirmSelection()

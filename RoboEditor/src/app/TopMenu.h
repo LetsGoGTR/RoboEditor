@@ -44,6 +44,7 @@ class TopMenu : public QObject
         QAction *openFile_   = nullptr;
         QAction *openFolder_ = nullptr;
 
+        QAction      *themeToggle_    = nullptr;
         QAction      *actToggle_      = nullptr;  // Ctrl+L
         QAction      *actLogVisible_  = nullptr;  // Visible
         QAction      *changePassword_ = nullptr;

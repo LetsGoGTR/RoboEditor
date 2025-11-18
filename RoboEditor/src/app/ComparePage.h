@@ -2,114 +2,88 @@
 #define COMPAREPAGE_H
 #pragma once
 
-#include <QList>
 #include <QSplitter>
-#include <QString>
-#include <QStringList>
 #include <QWidget>
 
-class QComboBox;
-class QPushButton;
-class QLabel;
-class QLineEdit;
-class QCheckBox;
-class QTableWidget;
-class QFileSystemModel;
-class QTreeView;
+#include "../core/FileTypeHelper.h"
+#include "CodeEditor.h"
+#include "DiffTablePanel.h"
+
 class QTabWidget;
-class DropTextEdit;
 
 class ComparePage : public QWidget
 {
     Q_OBJECT
       public:
         explicit ComparePage(QWidget *parent = nullptr);
-        void setTargetPath(const QString &path);  // 파일 선택 시 1회 호출
+        ~ComparePage();
 
-        QWidget *buildDiffPanel();
-        struct DiffRow
-        {
-            QString key;
-            QString origin;
-            QString target;
-            QString state;  // "SAME", "CHANGED", "ADDED", "REMOVED"
-        };
+        void setTargetPath(const QString &path);
+        void setLeftEditor(CodeEditor * leftEditor);
+        void clearHighlights();
 
-      public slots:
-        void onOpenLeftFolderClicked();
-        void onOpenRightFolderClicked();
-        void onLeftTreeDoubleClicked(const QModelIndex &idx);
-        void onRightTreeDoubleClicked(const QModelIndex &idx);
-
-        void refreshTreeView(const QString &side, const QString &path);
-        void loadLocalFolder(const QString &side, const QString &path);
-
-        void recalcDiff(const QString &leftText);  // 좌 텍스트 받아 재계산
+        void       performDiff(const QString &leftPath, const QString &rightPath);
+        void       performFolderDiff(const QString &leftPath, const QString &rightPath);
+        void       applyTheme(bool dark);
 
       signals:
-        // 메인/센터스택 쪽으로 전달할 로그용 이벤트
+        void closed();
+        void targetPathChanged(const QString &newPath);
+        void requestOpenFile(const QString &filePath);
         void uiCompareClicked(const QString &leftPath, const QString &rightPath);
-        void closed();                                   // [X] 클릭
-        void targetPathChanged(const QString &newPath);  // 비교 대상 파일 변경됨
+        void themeChangeRequested(bool dark);
+
+      public slots:
+        void recalcDiff(const QString &leftText, const QString &leftPath = QString());
 
       private slots:
-        void onCompareClicked();
-        void onCloseClicked();
+        void onFolderFileClicked(const QString &path);
+        void onDiffRowClicked(const DiffRow &row);  // 스크롤 동기화용 슬롯
 
       private:
-        QWidget      *dock_{nullptr};              // 헤더+[X]+rightSplit
-        QSplitter    *rightSplit_{nullptr};        // (좌) rightText_ | (우) diffPanel_
-        QTabWidget   *compareTabWidget_{nullptr};  // 비교 파일들을 탭으로 관리
-        DropTextEdit *rightText_{nullptr};  // 읽기 전용 (비교대상) - 현재 활성 탭
-        QWidget      *diffPanel_{nullptr};  // 기존 "테이블+상단 버튼" 위젯
-        QTableWidget *diffTable_ = nullptr;
-        QLabel       *statLabel_ = nullptr;
-        QString       targetPath_;
+        QWidget    *dock_{nullptr};
+        QSplitter  *rightSplit_{nullptr};
+        QTabWidget *compareTabWidget_{nullptr};
 
-        QLineEdit *leftFileSelect_{nullptr};
-        QLineEdit *rightFileSelect_{nullptr};
+        // 로직 처리를 위해 포인터는 유지하되, UI 구성시에는 컨테이너 안에 넣습니다.
+        DiffTablePanel *diffPanel_{nullptr};
+
+        CodeEditor *rightText_{nullptr};
+        CodeEditor *leftText_{nullptr};
+
+        core::DiffHighlighter *leftDiffHighlighter_{nullptr};
+        core::DiffHighlighter *rightDiffHighlighter_{nullptr};
+
+        QString     targetPath_;
+        QString     cachedLeftPath_;
+        QString     cachedLeftText_;
+        QStringList tempFolders_;
+
+        QString lastLeftFolderPath_;
+        QString lastRightFolderPath_;
+
+        bool isDarkMode_ = false;
 
         QWidget *buildDock();
-        // 현재 선택된 루트 경로
-        QString currentLeftRoot_;
-        QString currentRightRoot_;
 
-        // 현재 폴더에서 받은 파일 리스트 캐시
-        QStringList leftFiles_;
-        QStringList rightFiles_;
+        // 버튼 + 패널을 포함한 우측 영역 전체를 생성하는 함수
+        QWidget *buildRightPanel();
 
-        // 좌측 사이드: 폴더 브라우저 탭
-        QTabWidget *dirTabs_;
-        QWidget    *leftTabPage_;
-        QWidget    *rightTabPage_;
+        QList<DiffRow> parseDiffResult(const Json::Value &result, const QString &fileType);
+        QString        extractArchiveToTemp(const QString &archivePath);
+        void           cleanupTempFolders();
+        QString        formatPathForCompare(const QString &fullPath) const;
 
-        // 본문 텍스트 뷰
-        DropTextEdit *leftText_;
-        //DropTextEdit *rightText_;
-
-        // diff 영역
-        QLineEdit *keySearchEdit_;
-        QCheckBox *chkOnlyChanged_;
-        QCheckBox *chkHideSame_;
-        QCheckBox *chkOnlyAddDel_;
-
-        // 내부 유틸
-        void setRoots(const QString &leftRoot, const QString &rightRoot);
-        void populateFileSelects(const QStringList &leftFiles, const QStringList &rightFiles);
-        void updateFolderListing(const QString     &side,
-                                 const QString     &basePath,
-                                 const QStringList &folders,
-                                 const QStringList &files);
-
-        void setFileContents(const QString &leftText, const QString &rightText);
+        // 하이라이터 갱신 및 테이블 업데이트 통합 함수
         void setDiffRows(const QList<DiffRow> &rows);
-        void refreshDiffTable(const QList<DiffRow> &rows);
 
-        void loadRightText(const QString &path);
-        // 나중에 REST 붙일 자리 (지금은 더미)
-        void fetchFolderFromApiDummy(const QString &side, const QString &basePathHint);
-        void fetchCompareFromApiDummy(const QString &leftFilePath, const QString &rightFilePath);
-        void loadFileIntoEditor(const QString &fullPath, bool isLeft);
+        struct ControllerPathInfo
+        {
+            QString serial;
+            QString detail;
+        };
+        ControllerPathInfo      extractControllerInfo(const QString &path) const;
+        QPair<QString, QString> determineColumnHeaders(const QString &leftPath,
+                                                       const QString &rightPath) const;
 };
-
 #endif  // COMPAREPAGE_H

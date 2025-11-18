@@ -1,0 +1,221 @@
+/* === 기본 === */
+* {
+    font-family: 'Segoe UI', 'Noto Sans KR';
+    font-size: 13px;
+    color: #e0e0e0;
+}
+
+/* === 메인 윈도우 === */
+QMainWindow {
+    background-color: #1e1e1e;
+}
+
+/* === 메뉴바 === */
+QMenuBar {
+    background-color: rgb(48, 27, 120);
+    color: #ffffff;
+}
+QMenuBar::item {
+    background: transparent;
+    padding: 4px 12px;
+}
+QMenuBar::item:selected {
+    background-color: #3c3c3c;
+    border-radius: 4px;
+}
+QMenu {
+    background-color: #2b2b2b;
+    border: 1px solid #3f3f3f;
+}
+QMenu::item:selected {
+    background-color: #414863;
+}
+
+/* === 탭 === */
+QTabBar::tab {
+    background: #2d2d2d;
+    border: 1px solid #3a3a3a;
+    border-bottom: none;
+    padding: 6px 12px;
+    min-width: 80px;
+    color: #dcdcdc;
+}
+QTabBar::tab:selected {
+    background: #1e1e1e;
+    border-top: 2px solid #6ca0dc;
+}
+QTabWidget::pane {
+    border: 1px solid #3c3c3c;
+    top: -1px;
+}
+
+/* === 버튼 === */
+QPushButton {
+    background-color: #3a5fb0;
+    color: #ffffff;
+    border-radius: 3px;
+    padding: 5px 12px;
+}
+QPushButton:hover {
+    background-color: #4c78d0;
+}
+QPushButton:pressed {
+    background-color: #2f4f8d;
+}
+
+/* === 트리뷰 / 리스트 === */
+QTreeView, QListView {
+    background: #1f1f1f;
+    border: 1px solid #3a3a3a;
+    selection-background-color: #2f3b54;
+    selection-color: #e0e0e0;
+}
+QTreeView::item:hover {
+    background: #293447;
+}
+QTreeView::item:selected {
+    background: #2f3b54;
+    border-left: 3px solid #6ca0dc;
+}
+
+/* === 스플리터 === */
+QSplitter::handle {
+    background: #3a3a3a;
+}
+QSplitter::handle:hover {
+    background: #4c78d0;
+}
+
+/* === 스크롤바 === */
+QScrollBar:vertical {
+    background: transparent;
+    width: 10px;
+    margin: 2px;
+}
+QScrollBar::handle:vertical {
+    background: #4c78d0;
+    border-radius: 5px;
+    min-height: 20px;
+}
+QScrollBar::handle:vertical:hover {
+    background: #4c78d0;
+}
+QScrollBar::add-line:vertical,
+QScrollBar::sub-line:vertical {
+    height: 0;
+}
+
+/* === 라벨 === */
+QLabel {
+    color: #dcdcdc;
+}
+
+/* === 텍스트 에디터 === */
+QPlainTextEdit, QTextEdit {
+    background-color: #1e1e1e;
+    border-radius: 2px;
+    padding: 6px;
+    selection-background-color: #264f78;
+    selection-color: #ffffff;
+}
+
+/* === 테이블뷰 === */
+QTableView {
+    background: #1e1e1e;
+    gridline-color: #333;
+    selection-background-color: #2f3b54;
+}
+QHeaderView::section {
+    background: #2d2d2d;
+    border: 1px solid #3a3a3a;
+    padding: 4px;
+    color: #dcdcdc;
+}
+
+/* === 로그창 === */
+QTextBrowser, QTextEdit#logView {
+    background-color: #161616;
+    border: 1px solid #3a3a3a;
+    font-family: Consolas, monospace;
+    font-size: 12px;
+    color: #d0d0d0;
+}
+
+/* === 상태 표시 등 === */
+QLabel#status_connected {
+    color: #00cc66;
+}
+QLabel#status_disconnected {
+    color: #ff6666;
+}
+
+/* === 입력창 === */
+QLineEdit {
+    background-color: #2d2d2d;
+    color: #f0f0f0;
+    border: 1px solid #444;
+    min-width: 70px;
+    min-height: 20px;
+    padding: 4px 6px;
+}
+QSpinBox {
+    background-color: #2d2d2d;
+    color: #f0f0f0;
+    border: 1px solid #444;
+    min-width: 70px;
+    min-height: 20px;
+    padding: 2px 6px;
+}
+QSpinBox::up-button, QSpinBox::down-button {
+    width: 16px;
+    height: 10px;
+    background: #3a3a3a;
+}
+QSpinBox::up-button:hover,
+QSpinBox::down-button:hover {
+    background: #4d4d4d;
+}
+
+QSpinBox::up-arrow, QSpinBox::down-arrow {
+    width: 16px;
+    height: 10px;
+}
+#ComparePageRoot {
+    background-color: #1e1e1e;
+    color: #d4d4d4;
+}
+
+#ComparePageRoot QPlainTextEdit {
+    background-color: #1e1e1e;
+    color: #d4d4d4;
+    border: none;
+}
+
+#ComparePageRoot QLabel#pathLabel {
+    padding: 4px 8px;
+    background-color: #2d2d2d;
+    border-bottom: 1px solid #3a3a3a;
+    color: #a0a0a0;
+}
+
+#ComparePageRoot QTabBar::tab {
+    background: #2d2d2d;
+    color: #d4d4d4;
+    padding: 6px 12px;
+    border: 1px solid #3a3a3a;
+    border-bottom: none;
+}
+#ComparePageRoot QTabBar::tab:selected {
+    background: #1e1e1e;
+    border-bottom: 2px solid #569cd6;
+}
+
+#ComparePageRoot QPushButton {
+    background-color: #3a3a3a;
+    color: white;
+    border: 1px solid #555;
+    padding: 4px 8px;
+}
+#ComparePageRoot QPushButton:hover {
+    background-color: #505050;
+}
