@@ -1,4 +1,4 @@
-const FOLDER_API_PATH = '/proxy/api/v1/folder';
+const FOLDER_API_PATH = '/api/v1/folder';
 
 export const _getFolder = async (path: string) => {
 	const params = new URLSearchParams({ path });
@@ -7,27 +7,28 @@ export const _getFolder = async (path: string) => {
 };
 
 export const _createFolder = async (path: string) => {
-	const params = new URLSearchParams({ path });
-	const res = await fetch(`${FOLDER_API_PATH}?${params}`, {
-		method: 'POST'
+	const res = await fetch(FOLDER_API_PATH, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ path })
 	});
 	return res.json();
 };
 
 export const _updateFolder = async (path: string, newPath: string) => {
-	const params = new URLSearchParams({ path });
-	const res = await fetch(`${FOLDER_API_PATH}?${params}`, {
+	const res = await fetch(FOLDER_API_PATH, {
 		method: 'PUT',
 		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ newPath })
+		body: JSON.stringify({ path, newPath })
 	});
 	return res.json();
 };
 
 export const _deleteFolder = async (path: string) => {
-	const params = new URLSearchParams({ path });
-	const res = await fetch(`${FOLDER_API_PATH}?${params}`, {
-		method: 'DELETE'
+	const res = await fetch(FOLDER_API_PATH, {
+		method: 'DELETE',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ path })
 	});
 	return res.json();
 };

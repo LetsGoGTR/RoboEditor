@@ -132,8 +132,8 @@
   bind:open={showCompareFile}
   root={$fileTree}
   mode="file"
-  onConfirm={({ left, right }) => {
-    handleDiffFiles(left, right);
+  onConfirm={async ({ left, right }) => {
+    await handleDiffFiles(left, right);
     gotoPage("compare");
   }}
   onCancel={() => (showCompareFile = false)}
