@@ -43,67 +43,13 @@ services::ServiceResult FileTransferService::backupFromRemote(const std::string 
         std::string apiUrl = api.empty() ? ("https://" + sftpHost) : api;
         utils::logging::info("원격 서버 압축 API 호출: " + apiUrl + "/api/workspace/compress");
 
-        auto client = drogon::HttpClient::newHttpClient(apiUrl);
-        auto req    = drogon::HttpRequest::newHttpJsonRequest(Json::Value());
-        req->setMethod(drogon::Post);
-        req->setPath("/api/workspace/compress");
-
-        Json::Value body;
-        body["user"] = sftpUser;
-        req->setBody(body.toStyledString());
-        req->setContentTypeCode(drogon::CT_APPLICATION_JSON);
-
-        std::promise<bool> compressPromise;
-        auto               compressFuture = compressPromise.get_future();
-
-        client->sendRequest(req,
-                            [&compressPromise](drogon::ReqResult              result,
-                                               const drogon::HttpResponsePtr &response) {
-                                if (result != drogon::ReqResult::Ok) {
-                                    utils::logging::error("원격 압축 API 호출 실패: 네트워크 오류");
-                                    compressPromise.set_value(false);
-                                    return;
-                                }
-
-                                if (response->getStatusCode() != drogon::k200OK) {
-                                    std::string errorMsg =
-                                            "원격 압축 API 실패: HTTP " +
-                                            std::to_string(response->getStatusCode());
-
-                                    auto jsonResponse = response->getJsonObject();
-                                    if (jsonResponse && jsonResponse->isMember("error")) {
-                                        errorMsg += " - " + (*jsonResponse)["error"].asString();
-                                    } else {
-                                        auto body = response->getBody();
-                                        if (!body.empty() && body.size() < 200) {
-                                            errorMsg += " - " + std::string(body);
-                                        }
-                                    }
-
-                                    utils::logging::error(errorMsg);
-                                    compressPromise.set_value(false);
-                                    return;
-                                }
-
-                                auto jsonResponse = response->getJsonObject();
-                                if (!jsonResponse || !jsonResponse->isMember("success")) {
-                                    utils::logging::error("원격 압축 API 응답 형식 오류");
-                                    compressPromise.set_value(false);
-                                    return;
-                                }
-
-                                bool success = (*jsonResponse)["success"].asBool();
-                                if (success) {
-                                    utils::logging::info("원격 서버 압축 성공");
-                                } else {
-                                    utils::logging::error("원격 서버 압축 실패");
-                                }
-                                compressPromise.set_value(success);
-                            });
-
-        bool compressSuccess = compressFuture.get();
-        if (!compressSuccess) {
-            return services::ServiceResult::createError("원격 서버 압축 실패");
+        auto compressResult = compressWorkspace(sftpUser, apiUrl);
+        if (!compressResult.success) {
+            std::string message = compressResult.errorMessage;
+            if (!compressResult.remoteMessage.empty()) {
+                message += ": " + compressResult.remoteMessage;
+            }
+            return services::ServiceResult::createError(message);
         }
 
         // 4. SFTP 연결
@@ -246,9 +192,13 @@ services::ServiceResult FileTransferService::applyWorkspace(const std::string &w
         fs::remove(tempFile);
 
         // 7. Workspace Extract API 호출하여 압축 해제
-        auto [success, errorMsg] = extractWorkspace(sftpUser, api);
-        if (!success) {
-            return services::ServiceResult::createError(errorMsg);
+        auto apiResult = extractWorkspace(sftpUser, api);
+        if (!apiResult.success) {
+            std::string message = apiResult.errorMessage;
+            if (!apiResult.remoteMessage.empty()) {
+                message += ": " + apiResult.remoteMessage;
+            }
+            return services::ServiceResult::createError(message);
         }
 
         utils::logging::info("워크스페이스 압축 해제 성공");
@@ -270,8 +220,100 @@ services::ServiceResult FileTransferService::applyWorkspace(const std::string &w
     }
 }
 
-std::pair<bool, std::string> FileTransferService::extractWorkspace(const std::string &user,
-                                                                   const std::string &api)
+RemoteApiResult FileTransferService::compressWorkspace(const std::string &user,
+                                                       const std::string &api)
+{
+    try {
+        utils::logging::info("Workspace 압축 API 호출 준비: user=" + user);
+
+        // Workspace Compress API 호출
+        auto client = drogon::HttpClient::newHttpClient(api);
+        auto req    = drogon::HttpRequest::newHttpJsonRequest(Json::Value());
+        req->setMethod(drogon::Post);
+        req->setPath("/api/workspace/compress");
+
+        Json::Value body;
+        body["user"] = user;
+        req->setBody(body.toStyledString());
+        req->setContentTypeCode(drogon::CT_APPLICATION_JSON);
+
+        std::promise<RemoteApiResult> promise;
+        auto                          future = promise.get_future();
+
+        client->sendRequest(
+                req, [&promise](drogon::ReqResult result, const drogon::HttpResponsePtr &response) {
+                    if (result != drogon::ReqResult::Ok) {
+                        std::string error = "Workspace 압축 API 호출 실패: 네트워크 오류";
+                        utils::logging::error(error);
+                        promise.set_value({false, error, ""});
+                        return;
+                    }
+
+                    int statusCode = response->getStatusCode();
+                    if (statusCode != drogon::k200OK) {
+                        std::string error;
+                        std::string remoteMessage;
+
+                        if (statusCode == drogon::k401Unauthorized) {
+                            error = "원격 서버 인증 실패";
+                        } else {
+                            error = "원격 서버 압축 실패 (HTTP " + std::to_string(statusCode) + ")";
+
+                            // Try to extract message from response body
+                            auto jsonResponse = response->getJsonObject();
+                            if (jsonResponse && jsonResponse->isMember("message")) {
+                                remoteMessage = (*jsonResponse)["message"].asString();
+                            } else if (jsonResponse && jsonResponse->isMember("error")) {
+                                remoteMessage = (*jsonResponse)["error"].asString();
+                            }
+                        }
+                        utils::logging::error(error +
+                                              (remoteMessage.empty() ? "" : " - " + remoteMessage));
+                        promise.set_value({false, error, remoteMessage});
+                        return;
+                    }
+
+                    auto jsonResponse = response->getJsonObject();
+                    if (!jsonResponse || !jsonResponse->isMember("success")) {
+                        std::string error = "Workspace 압축 API 응답 형식 오류";
+                        utils::logging::error(error);
+                        promise.set_value({false, error, ""});
+                        return;
+                    }
+
+                    bool success = (*jsonResponse)["success"].asBool();
+                    if (success) {
+                        std::string message = "원격 서버 압축 성공";
+                        if (jsonResponse->isMember("message")) {
+                            message = (*jsonResponse)["message"].asString();
+                        }
+                        utils::logging::info(message);
+                        promise.set_value({true, "", message});
+                    } else {
+                        std::string error = "원격 서버 압축 실패";
+                        std::string remoteMessage;
+                        if (jsonResponse->isMember("message")) {
+                            remoteMessage = (*jsonResponse)["message"].asString();
+                        } else if (jsonResponse->isMember("error")) {
+                            remoteMessage = (*jsonResponse)["error"].asString();
+                        }
+                        utils::logging::error(error +
+                                              (remoteMessage.empty() ? "" : " - " + remoteMessage));
+                        promise.set_value({false, error, remoteMessage});
+                    }
+                });
+
+        return future.get();
+
+    } catch (const std::exception &e) {
+        std::string error = "Workspace 압축 중 오류: " + std::string(e.what());
+        utils::logging::error(error);
+        return {false, error, ""};
+    }
+}
+
+RemoteApiResult FileTransferService::extractWorkspace(const std::string &user,
+                                                      const std::string &api)
 {
     try {
         utils::logging::info("Workspace 압축 해제 API 호출 준비: user=" + user);
@@ -287,29 +329,40 @@ std::pair<bool, std::string> FileTransferService::extractWorkspace(const std::st
         req->setBody(body.toStyledString());
         req->setContentTypeCode(drogon::CT_APPLICATION_JSON);
 
-        std::promise<std::pair<bool, std::string>> promise;
-        auto                                       future = promise.get_future();
+        std::promise<RemoteApiResult> promise;
+        auto                          future = promise.get_future();
 
         client->sendRequest(
                 req, [&promise](drogon::ReqResult result, const drogon::HttpResponsePtr &response) {
                     if (result != drogon::ReqResult::Ok) {
                         std::string error = "Workspace 압축 해제 API 호출 실패: 네트워크 오류";
                         utils::logging::error(error);
-                        promise.set_value({false, error});
+                        promise.set_value({false, error, ""});
                         return;
                     }
 
                     int statusCode = response->getStatusCode();
                     if (statusCode != drogon::k200OK) {
                         std::string error;
+                        std::string remoteMessage;
+
                         if (statusCode == drogon::k401Unauthorized) {
-                            error = "인증 실패: 비밀번호가 올바르지 않습니다";
+                            error = "원격 서버 인증 실패";
                         } else {
-                            error = "Workspace 압축 해제 API 실패: HTTP " +
-                                    std::to_string(statusCode);
+                            error = "원격 서버 압축 해제 실패 (HTTP " + std::to_string(statusCode) +
+                                    ")";
+
+                            // Try to extract message from response body
+                            auto jsonResponse = response->getJsonObject();
+                            if (jsonResponse && jsonResponse->isMember("message")) {
+                                remoteMessage = (*jsonResponse)["message"].asString();
+                            } else if (jsonResponse && jsonResponse->isMember("error")) {
+                                remoteMessage = (*jsonResponse)["error"].asString();
+                            }
                         }
-                        utils::logging::error(error);
-                        promise.set_value({false, error});
+                        utils::logging::error(error +
+                                              (remoteMessage.empty() ? "" : " - " + remoteMessage));
+                        promise.set_value({false, error, remoteMessage});
                         return;
                     }
 
@@ -317,21 +370,29 @@ std::pair<bool, std::string> FileTransferService::extractWorkspace(const std::st
                     if (!jsonResponse || !jsonResponse->isMember("success")) {
                         std::string error = "Workspace 압축 해제 API 응답 형식 오류";
                         utils::logging::error(error);
-                        promise.set_value({false, error});
+                        promise.set_value({false, error, ""});
                         return;
                     }
 
                     bool success = (*jsonResponse)["success"].asBool();
                     if (success) {
-                        utils::logging::info("Workspace 압축 해제 성공");
-                        promise.set_value({true, ""});
-                    } else {
-                        std::string error = "Workspace 압축 해제 실패";
-                        if (jsonResponse->isMember("error")) {
-                            error = (*jsonResponse)["error"].asString();
+                        std::string message = "원격 서버 압축 해제 성공";
+                        if (jsonResponse->isMember("message")) {
+                            message = (*jsonResponse)["message"].asString();
                         }
-                        utils::logging::error(error);
-                        promise.set_value({false, error});
+                        utils::logging::info(message);
+                        promise.set_value({true, "", message});
+                    } else {
+                        std::string error = "원격 서버 압축 해제 실패";
+                        std::string remoteMessage;
+                        if (jsonResponse->isMember("message")) {
+                            remoteMessage = (*jsonResponse)["message"].asString();
+                        } else if (jsonResponse->isMember("error")) {
+                            remoteMessage = (*jsonResponse)["error"].asString();
+                        }
+                        utils::logging::error(error +
+                                              (remoteMessage.empty() ? "" : " - " + remoteMessage));
+                        promise.set_value({false, error, remoteMessage});
                     }
                 });
 
@@ -340,7 +401,7 @@ std::pair<bool, std::string> FileTransferService::extractWorkspace(const std::st
     } catch (const std::exception &e) {
         std::string error = "Workspace 압축 해제 중 오류: " + std::string(e.what());
         utils::logging::error(error);
-        return {false, error};
+        return {false, error, ""};
     }
 }
 
