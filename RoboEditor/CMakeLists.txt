@@ -9,6 +9,9 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# 모든 라이브러리(zlib 포함)를 PIC 모드로 빌드하여 링크 에러 해결
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets LinguistTools)
 find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets LinguistTools)
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Network)
@@ -71,19 +74,28 @@ set_target_properties(jsoncpp_static PROPERTIES
 add_subdirectory(external/libbcrypt)
 include_directories(external/libbcrypt/include)
 
-# OpenSSL 및 libssh2 경로 설정
-set(MSYS2_ROOT "C:/msys64/mingw64")
-set(OPENSSL_ROOT_DIR "${MSYS2_ROOT}" CACHE PATH "" FORCE)
-set(OPENSSL_INCLUDE_DIR "${MSYS2_ROOT}/include" CACHE PATH "" FORCE)
-set(OPENSSL_CRYPTO_LIBRARY "${MSYS2_ROOT}/lib/libcrypto.a" CACHE FILEPATH "" FORCE)
-set(OPENSSL_SSL_LIBRARY "${MSYS2_ROOT}/lib/libssl.a" CACHE FILEPATH "" FORCE)
+if(WIN32)
+    # Windows (MSYS2) 설정
+    set(MSYS2_ROOT "C:/msys64/mingw64")
+    set(OPENSSL_ROOT_DIR "${MSYS2_ROOT}" CACHE PATH "" FORCE)
+    set(OPENSSL_INCLUDE_DIR "${MSYS2_ROOT}/include" CACHE PATH "" FORCE)
+    set(OPENSSL_CRYPTO_LIBRARY "${MSYS2_ROOT}/lib/libcrypto.a" CACHE FILEPATH "" FORCE)
+    set(OPENSSL_SSL_LIBRARY "${MSYS2_ROOT}/lib/libssl.a" CACHE FILEPATH "" FORCE)
 
-# libssh2 경로 직접 지정 (MSYS2에 설치된 것 사용)
-set(LIBSSH2_INCLUDE_DIR "${MSYS2_ROOT}/include" CACHE PATH "")
-set(LIBSSH2_LIBRARY "${MSYS2_ROOT}/lib/libssh2.a" CACHE FILEPATH "")
+    set(LIBSSH2_INCLUDE_DIR "${MSYS2_ROOT}/include" CACHE PATH "")
+    set(LIBSSH2_LIBRARY "${MSYS2_ROOT}/lib/libssh2.a" CACHE FILEPATH "")
+else()
+    # Linux/macOS 설정 (패키지 매니저로 설치된 경로 탐색)
+    find_package(OpenSSL REQUIRED)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(LIBSSH2 REQUIRED libssh2)
+    
+    set(LIBSSH2_INCLUDE_DIR ${LIBSSH2_INCLUDE_DIRS})
+    set(LIBSSH2_LIBRARY ${LIBSSH2_LIBRARIES})
+endif()
 
 # libssh2 라이브러리 존재 확인
-if(NOT EXISTS ${LIBSSH2_LIBRARY})
+if(WIN32 AND NOT EXISTS "${LIBSSH2_LIBRARY}")
     message(FATAL_ERROR
         "libssh2 not found at ${LIBSSH2_LIBRARY}\n"
         "Please install it with: pacman -S mingw-w64-x86_64-libssh2"
@@ -192,7 +204,7 @@ set(PROJECT_SOURCES
 
         src/ui/mainwindow.ui
         src/ui/ApplyPage.ui
-        src/ui/confirmselection.ui
+        src/ui/ConfirmSelection.ui
         src/ui/ModifyPage.ui
         src/ui/PasswordInput.ui
         ${TS_FILES}
@@ -245,10 +257,16 @@ target_link_libraries(RoboEditor PRIVATE
     ${OPENSSL_CRYPTO_LIBRARY}
     ${OPENSSL_SSL_LIBRARY}
     zlibstatic
-    ws2_32
-    crypt32
-    ssp
 )
+
+# 2. Windows일 때만 추가 라이브러리 링크
+if(WIN32)
+    target_link_libraries(RoboEditor PRIVATE
+        ws2_32
+        crypt32
+        ssp
+    )
+endif()
 
 if(${QT_VERSION} VERSION_LESS 6.1.0)
     set(BUNDLE_ID_OPTION MACOSX_BUNDLE_GUI_IDENTIFIER com.example.RoboEditor)
