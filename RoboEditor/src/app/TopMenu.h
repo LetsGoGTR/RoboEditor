@@ -38,7 +38,8 @@ class TopMenu : public QObject
       private:
         MainWindow *mw_;
         QMenu      *file_ = nullptr, *edit_ = nullptr, *view_ = nullptr, *help_ = nullptr,
-              *ctrl_ = nullptr, *tools_ = nullptr, *showLogMenu_ = nullptr;
+              *ctrl_ = nullptr, *tools_ = nullptr, *showLogMenu_ = nullptr,
+              *setScreenSize_ = nullptr;
         QMenu *modifyMenu_ = nullptr, *removeMenu_ = nullptr;
 
         //File Action
@@ -64,6 +65,10 @@ class TopMenu : public QObject
         QAction *actModifyController_ = nullptr;
         QAction *actRemoveController_ = nullptr;
         QAction *actRefreshList_      = nullptr;
+        QAction *actCompareFile_      = nullptr;
+        QAction *actCompareFolder_    = nullptr;
+        QAction *actBackup_           = nullptr;
+        QAction *actApply_            = nullptr;
 
         // View Actions
         QAction *actToggleLog_     = nullptr;
@@ -73,19 +78,17 @@ class TopMenu : public QObject
         QAction *actResetLayout_   = nullptr;
 
         // Tools Actions
-        QAction *actCompareFile_   = nullptr;
-        QAction *actCompareFolder_ = nullptr;
-        QAction *actBackup_        = nullptr;
-        QAction *actApply_         = nullptr;
-        QAction *actChangePswd_    = nullptr;
+        QAction *actChangePswd_ = nullptr;
 
         // Help Actions
         QAction *actDocumentation_ = nullptr;
         QAction *actAbout_         = nullptr;
 
         QAction      *themeToggle_ = nullptr;
-        QActionGroup *posGroup_    = nullptr;  // Bottom/Right/Left/Top/Float/Embedded
-        void          build();
+        QActionGroup *posGroup_    = nullptr;
+        QActionGroup *screenGroup_ = nullptr;
+
+        void build();
 
       private slots:
         void onChangePasswordTriggered();
@@ -93,6 +96,9 @@ class TopMenu : public QObject
       signals:
         void requestModifyMenuUpdate(QMenu * menu);
         void requestRemoveMenuUpdate(QMenu * menu);
+        void fullScreenRequested(bool enable);
+        void maximizeRequested(bool enable);
+        void resetLayoutRequested();
 };
 
 #endif  // TOPMENU_H

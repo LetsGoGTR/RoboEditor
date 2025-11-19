@@ -52,6 +52,9 @@ class MainWindow : public QMainWindow
         void populateModifyMenu(QMenu * menu);
         void populateRemoveMenu(QMenu * menu);
 
+        void setFullScreen(bool enable);
+        void setMaximize(bool enable);
+
       protected:
         void closeEvent(QCloseEvent * event) override;
         bool eventFilter(QObject * obj, QEvent * event) override;
@@ -75,6 +78,8 @@ class MainWindow : public QMainWindow
         void wire();
 
         void loadTheme(bool isDark);
+
+        bool isFullScreen_ = false;
 
         bool isDarkMode_ = false;
 

@@ -45,6 +45,8 @@ void MainWindow::ensureMenu()
         menu_ = std::make_unique<TopMenu>(this);
     connect(menu_.get(), &TopMenu::requestModifyMenuUpdate, this, &MainWindow::populateModifyMenu);
     connect(menu_.get(), &TopMenu::requestRemoveMenuUpdate, this, &MainWindow::populateRemoveMenu);
+    connect(menu_.get(), &TopMenu::fullScreenRequested, this, &MainWindow::setFullScreen);
+    connect(menu_.get(), &TopMenu::maximizeRequested, this, &MainWindow::setMaximize);
 }
 
 void MainWindow::ensureCenter()
@@ -377,7 +379,42 @@ void MainWindow::populateRemoveMenu(QMenu *menu)
         });
     }
 }
+void MainWindow::setFullScreen(bool enable)
+{
+    if (enable) {
+        // 풀스크린 진입
+        isFullScreen_ = true;
+        showFullScreen();
+        statusBar()->showMessage("Full Screen Mode", 2000);
+        LogManager::append("Entered Full Screen mode");
+    } else {
+        // 풀스크린 해제
+        isFullScreen_ = false;
+        showNormal();
+        statusBar()->showMessage("Exited Full Screen Mode", 2000);
+        LogManager::append("Exited Full Screen mode");
+    }
+}
 
+void MainWindow::setMaximize(bool enable)
+{
+    if (enable) {
+        // 최대화
+        if (isFullScreen_) {
+            // 풀스크린이면 먼저 해제
+            showNormal();
+            isFullScreen_ = false;
+        }
+        showMaximized();
+        statusBar()->showMessage("Window Maximized", 2000);
+        LogManager::append("Window maximized");
+    } else {
+        // 일반 크기로
+        showNormal();
+        statusBar()->showMessage("Window Restored", 2000);
+        LogManager::append("Window restored to normal size");
+    }
+}
 void MainWindow::closeEvent(QCloseEvent *event)
 {
     QMainWindow::closeEvent(event);

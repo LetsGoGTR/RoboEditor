@@ -64,6 +64,7 @@ void TopMenu::build()
     connect(actSelectAll_, &QAction::triggered, mw_, &MainWindow::selectAllFromMenu);
 
     // add controllers actions
+
     actAddController_ = ctrl_->addAction("Add Controller");
     modifyMenu_       = ctrl_->addMenu("Modify Controller Setting");
     removeMenu_       = ctrl_->addMenu("Remove Controller");
@@ -80,12 +81,6 @@ void TopMenu::build()
     });
 
     // add view actions
-
-    // add tools actions
-
-    // add help actions
-
-    // View > Show Log
     showLogMenu_ = view_->addMenu("Show Log");
 
     actToggleLog_ = new QAction("Show Log Viewer", this);
@@ -98,6 +93,10 @@ void TopMenu::build()
 
     posGroup_ = new QActionGroup(this);
     posGroup_->setExclusive(true);
+
+    screenGroup_ = new QActionGroup(this);
+    screenGroup_->setExclusive(true);
+
     auto mk = [&](const char *t) {
         auto *a = new QAction(t, this);
         a->setCheckable(true);
@@ -112,19 +111,45 @@ void TopMenu::build()
     showLogMenu_->addAction(mk("Log → Float"));
     posGroup_->actions().front()->setChecked(true);
 
-    themeToggle_ = new QAction("Toggle Dark/Light", this);
-
-    actChangePswd_ = new QAction("Change Password", this);
-
-    //sett_->addAction(actChangePswd_);
-    //sett_->addAction(themeToggle_);
-
     connect(actToggleLog_, &QAction::toggled, this, [this](bool checked) {
         if (LogManager::instance()) {
             LogManager::instance()->setVisible(checked);
         }
     });
+
+    auto sS = [&](const char *t) {
+        auto *a = new QAction(t, this);
+        a->setCheckable(true);
+        screenGroup_->addAction(a);
+        return a;
+    };
+
+    setScreenSize_ = view_->addMenu("Screen Size");
+
+    actFullScreen_ = sS("Full Screen");
+    actMaximize_   = sS("MaxiMize");
+
+    setScreenSize_->addAction(actFullScreen_);
+    setScreenSize_->addAction(actMaximize_);
+
+    connect(actFullScreen_, &QAction::toggled, this, [this](bool checked) {
+        emit fullScreenRequested(checked);
+    });
+
+    connect(actMaximize_, &QAction::toggled, this, [this](bool checked) {
+        emit maximizeRequested(checked);
+    });
+
+    // add tools actions
+    actChangePswd_ = new QAction("Change Password", this);
+
     connect(actChangePswd_, &QAction::triggered, this, &TopMenu::onChangePasswordTriggered);
+    tools_->addAction(actChangePswd_);
+
+    //themeToggle_ = new QAction("Toggle Dark/Light", this);
+    //sett_->addAction(themeToggle_);
+
+    // add help actions
 }
 
 void TopMenu::onChangePasswordTriggered()

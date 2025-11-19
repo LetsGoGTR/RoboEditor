@@ -66,10 +66,12 @@ void ControllerManager::registerController()
         // SN 폴더 자동 생성
         QString folderPath = "C:/backup/" + newConInfo.serialNumber;
         QDir    dir;
+        bool    folderCreated = false;
 
         if (!dir.exists(folderPath)) {
             if (dir.mkpath(folderPath)) {
                 qDebug() << "폴더 생성 완료:" << folderPath;
+                folderCreated = true;
             } else {
                 QMessageBox::warning(nullptr,
                                      "폴더 생성 실패",
@@ -88,6 +90,14 @@ void ControllerManager::registerController()
                                  "제어기와의 연결을 확인할 수 없습니다.\n"
                                  "API 또는 SFTP 연결이 실패했습니다.\n"
                                  "IP 주소, 포트, 계정 정보를 확인해주세요.");
+            if (folderCreated) {
+                if (dir.rmpath(folderPath)) {
+                    qDebug() << "등록 실패로 인한 폴더 삭제:" << folderPath;
+                } else {
+                    qDebug() << "폴더 삭제 실패:" << folderPath;
+                }
+            }
+
             return;
         }
 
