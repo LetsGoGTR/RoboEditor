@@ -99,6 +99,10 @@ class TopMenu : public QObject
         void fullScreenRequested(bool enable);
         void maximizeRequested(bool enable);
         void resetLayoutRequested();
+        void compareFileFromMenu();
+        void compareFolderFromMenu();
+        void applyFromMenu();
+        void backupFromMenu();
 };
 
 #endif  // TOPMENU_H

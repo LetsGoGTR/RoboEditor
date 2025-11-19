@@ -55,6 +55,11 @@ class MainWindow : public QMainWindow
         void setFullScreen(bool enable);
         void setMaximize(bool enable);
 
+        void applyFromMenu();
+        void backupFromMenu();
+        void compareFileFromMenu();
+        void compareFolderFromMenu();
+
       protected:
         void closeEvent(QCloseEvent * event) override;
         bool eventFilter(QObject * obj, QEvent * event) override;

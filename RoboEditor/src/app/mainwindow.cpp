@@ -415,6 +415,55 @@ void MainWindow::setMaximize(bool enable)
         LogManager::append("Window restored to normal size");
     }
 }
+
+void MainWindow::compareFileFromMenu()
+{
+    center_->showModifyWithCompare();
+}
+void MainWindow::compareFolderFromMenu()
+{
+    center_->showModifyWithCompare();
+}
+void MainWindow::backupFromMenu()
+{
+    if (backupPopup_ && backupPopup_->isVisible()) {
+        backupPopup_->raise();
+        backupPopup_->activateWindow();
+        return;
+    }
+    backupPopup_ = new QWidget(nullptr, Qt::Window);
+    backupPopup_->setAttribute(Qt::WA_DeleteOnClose);
+    backupPopup_->setWindowTitle("Backup from Robot Controller");
+    backupPopup_->resize(900, 600);
+    auto *backupPage = new BackupPage(backupPopup_);
+    auto *layout     = new QVBoxLayout(backupPopup_);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->addWidget(backupPage);
+    connect(backupPopup_, &QWidget::destroyed, this, [this]() { backupPopup_ = nullptr; });
+    backupPopup_->show();
+}
+void MainWindow::applyFromMenu()
+{
+    if (applyPopup_ && applyPopup_->isVisible()) {
+        applyPopup_->raise();
+        applyPopup_->activateWindow();
+        return;
+    }
+
+    applyPopup_ = new QWidget(nullptr, Qt::Window);
+    applyPopup_->setAttribute(Qt::WA_DeleteOnClose);
+    applyPopup_->setWindowTitle("Apply to Robot Controller");
+    applyPopup_->resize(900, 600);
+
+    auto *applyPage = new ApplyPage(applyPopup_);
+    auto *layout    = new QVBoxLayout(applyPopup_);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->addWidget(applyPage);
+
+    QObject::connect(applyPopup_, &QWidget::destroyed, this, [this]() { applyPopup_ = nullptr; });
+
+    applyPopup_->show();
+}
 void MainWindow::closeEvent(QCloseEvent *event)
 {
     QMainWindow::closeEvent(event);

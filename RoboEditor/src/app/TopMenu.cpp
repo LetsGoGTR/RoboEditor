@@ -69,6 +69,10 @@ void TopMenu::build()
     modifyMenu_       = ctrl_->addMenu("Modify Controller Setting");
     removeMenu_       = ctrl_->addMenu("Remove Controller");
     actRefreshList_   = ctrl_->addAction("Refresh List");
+    actCompareFile_   = ctrl_->addAction("Compare Files");
+    actCompareFolder_ = ctrl_->addAction("Compare Folders");
+    actBackup_        = ctrl_->addAction("Backup from Controller");
+    actApply_         = ctrl_->addAction("Apply to Controller");
 
     connect(actAddController_, &QAction::triggered, mw_, &MainWindow::addCtrlFromMenu);
     connect(actRefreshList_, &QAction::triggered, mw_, &MainWindow::refreshCtrlFromMenu);
@@ -79,6 +83,11 @@ void TopMenu::build()
     connect(removeMenu_, &QMenu::aboutToShow, this, [this]() {
         emit requestRemoveMenuUpdate(removeMenu_);
     });
+
+    connect(actCompareFile_, &QAction::triggered, mw_, &MainWindow::compareFileFromMenu);
+    connect(actCompareFolder_, &QAction::triggered, mw_, &MainWindow::compareFolderFromMenu);
+    connect(actBackup_, &QAction::triggered, mw_, &MainWindow::backupFromMenu);
+    connect(actApply_, &QAction::triggered, mw_, &MainWindow::applyFromMenu);
 
     // add view actions
     showLogMenu_ = view_->addMenu("Show Log");
