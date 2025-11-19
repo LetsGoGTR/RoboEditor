@@ -4,7 +4,7 @@
 	import type { TreeNode } from '@/types';
   import FileExplorer from '@features/FileExplorer.svelte';
   import ApplyDialog from '@features/dialogs/ApplyDialog.svelte';
-	import { get } from 'svelte/store';
+	import { openDirectory } from '@/utils/open';
 	import { fileTree } from '@/stores/fileTree';
   
   let selected = $state<string[]>([]);
@@ -22,7 +22,7 @@
   const filteredControllers = $derived(
     showBackupOnly
       ? dummyController.filter(
-          (c) => c.state === 'idle' || c.state === 'error'
+          (c) => c.controllerMeta.state === 'idle' || c.controllerMeta.state === 'error'
         )
       : dummyController
   );
@@ -40,13 +40,18 @@
   // dialog
   let applyDlg: any;
   async function handleConfirm() {
-    try {
-      if (tree && tree.type === 'folder') {
-        selectTree = tree;
-      }
-    } catch (err) {
-      console.error('openDirectory 실패:', err);
+    const result = await openDirectory();
+
+    if (!result) {
+      console.log('사용자 취소');
+      return;
     }
+
+    const { metadata, tree } = result;
+    console.log('선택된 워크스페이스 메타:', metadata);
+    console.log('선택된 워크스페이스 트리:', tree);
+    selectTree=tree;
+
     return;
   }
 
@@ -65,10 +70,10 @@
     const remotePath = `/home/default/${archiveName}`;
     try {
       const targets = filteredControllers
-        .filter((c) => selected.includes(c.serialNumber))
+        .filter((c) => selected.includes(c.controllerMeta.serialNumber))
         .map((c) => ({
-          host: c.ipAddress,           // 또는 c.host / c.address 등 실제 필드에 맞게
-          port: 22, // 이미 number면 Number() 없어도 됨
+          host: c.controllerMeta.api,           // 또는 c.host / c.address 등 실제 필드에 맞게
+          port: c.controllerMeta.sftpPort, // 이미 number면 Number() 없어도 됨
           username: 'default', // 또는 c.user / c.id 등 실제 계정 필드
           password: '1234',             // 다이얼로그에서 받은 비번
         }));

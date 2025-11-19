@@ -9,11 +9,11 @@
 
 <div class="controller-item {selected ? 'selected' : ''}">
   <div class="header">
-    <span class="serial">{controller.serialNumber}</span>
-    <span class="state {controller.state.toLowerCase()}">{controller.state}</span>
+    <span class="serial">{controller.controllerMeta.serialNumber}</span>
+    <span class="state {controller.controllerMeta.state.toLowerCase()}">{controller.controllerMeta.state}</span>
   </div>
   <div class="info">
-    <div><strong>IP:</strong> {controller.ipAddress}</div>
+    <div><strong>IP:</strong> {controller.controllerMeta.api}</div>
   </div>
 </div>
 

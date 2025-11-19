@@ -12,6 +12,8 @@
 	let tree: TreeNode | null = null;
 	let activeId: 'left' | 'right' = 'left';
 
+	let controllerDirRef: any;
+
 	// 파일 클릭 시 store 저장 및 routing
 	function handleSelect(node: TreeNode) {
 		if (node.type === "directory") {
@@ -31,6 +33,10 @@
 	// 수동 클릭 대응
 	function handleTabChange(id: 'left' | 'right') {
 		activeId = id;
+
+		if (activeId === 'left') {
+			controllerDirRef?.loadDevices();
+		}
 	}
 
 	onDestroy(unsubscribe);
@@ -43,7 +49,7 @@
 	onTabChange={handleTabChange}
 >
 	<div slot="left">
-		<ControllerDir />
+		<ControllerDir bind:this={controllerDirRef} />
 	</div>
 
 	<div slot="right">

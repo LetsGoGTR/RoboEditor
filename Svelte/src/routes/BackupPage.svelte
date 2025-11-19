@@ -12,7 +12,7 @@
   const filteredControllers = $derived(
     showBackupOnly
       ? dummyController.filter(
-          (c) => c.state === 'idle' || c.state === 'error'
+          (c) => c.controllerMeta.state === 'idle' || c.controllerMeta.state === 'error'
         )
       : dummyController
   );

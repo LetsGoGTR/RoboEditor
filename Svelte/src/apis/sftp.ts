@@ -17,3 +17,12 @@ export const _ftBackup = async (payload: any) => {
 	});
 	return res.json();
 };
+
+export const _ftChangePassword = async (payload: any) => {
+	const res = await fetch(`${FT_API_BASE}/password`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(payload)
+	});
+	return res.json();
+};
