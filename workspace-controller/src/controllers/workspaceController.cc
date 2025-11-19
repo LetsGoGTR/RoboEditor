@@ -24,7 +24,6 @@ void WorkspaceController::handleCompress(int client, const std::string& body) {
 void WorkspaceController::handleExtract(int client, const std::string& body) {
   try {
     std::string user = utils::validateUser(body);
-    std::string password = utils::extractJson(body, "password");
 
     std::string message = services::WorkspaceService::extract(user);
 

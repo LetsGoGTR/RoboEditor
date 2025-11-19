@@ -4,7 +4,7 @@ project(workspace-controller)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Static build option
+# 정적 빌드 옵션
 option(BUILD_STATIC "Build static executable" OFF)
 
 if(BUILD_STATIC)
@@ -30,6 +30,7 @@ add_executable(
 target_include_directories(workspace-controller
   PRIVATE
     ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/src/libs
     ${LIBARCHIVE_INCLUDE_DIRS}
 )
 

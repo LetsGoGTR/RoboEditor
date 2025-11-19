@@ -1,8 +1,8 @@
 #include "httpController.h"
 
+#include <plog/Log.h>
 #include <unistd.h>
 
-#include <iostream>
 #include <sstream>
 
 #include "../utils/config.h"
@@ -51,7 +51,7 @@ void HttpController::handleRequest(int client, const std::string& client_ip) {
     std::getline(stream, line);
     std::istringstream(line) >> method >> path;
 
-    std::cout << client_ip << " - " << method << " " << path << '\n';
+    PLOGI << client_ip << " - " << method << " " << path;
 
     // Route based on HTTP method
     if (method == "GET") {
