@@ -46,7 +46,9 @@ bool SFTPClient::connectToServer()
     // TCP 소켓 생성
     socket_.connectToHost(host_, port_);
     if (!socket_.waitForConnected(5000)) {
-        qWarning() << "TCP connect failed:" << socket_.errorString();
+        QString error = socket_.errorString();
+        qWarning() << "TCP connect failed:" << error;
+        lastError_ = QString("TCP connect failed: %1").arg(error);
         return false;
     }
 
@@ -62,6 +64,8 @@ bool SFTPClient::connectToServer()
     int rc = libssh2_session_handshake(session_, sockfd);
     if (rc) {
         qWarning() << "Handshake failed:" << rc;
+        lastError_ = QString("Handshake failed: %1").arg(rc);
+
         return false;
     }
 
@@ -70,6 +74,7 @@ bool SFTPClient::connectToServer()
             session_, user_.toUtf8().constData(), pass_.toUtf8().constData());
     if (rc) {
         qWarning() << "Authentication failed:" << rc;
+        lastError_ = QString("Authentication failed: %1").arg(rc);
         return false;
     }
     //4 SFTP 세션 생성(파일 전송용 채널)
@@ -77,6 +82,7 @@ bool SFTPClient::connectToServer()
     sftpSession_ = libssh2_sftp_init(session_);
     if (!sftpSession_) {
         qWarning() << "Unable to init SFTP session";
+        lastError_ = QString("Unable to init SFTP session");
         return false;
     }
 
@@ -113,6 +119,7 @@ bool SFTPClient::uploadFile(const QString &localPath, const QString &remotePath)
     //sftp 세션 확인
     if (!sftpSession_) {
         qWarning() << "SFTP session not initialized";
+        lastError_ = QString("SFTP session not initialized");
         return false;
     }
 
@@ -120,6 +127,8 @@ bool SFTPClient::uploadFile(const QString &localPath, const QString &remotePath)
     QFile localFile(localPath);
     if (!localFile.open(QIODevice::ReadOnly)) {
         qWarning() << "Cannot open local file:" << localPath;
+
+        lastError_ = QString("Cannot open local file: %1").arg(localPath);
         return false;
     }
 
@@ -133,6 +142,11 @@ bool SFTPClient::uploadFile(const QString &localPath, const QString &remotePath)
     if (!sftpHandle) {
         qWarning() << "Unable to open remote file:" << remotePath
                    << "Error:" << libssh2_sftp_last_error(sftpSession_);
+
+        int errorCode = libssh2_sftp_last_error(sftpSession_);
+        lastError_    = QString("Unable to open remote file: %1, Error code: %2")
+                             .arg(remotePath)
+                             .arg(errorCode);
         return false;
     }
 
@@ -151,6 +165,7 @@ bool SFTPClient::uploadFile(const QString &localPath, const QString &remotePath)
         while (remaining > 0) {
             ssize_t written = libssh2_sftp_write(sftpHandle, ptr, remaining);
             if (written < 0) {
+                lastError_ = QString("SFTP write error: %1").arg(written);
                 qWarning() << "SFTP write error:" << written;
                 success = false;
                 break;
@@ -177,12 +192,14 @@ bool SFTPClient::downloadFile(const QString &remotePath, const QString &localPat
 {
     if (!sftpSession_) {
         qWarning() << "SFTP session not initialized";
+        lastError_ = QString("SFTP session not initialized");
         return false;
     }
 
     QFile localFile(localPath);
     if (!localFile.open(QIODevice::WriteOnly)) {
         qWarning() << "Cannot open local file:" << localPath;
+        lastError_ = QString("Cannot open local file: %1").arg(localPath);
         return false;
     }
 
@@ -192,6 +209,10 @@ bool SFTPClient::downloadFile(const QString &remotePath, const QString &localPat
                                                         LIBSSH2_FXF_READ,
                                                         0);
     if (!sftpHandle) {
+        int errorCode = libssh2_sftp_last_error(sftpSession_);
+        lastError_    = QString("Unable to open remote file: %1, Error code: %2")
+                             .arg(remotePath)
+                             .arg(errorCode);
         qWarning() << "Unable to open remote file:" << remotePath
                    << "Error:" << libssh2_sftp_last_error(sftpSession_);
         return false;
@@ -204,6 +225,8 @@ bool SFTPClient::downloadFile(const QString &remotePath, const QString &localPat
         ssize_t bytesRead = libssh2_sftp_read(sftpHandle, buffer, sizeof(buffer));
 
         if (bytesRead < 0) {
+            lastError_ = QString("SFTP read error: %1").arg(bytesRead);
+
             qWarning() << "SFTP read error:" << bytesRead;
             success = false;
             break;
@@ -216,7 +239,8 @@ bool SFTPClient::downloadFile(const QString &remotePath, const QString &localPat
         qint64 written = localFile.write(buffer, bytesRead);
         if (written != bytesRead) {
             qWarning() << "Local write error";
-            success = false;
+            lastError_ = QString("Local write error");
+            success    = false;
             break;
         }
 

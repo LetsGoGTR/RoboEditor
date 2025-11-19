@@ -23,14 +23,19 @@ class SFTPClient : public QObject
         bool connectToServer();
         void disconnect();
 
-        bool uploadFile(const QString &localPath, const QString &remotePath);
-        bool downloadFile(const QString &remotePath, const QString &localPath);
+        bool    uploadFile(const QString &localPath, const QString &remotePath);
+        bool    downloadFile(const QString &remotePath, const QString &localPath);
+        QString getLastError() const
+        {
+            return lastError_;
+        }
 
       private:
         QString host_;
         int     port_;
         QString user_;
         QString pass_;
+        QString lastError_;
 
         QTcpSocket       socket_;
         LIBSSH2_SESSION *session_     = nullptr;

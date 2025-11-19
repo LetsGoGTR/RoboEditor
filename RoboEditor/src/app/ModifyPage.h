@@ -119,16 +119,26 @@ class ModifyPage : public QWidget
         // 외부에서 접근 가능한 메서드들
         Document *openDocument(const QString &path);
         Document *currentDocument();  // private에서 public으로 이동
+        void      createNewFile();
         void      closeFile(int index);
+        void      closeFile();
+        void      closeAll();
         void      openFile();
         void      saveFile();
         void      saveAsFile();
+        void      saveAsFile(int index);
+        void      saveAll();
         bool      hasUnsavedChanges(Document * doc);
         void      updateTitle();
         void      onTabChanged(int index);
         // 트리뷰 연동용 (함수만 준비)
         void openFromTree(const QString &path);
         void compareWithFromTree(const QString &path);
+
+        QPlainTextEdit *getEditor() const
+        {
+            return editor_;
+        }
 
       private:
         int cursorLine;

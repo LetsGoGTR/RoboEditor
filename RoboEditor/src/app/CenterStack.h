@@ -51,6 +51,11 @@ class CenterStack : public QWidget
         {
             return comparePage_;
         }
+        ControllerManager *getControllerManager() const
+        {
+            return controllerManager_;
+        }
+
         // 경로 관련
         QString getWorkspacePath() const;
         void    setBackupPath(const QString &path);
