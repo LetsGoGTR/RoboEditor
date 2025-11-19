@@ -199,12 +199,3 @@ QSpinBox::up-arrow, QSpinBox::down-arrow {
     background-color: #d0d0d0;
 }
 
-QPushButton:checked {
-    background-color: #4a67d6;   /* 기본 파란색 */
-    color: white;
-    border: 1px solid #3a54b0;
-}
-
-QPushButton:checked:hover {
-    background-color: #5e7aed;
-}

@@ -100,6 +100,10 @@ class ControllerManager : public QObject
         void updateRunningState(const QString &serialNumber, bool running);
         void updateConnectionState(const QString &serialNumber, bool connected);
 
+        bool validateConnection(const ControllerInfo &info);
+        bool validateApiConnection(const ControllerInfo &info);
+        bool validateSftpConnection(const ControllerInfo &info);
+
         static QPair<QString, quint16> parseHostPort(const QString &hostString,
                                                      quint16        defaultPort);
         bool                           stateUpdatesPaused_ = false;
