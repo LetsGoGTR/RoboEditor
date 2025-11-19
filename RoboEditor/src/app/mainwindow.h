@@ -31,6 +31,25 @@ class MainWindow : public QMainWindow
 
       public slots:
         void toggleTheme();
+        void createNewDocument();
+        void openFileFromMenu();
+        void saveFileFromMenu();
+        void saveAsFileFromMenu();
+        void saveAllFromMenu();
+        void closeFileFromMenu();
+        void closeAllFromMenu();
+
+        void undoFromMenu();
+        void redoFromMenu();
+        void cutFromMenu();
+        void copyFromMenu();
+        void pasteFromMenu();
+        void selectAllFromMenu();
+
+        void addCtrlFromMenu();
+        void removeCtrlFromMenu();
+        void modifyCtrlFromMenu();
+        void refreshCtrlFromMenu();
 
       protected:
         void closeEvent(QCloseEvent * event) override;

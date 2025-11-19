@@ -8,7 +8,7 @@
 
 #include "PasswordManager.h"
 
-class QMainWindow;
+class MainWindow;
 class QMenu;
 class QAction;
 class QActionGroup;
@@ -17,14 +17,14 @@ class TopMenu : public QObject
 {
     Q_OBJECT
       public:
-        explicit TopMenu(QMainWindow * mw);
+        explicit TopMenu(MainWindow * mw);
         QMenu *viewMenu() const
         {
             return view_;
         }
         QAction *logVisibleAction() const
         {
-            return actLogVisible_;
+            return actToggleLog_;
         }
         QActionGroup *logPosGroup() const
         {
@@ -36,19 +36,54 @@ class TopMenu : public QObject
         }
 
       private:
-        QMainWindow *mw_;
-        QMenu       *file_ = nullptr, *edit_ = nullptr, *view_ = nullptr, *help_ = nullptr,
-              *sett_ = nullptr, *showLogMenu_ = nullptr;
+        MainWindow *mw_;
+        QMenu      *file_ = nullptr, *edit_ = nullptr, *view_ = nullptr, *help_ = nullptr,
+              *ctrl_ = nullptr, *tools_ = nullptr, *showLogMenu_ = nullptr;
 
-        QAction *newFile_    = nullptr;
-        QAction *openFile_   = nullptr;
-        QAction *openFolder_ = nullptr;
+        //File Action
+        QAction *actNewFile_    = nullptr;
+        QAction *actOpenFile_   = nullptr;
+        QAction *actSaveFile_   = nullptr;
+        QAction *actSaveAsFile_ = nullptr;
+        QAction *actSaveAll_    = nullptr;
+        QAction *actCloseFile_  = nullptr;
+        QAction *actCloseAll_   = nullptr;
+        QAction *actExit_       = nullptr;
 
-        QAction      *themeToggle_    = nullptr;
-        QAction      *actToggle_      = nullptr;  // Ctrl+L
-        QAction      *actLogVisible_  = nullptr;  // Visible
-        QAction      *changePassword_ = nullptr;
-        QActionGroup *posGroup_       = nullptr;  // Bottom/Right/Left/Top/Float/Embedded
+        // Edit Actions
+        QAction *actUndo_      = nullptr;
+        QAction *actRedo_      = nullptr;
+        QAction *actCut_       = nullptr;
+        QAction *actCopy_      = nullptr;
+        QAction *actPaste_     = nullptr;
+        QAction *actSelectAll_ = nullptr;
+
+        // Controller Actions
+        QAction *actAddController_    = nullptr;
+        QAction *actModifyController_ = nullptr;
+        QAction *actRemoveController_ = nullptr;
+        QAction *actRefreshList_      = nullptr;
+
+        // View Actions
+        QAction *actToggleLog_     = nullptr;
+        QAction *actToggleToolbar_ = nullptr;
+        QAction *actFullScreen_    = nullptr;
+        QAction *actMaximize_      = nullptr;
+        QAction *actResetLayout_   = nullptr;
+
+        // Tools Actions
+        QAction *actCompareFile_   = nullptr;
+        QAction *actCompareFolder_ = nullptr;
+        QAction *actBackup_        = nullptr;
+        QAction *actApply_         = nullptr;
+        QAction *actChangePswd_    = nullptr;
+
+        // Help Actions
+        QAction *actDocumentation_ = nullptr;
+        QAction *actAbout_         = nullptr;
+
+        QAction      *themeToggle_ = nullptr;
+        QActionGroup *posGroup_    = nullptr;  // Bottom/Right/Left/Top/Float/Embedded
         void          build();
 
       private slots:

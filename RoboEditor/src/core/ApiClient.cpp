@@ -409,6 +409,7 @@ bool ApiClient::postWorkspaceCompress(const QString &user)
     return postJson("/api/workspace/compress", j);
 }
 
+//패스워드도 빼도 된다.
 bool ApiClient::postWorkspaceExtract(const QString &user, const QString &password)
 {
     QJsonObject j;

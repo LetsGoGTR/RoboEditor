@@ -132,7 +132,9 @@ void MainWindow::wire()
 
     connect(shortcutMgr, &ShortcutManager::openRequested, modifyPage, &ModifyPage::openFile);
     connect(shortcutMgr, &ShortcutManager::saveRequested, modifyPage, &ModifyPage::saveFile);
-    connect(shortcutMgr, &ShortcutManager::saveAsRequested, modifyPage, &ModifyPage::saveAsFile);
+    connect(shortcutMgr, &ShortcutManager::saveAsRequested, this, [this]() {
+        modifyPage->saveAsFile();
+    });
     connect(shortcutMgr,
             &ShortcutManager::closeRequested,
             modifyPage,
@@ -186,6 +188,140 @@ void MainWindow::toggleTheme()
     }
 }
 
+void MainWindow::createNewDocument()
+{
+    if (center_) {
+        auto *modify = center_->getModifyPage();
+        modify->createNewFile();
+
+        LogManager::append("New document created: untitled");
+    }
+}
+void MainWindow::openFileFromMenu()
+{
+    if (center_) {
+        auto *modify = center_->getModifyPage();
+        modify->openFile();
+    }
+}
+void MainWindow::saveFileFromMenu()
+{
+    if (center_) {
+        auto *modify = center_->getModifyPage();
+        modify->saveFile();
+    }
+}
+void MainWindow::saveAsFileFromMenu()
+{
+    if (center_) {
+        auto *modify = center_->getModifyPage();
+        modify->saveAsFile();
+    }
+}
+void MainWindow::saveAllFromMenu()
+{
+    if (center_) {
+        auto *modify = center_->getModifyPage();
+        modify->saveAll();
+    }
+}
+void MainWindow::closeFileFromMenu()
+{
+    if (center_) {
+        auto *modify = center_->getModifyPage();
+        modify->closeFile();
+    }
+}
+void MainWindow::closeAllFromMenu()
+{
+    if (center_) {
+        auto *modify = center_->getModifyPage();
+        modify->closeAll();
+    }
+}
+void MainWindow::undoFromMenu()
+{
+    if (center_) {
+        auto *modify = center_->getModifyPage();
+        if (auto *ed = modify->getEditor()) {
+            ed->undo();
+        }
+    }
+}
+void MainWindow::redoFromMenu()
+{
+    if (center_) {
+        auto *modify = center_->getModifyPage();
+        if (auto *ed = modify->getEditor()) {
+            ed->redo();
+        }
+    }
+}
+void MainWindow::cutFromMenu()
+{
+    if (center_) {
+        auto *modify = center_->getModifyPage();
+        if (auto *ed = modify->getEditor()) {
+            ed->cut();
+        }
+    }
+}
+void MainWindow::copyFromMenu()
+{
+    if (center_) {
+        auto *modify = center_->getModifyPage();
+        if (auto *ed = modify->getEditor()) {
+            ed->copy();
+        }
+    }
+}
+void MainWindow::pasteFromMenu()
+{
+    if (center_) {
+        auto *modify = center_->getModifyPage();
+        if (auto *ed = modify->getEditor()) {
+            ed->paste();
+        }
+    }
+}
+void MainWindow::selectAllFromMenu()
+{
+    if (center_) {
+        auto *modify = center_->getModifyPage();
+        if (auto *ed = modify->getEditor()) {
+            ed->selectAll();
+            ;
+        }
+    }
+}
+void MainWindow::addCtrlFromMenu()
+{
+    if (center_) {
+        auto *ctrlManager = center_->getControllerManager();
+        ctrlManager->registerController();
+    }
+}
+void MainWindow::modifyCtrlFromMenu()
+{
+    if (center_) {
+        auto *ctrlManager = center_->getControllerManager();
+        ctrlManager->registerController();
+    }
+}
+void MainWindow::removeCtrlFromMenu()
+{
+    if (center_) {
+        auto *ctrlManager = center_->getControllerManager();
+        ctrlManager->registerController();
+    }
+}
+void MainWindow::refreshCtrlFromMenu()
+{
+    if (center_) {
+        auto *ctrlManager = center_->getControllerManager();
+        ctrlManager->registerController();
+    }
+}
 void MainWindow::closeEvent(QCloseEvent *event)
 {
     QMainWindow::closeEvent(event);
