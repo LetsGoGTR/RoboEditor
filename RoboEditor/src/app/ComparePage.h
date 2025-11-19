@@ -22,9 +22,9 @@ class ComparePage : public QWidget
         void setLeftEditor(CodeEditor * leftEditor);
         void clearHighlights();
 
-        void       performDiff(const QString &leftPath, const QString &rightPath);
-        void       performFolderDiff(const QString &leftPath, const QString &rightPath);
-        void       applyTheme(bool dark);
+        void performDiff(const QString &leftPath, const QString &rightPath);
+        void performFolderDiff(const QString &leftPath, const QString &rightPath);
+        void applyTheme(bool dark);
 
       signals:
         void closed();
