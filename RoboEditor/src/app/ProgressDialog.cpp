@@ -18,6 +18,17 @@ ProgressDialog::ProgressDialog(QWidget *parent) : QDialog(parent)
     progressBar_ = new QProgressBar();
     progressBar_->setRange(0, 100);
 
+    progressBar_->setStyleSheet(
+               "QProgressBar {"
+               "  border: 1px solid #d0d0d0;"
+               "  border-radius: 4px;"
+               "  text-align: center;"
+               "}"
+               "QProgressBar::chunk {"
+               "  background-color: #2d89ef;"   // 파란색 계열
+               "}"
+           );
+
     statusLabel_ = new QLabel("");
     statusLabel_->setWordWrap(true);
 
@@ -42,13 +53,17 @@ ProgressDialog::ProgressDialog(QWidget *parent) : QDialog(parent)
 void ProgressDialog::setTotalCount(int total)
 {
     totalCount_ = total;
-    countLabel_->setText(QString("%1 / %2").arg(currentIndex_).arg(totalCount_));
+    if (!useCustomCountText_ && countLabel_) {
+        countLabel_->setText(QString("%1 / %2").arg(currentIndex_).arg(totalCount_));
+    }
 }
 
 void ProgressDialog::setCurrentIndex(int index)
 {
     currentIndex_ = index;
-    countLabel_->setText(QString("%1 / %2").arg(currentIndex_).arg(totalCount_));
+    if (!useCustomCountText_ && countLabel_) {
+        countLabel_->setText(QString("%1 / %2").arg(currentIndex_).arg(totalCount_));
+    }
 }
 
 void ProgressDialog::setSerialNumber(const QString &sn)
@@ -95,6 +110,7 @@ void ProgressDialog::reset()
 {
     totalCount_ = 0;
     currentIndex_ = 0;
+    useCustomCountText_ = false;
 
     serialLabel_->setText("현재 제어기: -");
     countLabel_->setText("0 / 0");
@@ -106,4 +122,12 @@ void ProgressDialog::reset()
 
     cancelBtn_->setText("취소");
     setWindowTitle("진행 중...");
+}
+
+void ProgressDialog::setCountText(const QString &text)
+{
+    useCustomCountText_ = true;
+    if (countLabel_) {
+        countLabel_->setText(text);
+    }
 }

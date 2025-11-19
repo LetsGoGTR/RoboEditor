@@ -22,6 +22,7 @@ class ProgressDialog : public QDialog
     void setStatusText(const QString &text);
     void setFinishedMode(bool finished);
     void reset();
+    void setCountText(const QString &text);
 
       signals:
         void cancelRequested();
@@ -41,6 +42,8 @@ class ProgressDialog : public QDialog
         QTimer       *timer_;
         int           totalCount_   = 0;
         int           currentIndex_ = 0;
+
+        bool          useCustomCountText_ = false;
 };
 
 #endif  // PROGRESSDIALOG_H
