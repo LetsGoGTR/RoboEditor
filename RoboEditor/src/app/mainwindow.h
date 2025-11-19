@@ -39,6 +39,18 @@ class MainWindow : public QMainWindow
         void closeFileFromMenu();
         void closeAllFromMenu();
 
+        void undoFromMenu();
+        void redoFromMenu();
+        void cutFromMenu();
+        void copyFromMenu();
+        void pasteFromMenu();
+        void selectAllFromMenu();
+
+        void addCtrlFromMenu();
+        void removeCtrlFromMenu();
+        void modifyCtrlFromMenu();
+        void refreshCtrlFromMenu();
+
       protected:
         void closeEvent(QCloseEvent * event) override;
         bool eventFilter(QObject * obj, QEvent * event) override;

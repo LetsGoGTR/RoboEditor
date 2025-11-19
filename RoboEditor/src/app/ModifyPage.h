@@ -135,6 +135,11 @@ class ModifyPage : public QWidget
         void openFromTree(const QString &path);
         void compareWithFromTree(const QString &path);
 
+        QPlainTextEdit *getEditor() const
+        {
+            return editor_;
+        }
+
       private:
         int cursorLine;
         int cursorColumn;

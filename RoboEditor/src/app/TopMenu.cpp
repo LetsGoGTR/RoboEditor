@@ -47,6 +47,39 @@ void TopMenu::build()
     connect(actCloseAll_, &QAction::triggered, mw_, &MainWindow::closeAllFromMenu);
     connect(actExit_, &QAction::triggered, qApp, &QApplication::quit);
 
+    // add edit actions
+
+    actUndo_      = edit_->addAction("Undo");
+    actRedo_      = edit_->addAction("Redo");
+    actCut_       = edit_->addAction("Cut");
+    actCopy_      = edit_->addAction("Copy");
+    actPaste_     = edit_->addAction("Paste");
+    actSelectAll_ = edit_->addAction("Select All");
+
+    connect(actUndo_, &QAction::triggered, mw_, &MainWindow::undoFromMenu);
+    connect(actRedo_, &QAction::triggered, mw_, &MainWindow::redoFromMenu);
+    connect(actCut_, &QAction::triggered, mw_, &MainWindow::cutFromMenu);
+    connect(actCopy_, &QAction::triggered, mw_, &MainWindow::copyFromMenu);
+    connect(actPaste_, &QAction::triggered, mw_, &MainWindow::pasteFromMenu);
+    connect(actSelectAll_, &QAction::triggered, mw_, &MainWindow::selectAllFromMenu);
+
+    // add controllers actions
+    actAddController_    = ctrl_->addAction("Add Controller");
+    actModifyController_ = ctrl_->addAction("Modify Controller Setting");
+    actRemoveController_ = ctrl_->addAction("Remove Controller");
+    actRefreshList_      = ctrl_->addAction("Refresh List");
+
+    connect(actAddController_, &QAction::triggered, mw_, &MainWindow::addCtrlFromMenu);
+    connect(actModifyController_, &QAction::triggered, mw_, &MainWindow::modifyCtrlFromMenu);
+    connect(actRemoveController_, &QAction::triggered, mw_, &MainWindow::removeCtrlFromMenu);
+    connect(actRefreshList_, &QAction::triggered, mw_, &MainWindow::refreshCtrlFromMenu);
+
+    // add view actions
+
+    // add tools actions
+
+    // add help actions
+
     // View > Show Log
     showLogMenu_ = view_->addMenu("Show Log");
 

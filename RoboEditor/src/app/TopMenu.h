@@ -51,12 +51,12 @@ class TopMenu : public QObject
         QAction *actExit_       = nullptr;
 
         // Edit Actions
-        QAction *actUndo_   = nullptr;
-        QAction *actRedo_   = nullptr;
-        QAction *actCut_    = nullptr;
-        QAction *actCopy_   = nullptr;
-        QAction *actPaste_  = nullptr;
-        QAction *actDelete_ = nullptr;  // del → Delete (명확하게)
+        QAction *actUndo_      = nullptr;
+        QAction *actRedo_      = nullptr;
+        QAction *actCut_       = nullptr;
+        QAction *actCopy_      = nullptr;
+        QAction *actPaste_     = nullptr;
+        QAction *actSelectAll_ = nullptr;
 
         // Controller Actions
         QAction *actAddController_    = nullptr;

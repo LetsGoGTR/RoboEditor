@@ -239,7 +239,89 @@ void MainWindow::closeAllFromMenu()
         modify->closeAll();
     }
 }
-
+void MainWindow::undoFromMenu()
+{
+    if (center_) {
+        auto *modify = center_->getModifyPage();
+        if (auto *ed = modify->getEditor()) {
+            ed->undo();
+        }
+    }
+}
+void MainWindow::redoFromMenu()
+{
+    if (center_) {
+        auto *modify = center_->getModifyPage();
+        if (auto *ed = modify->getEditor()) {
+            ed->redo();
+        }
+    }
+}
+void MainWindow::cutFromMenu()
+{
+    if (center_) {
+        auto *modify = center_->getModifyPage();
+        if (auto *ed = modify->getEditor()) {
+            ed->cut();
+        }
+    }
+}
+void MainWindow::copyFromMenu()
+{
+    if (center_) {
+        auto *modify = center_->getModifyPage();
+        if (auto *ed = modify->getEditor()) {
+            ed->copy();
+        }
+    }
+}
+void MainWindow::pasteFromMenu()
+{
+    if (center_) {
+        auto *modify = center_->getModifyPage();
+        if (auto *ed = modify->getEditor()) {
+            ed->paste();
+        }
+    }
+}
+void MainWindow::selectAllFromMenu()
+{
+    if (center_) {
+        auto *modify = center_->getModifyPage();
+        if (auto *ed = modify->getEditor()) {
+            ed->selectAll();
+            ;
+        }
+    }
+}
+void MainWindow::addCtrlFromMenu()
+{
+    if (center_) {
+        auto *ctrlManager = center_->getControllerManager();
+        ctrlManager->registerController();
+    }
+}
+void MainWindow::modifyCtrlFromMenu()
+{
+    if (center_) {
+        auto *ctrlManager = center_->getControllerManager();
+        ctrlManager->registerController();
+    }
+}
+void MainWindow::removeCtrlFromMenu()
+{
+    if (center_) {
+        auto *ctrlManager = center_->getControllerManager();
+        ctrlManager->registerController();
+    }
+}
+void MainWindow::refreshCtrlFromMenu()
+{
+    if (center_) {
+        auto *ctrlManager = center_->getControllerManager();
+        ctrlManager->registerController();
+    }
+}
 void MainWindow::closeEvent(QCloseEvent *event)
 {
     QMainWindow::closeEvent(event);
