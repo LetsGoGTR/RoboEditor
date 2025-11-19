@@ -10,10 +10,14 @@ namespace services
 
     struct DeviceMetadata
     {
-        std::string id;
+        std::string serialNumber;
+        std::string api;
+        std::string sftpHost;
+        int         sftpPort;
+        std::string sftpPassword;
+        std::string sftpUser;
         std::string name;
         std::string description;
-        std::string ip;
         std::string createdAt;
         std::string updatedAt;
 
@@ -25,16 +29,14 @@ namespace services
     {
       public:
         // Device CRUD operations
-        static ServiceResult createDevice(const std::string    &baseDir,
+        static ServiceResult createDevice(const DeviceMetadata &metadata);
+        static ServiceResult readDevice(const std::string &deviceId);
+        static ServiceResult updateDevice(const std::string    &deviceId,
                                           const DeviceMetadata &metadata);
-        static ServiceResult readDevice(const std::string &baseDir, const std::string &deviceId);
-        static ServiceResult updateDevice(const std::string    &baseDir,
-                                          const std::string    &deviceId,
-                                          const DeviceMetadata &metadata);
-        static ServiceResult deleteDevice(const std::string &baseDir, const std::string &deviceId);
+        static ServiceResult deleteDevice(const std::string &deviceId);
 
         // List all devices
-        static ServiceResult listDevices(const std::string &baseDir);
+        static ServiceResult listDevices();
 
       private:
         static const std::string metadataFilename_;

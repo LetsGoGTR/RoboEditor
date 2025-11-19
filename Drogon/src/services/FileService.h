@@ -18,10 +18,8 @@ namespace services
         static ServiceResult deleteFile(const std::string &filePath);
         static ServiceResult moveFile(const std::string &oldPath, const std::string &newPath);
 
-        // File utility operations
-        static Json::Value getFileInfo(const std::string &filePath);
-
       private:
+        static Json::Value getFileInfo(const std::string &filePath);
     };
 
 }  // namespace services

@@ -1,14 +1,16 @@
 #include "DeviceService.h"
 
+#include "../utils/ConfigUtils.h"
+#include "../utils/JsonFileUtils.h"
+#include "../utils/PathValidator.h"
+#include "../utils/TimeUtils.h"
+#include "../utils/logging/Logger.h"
+
 #include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <sstream>
-
-#include "../utils/JsonFileUtils.h"
-#include "../utils/TimeUtils.h"
-#include "../utils/logging/Logger.h"
 
 namespace fs = std::filesystem;
 
@@ -17,12 +19,16 @@ const std::string services::DeviceService::metadataFilename_ = ".device.json";
 Json::Value services::DeviceMetadata::toJson() const
 {
     Json::Value json;
-    json["id"]          = id;
-    json["name"]        = name;
-    json["description"] = description;
-    json["ip"]          = ip;
-    json["createdAt"]   = createdAt;
-    json["updatedAt"]   = updatedAt;
+    json["serialNumber"]  = serialNumber;
+    json["api"]           = api;
+    json["sftpHost"]      = sftpHost;
+    json["sftpPort"]      = sftpPort;
+    json["sftpPassword"]  = sftpPassword;
+    json["sftpUser"]      = sftpUser;
+    json["name"]          = name;
+    json["description"]   = description;
+    json["createdAt"]     = createdAt;
+    json["updatedAt"]     = updatedAt;
     return json;
 }
 
@@ -30,14 +36,22 @@ services::DeviceMetadata services::DeviceMetadata::fromJson(const Json::Value &j
 {
     DeviceMetadata metadata;
 
-    if (json.isMember("id"))
-        metadata.id = json["id"].asString();
+    if (json.isMember("serialNumber"))
+        metadata.serialNumber = json["serialNumber"].asString();
+    if (json.isMember("api"))
+        metadata.api = json["api"].asString();
+    if (json.isMember("sftpHost"))
+        metadata.sftpHost = json["sftpHost"].asString();
+    if (json.isMember("sftpPort"))
+        metadata.sftpPort = json["sftpPort"].asInt();
+    if (json.isMember("sftpPassword"))
+        metadata.sftpPassword = json["sftpPassword"].asString();
+    if (json.isMember("sftpUser"))
+        metadata.sftpUser = json["sftpUser"].asString();
     if (json.isMember("name"))
         metadata.name = json["name"].asString();
     if (json.isMember("description"))
         metadata.description = json["description"].asString();
-    if (json.isMember("ip"))
-        metadata.ip = json["ip"].asString();
     if (json.isMember("createdAt"))
         metadata.createdAt = json["createdAt"].asString();
     if (json.isMember("updatedAt"))
@@ -52,19 +66,26 @@ services::DeviceMetadata services::DeviceService::loadMetadata(const std::string
     return utils::loadJsonFromFile<DeviceMetadata>(metadataPath);
 }
 
-services::ServiceResult services::DeviceService::createDevice(const std::string    &baseDir,
-                                                              const DeviceMetadata &metadata)
+services::ServiceResult
+services::DeviceService::createDevice(const DeviceMetadata &metadata)
 {
-    // Validation
-    if (metadata.id.empty()) {
-        return ServiceResult::createError("Device ID cannot be empty");
+    // Validate device serialNumber
+    if (metadata.serialNumber.empty()) {
+        return ServiceResult::createError("Device serialNumber cannot be empty");
     }
 
-    std::string devicePath = baseDir + metadata.id;
+    // Validate path for security
+    if (!utils::validatePath(metadata.serialNumber)) {
+        utils::logging::warn("Invalid device serialNumber: " + metadata.serialNumber);
+        return ServiceResult::createError("Invalid device serialNumber: " + metadata.serialNumber);
+    }
+
+    std::string devicePath = utils::config::getBaseDir() + metadata.serialNumber;
 
     // Check if device already exists
-    if (fs::exists(devicePath)) {
-        return ServiceResult::createError("Device already exists: " + metadata.id);
+    if (fs::exists(devicePath) && fs::is_directory(devicePath)) {
+        utils::logging::warn("Device already exists: " + metadata.serialNumber);
+        return ServiceResult::createError("Device already exists: " + metadata.serialNumber);
     }
 
     try {
@@ -81,6 +102,7 @@ services::ServiceResult services::DeviceService::createDevice(const std::string 
         std::string metadataPath = devicePath + "/" + metadataFilename_;
         if (!utils::saveJsonToFile(metadataPath, newMetadata)) {
             fs::remove_all(devicePath);
+            utils::logging::error("Failed to save device metadata: " + metadata.serialNumber);
             return ServiceResult::createError("Failed to save metadata");
         }
 
@@ -88,7 +110,7 @@ services::ServiceResult services::DeviceService::createDevice(const std::string 
         result.success = true;
         result.data    = newMetadata.toJson();
 
-        utils::logging::info("Created device: " + metadata.name + " (ID: " + metadata.id + ")");
+        utils::logging::info("Created device: " + metadata.name + " (serialNumber: " + metadata.serialNumber + ")");
         return result;
 
     } catch (const std::exception &e) {
@@ -98,18 +120,24 @@ services::ServiceResult services::DeviceService::createDevice(const std::string 
     }
 }
 
-services::ServiceResult services::DeviceService::readDevice(const std::string &baseDir,
-                                                            const std::string &deviceId)
+services::ServiceResult services::DeviceService::readDevice(const std::string &deviceId)
 {
-    std::string devicePath = baseDir + deviceId;
+    // Validate path for security
+    if (!utils::validatePath(deviceId)) {
+        utils::logging::warn("Invalid device ID: " + deviceId);
+        return ServiceResult::createError("Invalid device ID: " + deviceId);
+    }
 
-    // Validation
+    std::string devicePath = utils::config::getBaseDir() + deviceId;
+
+    // Check if device exists
     if (!fs::exists(devicePath) || !fs::is_directory(devicePath)) {
+        utils::logging::warn("Device not found: " + deviceId);
         return ServiceResult::createError("Device not found: " + deviceId);
     }
 
     DeviceMetadata metadata = loadMetadata(devicePath);
-    if (metadata.id.empty()) {
+    if (metadata.serialNumber.empty()) {
         return ServiceResult::createError("Invalid device metadata: " + deviceId);
     }
 
@@ -121,33 +149,40 @@ services::ServiceResult services::DeviceService::readDevice(const std::string &b
     return result;
 }
 
-services::ServiceResult services::DeviceService::updateDevice(const std::string    &baseDir,
-                                                              const std::string    &deviceId,
-                                                              const DeviceMetadata &metadata)
+services::ServiceResult services::DeviceService::updateDevice(
+        const std::string &deviceId, const DeviceMetadata &metadata)
 {
-    std::string devicePath = baseDir + deviceId;
+    // Validate path for security
+    if (!utils::validatePath(deviceId)) {
+        utils::logging::warn("Invalid device ID: " + deviceId);
+        return ServiceResult::createError("Invalid device ID: " + deviceId);
+    }
 
-    // Validation
+    std::string devicePath = utils::config::getBaseDir() + deviceId;
+
+    // Check if device exists
     if (!fs::exists(devicePath) || !fs::is_directory(devicePath)) {
+        utils::logging::warn("Device not found: " + deviceId);
         return ServiceResult::createError("Device not found: " + deviceId);
     }
 
     // Load existing metadata to preserve createdAt
     DeviceMetadata existingMetadata = loadMetadata(devicePath);
-    if (existingMetadata.id.empty()) {
+    if (existingMetadata.serialNumber.empty()) {
         return ServiceResult::createError("Invalid device metadata: " + deviceId);
     }
 
     try {
         // Prepare updated metadata
-        DeviceMetadata updatedMetadata = metadata;
-        updatedMetadata.id             = deviceId;  // Ensure ID doesn't change
-        updatedMetadata.createdAt      = existingMetadata.createdAt;
-        updatedMetadata.updatedAt      = utils::getCurrentTimestamp();
+        DeviceMetadata updatedMetadata      = metadata;
+        updatedMetadata.serialNumber = deviceId;  // Ensure serialNumber doesn't change
+        updatedMetadata.createdAt    = existingMetadata.createdAt;
+        updatedMetadata.updatedAt    = utils::getCurrentTimestamp();
 
         // Save metadata
         std::string metadataPath = devicePath + "/" + metadataFilename_;
         if (!utils::saveJsonToFile(metadataPath, updatedMetadata)) {
+            utils::logging::error("Failed to save device metadata: " + deviceId);
             return ServiceResult::createError("Failed to save metadata");
         }
 
@@ -163,13 +198,19 @@ services::ServiceResult services::DeviceService::updateDevice(const std::string 
     }
 }
 
-services::ServiceResult services::DeviceService::deleteDevice(const std::string &baseDir,
-                                                              const std::string &deviceId)
+services::ServiceResult services::DeviceService::deleteDevice(const std::string &deviceId)
 {
-    std::string devicePath = baseDir + deviceId;
+    // Validate path for security
+    if (!utils::validatePath(deviceId)) {
+        utils::logging::warn("Invalid device ID: " + deviceId);
+        return ServiceResult::createError("Invalid device ID: " + deviceId);
+    }
 
-    // Validation
+    std::string devicePath = utils::config::getBaseDir() + deviceId;
+
+    // Check if device exists
     if (!fs::exists(devicePath) || !fs::is_directory(devicePath)) {
+        utils::logging::warn("Device not found: " + deviceId);
         return ServiceResult::createError("Device not found: " + deviceId);
     }
 
@@ -192,14 +233,15 @@ services::ServiceResult services::DeviceService::deleteDevice(const std::string 
     }
 }
 
-services::ServiceResult services::DeviceService::listDevices(const std::string &baseDir)
+services::ServiceResult services::DeviceService::listDevices()
 {
+    std::string baseDir = utils::config::getBaseDir();
+
     if (!fs::exists(baseDir)) {
         try {
             fs::create_directories(baseDir);
         } catch (const std::exception &e) {
-            return ServiceResult::createError("Failed to create base directory: " +
-                                              std::string(e.what()));
+            return ServiceResult::createError("Failed to create base directory: " + std::string(e.what()));
         }
     }
 
@@ -211,7 +253,7 @@ services::ServiceResult services::DeviceService::listDevices(const std::string &
                 continue;
 
             DeviceMetadata metadata = loadMetadata(entry.path().string());
-            if (metadata.id.empty())
+            if (metadata.serialNumber.empty())
                 continue;  // Skip invalid
 
             devices.append(metadata.toJson());

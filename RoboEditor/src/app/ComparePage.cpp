@@ -124,6 +124,24 @@ QWidget *ComparePage::buildRightPanel()
     btnSelectFile->setObjectName("fileBtn");
 
     connect(btnSelectFile, &QPushButton::clicked, this, [this]() {
+        // 1) ModifyPage에서 왼쪽 편집기를 넘겨준 경우: 그걸 그대로 사용
+        if (leftText_) {
+            QString leftContent = leftText_->toPlainText();
+            QString leftPath    = leftText_->lastLoadedPath();  // 비어 있어도 recalcDiff에서 보정함
+
+            // 오른쪽 파일만 선택 (기준/base)
+            QString rightPath = QFileDialog::getOpenFileName(
+                    this, tr("Select right file (base)"), "C:/backup", tr("All Files (*.*)"));
+            if (rightPath.isEmpty())
+                return;
+
+            // ComparePage의 오른쪽 탭에 파일 로드 + diff 재계산
+            setTargetPath(rightPath);
+            recalcDiff(leftContent, leftPath);
+            return;
+        }
+
+        // 2) 왼쪽 편집기가 없는 경우(단독 ComparePage 사용 시): 기존 동작 유지
         QString leftPath = QFileDialog::getOpenFileName(
                 this, tr("Select left file (compare)"), "C:/backup", tr("All Files (*.*)"));
         if (leftPath.isEmpty())

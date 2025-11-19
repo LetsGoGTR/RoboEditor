@@ -18,7 +18,7 @@ namespace services
                                   const std::string &nameA,
                                   const std::string &nameB);
 
-        static ServiceResult diffDirectories(const std::string &dirA, const std::string &dirB);
+        static ServiceResult diffTree(const std::string &dirA, const std::string &dirB);
 
       private:
         static const std::vector<std::string> supportedFormats_;
