@@ -69,8 +69,9 @@ void api::v1::Repo::create(const drogon::HttpRequestPtr                         
         metadata.name         = (*json)["name"].asString();
         metadata.description =
                 json->isMember("description") ? (*json)["description"].asString() : "";
-        metadata.ip       = json->isMember("ip") ? (*json)["ip"].asString() : "";
-        metadata.apiPort  = json->isMember("apiPort") ? (*json)["apiPort"].asInt() : 80;
+        metadata.host     = json->isMember("host") ? (*json)["host"].asString() : "";
+        metadata.scheme   = json->isMember("scheme") ? (*json)["scheme"].asString() : "http";
+        metadata.apiPort  = json->isMember("apiPort") ? (*json)["apiPort"].asInt() : 0;
         metadata.sftpPort = json->isMember("sftpPort") ? (*json)["sftpPort"].asInt() : 22;
         metadata.sftpPassword =
                 json->isMember("sftpPassword") ? (*json)["sftpPassword"].asString() : "";

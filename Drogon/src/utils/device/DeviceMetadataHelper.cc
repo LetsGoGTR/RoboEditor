@@ -18,13 +18,13 @@ namespace utils
     services::ServiceResult DeviceMetadataHelper::extractConnectionParams(
             const services::DeviceMetadata &metadata, ConnectionParams &params)
     {
-        // Validate IP
-        if (metadata.ip.empty()) {
-            return services::ServiceResult::createError("Device IP is empty");
+        // Validate host
+        if (metadata.host.empty()) {
+            return services::ServiceResult::createError("Device host is empty");
         }
 
-        if (!isValidIP(metadata.ip)) {
-            return services::ServiceResult::createError("Invalid IP address format: " + metadata.ip);
+        if (!isValidIP(metadata.host)) {
+            return services::ServiceResult::createError("Invalid host format: " + metadata.host);
         }
 
         // Validate ports
@@ -39,11 +39,14 @@ namespace utils
         }
 
         // Extract parameters
-        params.sftpHost     = metadata.ip;
+        params.sftpHost     = metadata.host;
         params.sftpPort     = metadata.sftpPort;
         params.sftpUser     = metadata.sftpUser;
         params.sftpPassword = metadata.sftpPassword;
-        params.apiUrl       = "http://" + metadata.ip + ":" + std::to_string(metadata.apiPort);
+
+        // Build apiUrl with scheme
+        std::string scheme = metadata.scheme.empty() ? "http" : metadata.scheme;
+        params.apiUrl = scheme + "://" + metadata.host + ":" + std::to_string(metadata.apiPort);
 
         return services::ServiceResult::createSuccess("");
     }
@@ -52,19 +55,20 @@ namespace utils
             const Json::Value &deviceData, ConnectionParams &params)
     {
         // Extract from JSON
-        std::string ip           = deviceData["ip"].asString();
+        std::string host         = deviceData["host"].asString();
+        std::string scheme       = deviceData.isMember("scheme") ? deviceData["scheme"].asString() : "http";
         int         apiPort      = deviceData["apiPort"].asInt();
-        int         sftpPort     = deviceData["sftpPort"].asInt();
+        int         sftpPort     = deviceData.isMember("sftpPort") ? deviceData["sftpPort"].asInt() : 22;
         std::string sftpPassword = deviceData["sftpPassword"].asString();
         std::string sftpUser     = deviceData["sftpUser"].asString();
 
-        // Validate IP
-        if (ip.empty()) {
-            return services::ServiceResult::createError("Device IP is empty");
+        // Validate host
+        if (host.empty()) {
+            return services::ServiceResult::createError("Device host is empty");
         }
 
-        if (!isValidIP(ip)) {
-            return services::ServiceResult::createError("Invalid IP address format: " + ip);
+        if (!isValidIP(host)) {
+            return services::ServiceResult::createError("Invalid host format: " + host);
         }
 
         // Validate ports
@@ -79,11 +83,11 @@ namespace utils
         }
 
         // Set parameters
-        params.sftpHost     = ip;
+        params.sftpHost     = host;
         params.sftpPort     = sftpPort;
         params.sftpUser     = sftpUser;
         params.sftpPassword = sftpPassword;
-        params.apiUrl       = "http://" + ip + ":" + std::to_string(apiPort);
+        params.apiUrl       = scheme + "://" + host + ":" + std::to_string(apiPort);
 
         return services::ServiceResult::createSuccess("");
     }

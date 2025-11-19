@@ -316,10 +316,10 @@ void api::v1::Operation::workspaceExport(
         std::function<void(const drogon::HttpResponsePtr &)> &&callback)
 {
     auto json = req->getJsonObject();
-    if (!json || !json->isMember("id") || !json->isMember("deviceId"))
-        return sendError(callback, drogon::k400BadRequest, "Missing 'id' or 'deviceId' field");
+    if (!json || !json->isMember("workspaceId") || !json->isMember("deviceId"))
+        return sendError(callback, drogon::k400BadRequest, "Missing 'workspaceId' or 'deviceId' field");
 
-    std::string workspaceId = (*json)["id"].asString();
+    std::string workspaceId = (*json)["workspaceId"].asString();
     std::string deviceId    = (*json)["deviceId"].asString();
 
     try {

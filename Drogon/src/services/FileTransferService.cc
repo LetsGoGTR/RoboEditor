@@ -64,8 +64,7 @@ services::ServiceResult FileTransferService::backupFromRemote(const std::string 
         SFTPConfig sftpConfig = utils::DeviceMetadataHelper::createSFTPConfig(connParams);
         SFTPClient sftpClient(sftpConfig);
         if (!sftpClient.connect()) {
-            return services::ServiceResult::createError(
-                    utils::ConnectionValidator::formatSFTPError(sftpClient));
+            return services::ServiceResult::createError(sftpClient.getLastError());
         }
 
         // 5. 원격 파일 경로 구성 (output.tgz 고정)
@@ -188,8 +187,7 @@ services::ServiceResult FileTransferService::applyWorkspace(const std::string &w
 
         if (!sftpClient.connect()) {
             fs::remove(tempFile);
-            return services::ServiceResult::createError(
-                    utils::ConnectionValidator::formatSFTPError(sftpClient));
+            return services::ServiceResult::createError(sftpClient.getLastError());
         }
 
         std::string remotePath = "/home/" + sftpUser + "/input.tgz";

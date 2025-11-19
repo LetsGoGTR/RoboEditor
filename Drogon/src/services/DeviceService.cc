@@ -20,7 +20,8 @@ Json::Value services::DeviceMetadata::toJson() const
 {
     Json::Value json;
     json["serialNumber"]  = serialNumber;
-    json["ip"]            = ip;
+    json["host"]          = host;
+    json["scheme"]        = scheme;
     json["apiPort"]       = apiPort;
     json["sftpPort"]      = sftpPort;
     json["sftpPassword"]  = sftpPassword;
@@ -38,12 +39,14 @@ services::DeviceMetadata services::DeviceMetadata::fromJson(const Json::Value &j
 
     if (json.isMember("serialNumber"))
         metadata.serialNumber = json["serialNumber"].asString();
-    if (json.isMember("ip"))
-        metadata.ip = json["ip"].asString();
+    if (json.isMember("host"))
+        metadata.host = json["host"].asString();
+    if (json.isMember("scheme"))
+        metadata.scheme = json["scheme"].asString();
+    else
+        metadata.scheme = "http";  // 기본값
     if (json.isMember("apiPort"))
         metadata.apiPort = json["apiPort"].asInt();
-    else
-        metadata.apiPort = 80;  // 기본값
     if (json.isMember("sftpPort"))
         metadata.sftpPort = json["sftpPort"].asInt();
     else
