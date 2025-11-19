@@ -127,7 +127,18 @@ void ControllerManager::removeController(int index)
         emit controllerListChanged();
     }
 }
+void ControllerManager::removeControllerBySN(const QString &SN)
+{
+    for (int i = 0; i < controllers_.size(); ++i) {
+        if (controllers_[i].serialNumber == SN) {
+            removeController(i);  // 기존 함수 재사용
+            return;
+        }
+    }
 
+    QString msg = QString("[%1] not found for removal").arg(SN);
+    LogManager::append(msg);
+}
 void ControllerManager::removeController(const ControllerInfo *curCon)
 {
     QMutexLocker locker(&mutex_);

@@ -32,6 +32,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 
     wire();
 
+    qApp->installEventFilter(this);
+
     applyStyleSheet();
 
     statusBar()->showMessage("UI Ready");
@@ -41,6 +43,8 @@ void MainWindow::ensureMenu()
 {
     if (!menu_)
         menu_ = std::make_unique<TopMenu>(this);
+    connect(menu_.get(), &TopMenu::requestModifyMenuUpdate, this, &MainWindow::populateModifyMenu);
+    connect(menu_.get(), &TopMenu::requestRemoveMenuUpdate, this, &MainWindow::populateRemoveMenu);
 }
 
 void MainWindow::ensureCenter()
@@ -296,32 +300,84 @@ void MainWindow::selectAllFromMenu()
 }
 void MainWindow::addCtrlFromMenu()
 {
-    if (center_) {
-        auto *ctrlManager = center_->getControllerManager();
-        ctrlManager->registerController();
-    }
+    ControllerManager::instance()->registerController();
+    statusBar()->showMessage("Controller registration dialog opened");
 }
-void MainWindow::modifyCtrlFromMenu()
+
+ControllerManager *MainWindow::getControllerManager()
 {
-    if (center_) {
-        auto *ctrlManager = center_->getControllerManager();
-        ctrlManager->registerController();
-    }
-}
-void MainWindow::removeCtrlFromMenu()
-{
-    if (center_) {
-        auto *ctrlManager = center_->getControllerManager();
-        ctrlManager->registerController();
-    }
+    return ControllerManager::instance();
 }
 void MainWindow::refreshCtrlFromMenu()
 {
-    if (center_) {
-        auto *ctrlManager = center_->getControllerManager();
-        ctrlManager->registerController();
+    ControllerManager::instance()->updateControllersStates();
+    statusBar()->showMessage("Controller list refreshed");
+}
+void MainWindow::populateModifyMenu(QMenu *menu)
+{
+    if (!menu)
+        return;
+
+    menu->clear();
+
+    //컨트롤러 매니저 가져오기
+    auto *mgr = getControllerManager();
+    if (!mgr)
+        return;
+
+    //컨트롤러 리스트 가져오기
+    auto list = mgr->getControllers();
+
+    if (list.isEmpty()) {
+        menu->addAction("(No Controllers)")->setEnabled(false);
+        return;
+    }
+
+    // action 추가, 발생 시 수정함수 호출
+    for (const auto &info : list) {
+        QAction *a = menu->addAction(info.serialNumber);
+
+        // ControllerManager::modifyController 직접 호출
+        connect(a, &QAction::triggered, this, [mgr, info]() { mgr->updateInfo(info); });
     }
 }
+
+void MainWindow::populateRemoveMenu(QMenu *menu)
+{
+    if (!menu)
+        return;
+
+    menu->clear();
+
+    auto *mgr = getControllerManager();
+    if (!mgr)
+        return;
+
+    auto list = mgr->getControllers();
+
+    if (list.isEmpty()) {
+        menu->addAction("(No Controllers)")->setEnabled(false);
+        return;
+    }
+
+    for (const auto &info : list) {
+        QString  serial = info.serialNumber;
+        QAction *a      = menu->addAction(serial);
+
+        connect(a, &QAction::triggered, this, [this, mgr, serial]() {
+            QMessageBox::StandardButton reply = QMessageBox::question(
+                    this,
+                    "Remove Controller",
+                    QString("Are you sure you want to remove controller [%1]?").arg(serial),
+                    QMessageBox::Yes | QMessageBox::No);
+
+            if (reply == QMessageBox::Yes) {
+                mgr->removeControllerBySN(serial);
+            }
+        });
+    }
+}
+
 void MainWindow::closeEvent(QCloseEvent *event)
 {
     QMainWindow::closeEvent(event);

@@ -39,6 +39,7 @@ class TopMenu : public QObject
         MainWindow *mw_;
         QMenu      *file_ = nullptr, *edit_ = nullptr, *view_ = nullptr, *help_ = nullptr,
               *ctrl_ = nullptr, *tools_ = nullptr, *showLogMenu_ = nullptr;
+        QMenu *modifyMenu_ = nullptr, *removeMenu_ = nullptr;
 
         //File Action
         QAction *actNewFile_    = nullptr;
@@ -88,6 +89,10 @@ class TopMenu : public QObject
 
       private slots:
         void onChangePasswordTriggered();
+
+      signals:
+        void requestModifyMenuUpdate(QMenu * menu);
+        void requestRemoveMenuUpdate(QMenu * menu);
 };
 
 #endif  // TOPMENU_H

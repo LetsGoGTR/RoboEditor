@@ -64,15 +64,20 @@ void TopMenu::build()
     connect(actSelectAll_, &QAction::triggered, mw_, &MainWindow::selectAllFromMenu);
 
     // add controllers actions
-    actAddController_    = ctrl_->addAction("Add Controller");
-    actModifyController_ = ctrl_->addAction("Modify Controller Setting");
-    actRemoveController_ = ctrl_->addAction("Remove Controller");
-    actRefreshList_      = ctrl_->addAction("Refresh List");
+    actAddController_ = ctrl_->addAction("Add Controller");
+    modifyMenu_       = ctrl_->addMenu("Modify Controller Setting");
+    removeMenu_       = ctrl_->addMenu("Remove Controller");
+    actRefreshList_   = ctrl_->addAction("Refresh List");
 
     connect(actAddController_, &QAction::triggered, mw_, &MainWindow::addCtrlFromMenu);
-    connect(actModifyController_, &QAction::triggered, mw_, &MainWindow::modifyCtrlFromMenu);
-    connect(actRemoveController_, &QAction::triggered, mw_, &MainWindow::removeCtrlFromMenu);
     connect(actRefreshList_, &QAction::triggered, mw_, &MainWindow::refreshCtrlFromMenu);
+    connect(modifyMenu_, &QMenu::aboutToShow, this, [this]() {
+        emit requestModifyMenuUpdate(modifyMenu_);
+    });
+
+    connect(removeMenu_, &QMenu::aboutToShow, this, [this]() {
+        emit requestRemoveMenuUpdate(removeMenu_);
+    });
 
     // add view actions
 
