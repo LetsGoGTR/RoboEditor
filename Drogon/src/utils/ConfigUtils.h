@@ -36,12 +36,6 @@ namespace utils
             return drogon::app().getCustomConfig()["storage"]["temp_backup_dir"].asString();
         }
 
-        // Auth config
-        inline std::string getPasswordHash()
-        {
-            return drogon::app().getCustomConfig()["auth"]["device_password_hash"].asString();
-        }
-
     }  // namespace config
 
 }  // namespace utils
