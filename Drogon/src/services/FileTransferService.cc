@@ -14,6 +14,8 @@
 #include "../services/WorkspaceService.h"
 #include "../utils/ConfigUtils.h"
 #include "../utils/TimeUtils.h"
+#include "../utils/connection/ConnectionValidator.h"
+#include "../utils/device/DeviceMetadataHelper.h"
 #include "../utils/logging/Logger.h"
 
 namespace fs = std::filesystem;
@@ -30,14 +32,18 @@ services::ServiceResult FileTransferService::backupFromRemote(const std::string 
         }
 
         // 2. Device metadata에서 SFTP 및 API 정보 추출
-        std::string ip           = deviceResult.data["ip"].asString();
-        int         apiPort      = deviceResult.data["apiPort"].asInt();
-        int         sftpPort     = deviceResult.data["sftpPort"].asInt();
-        std::string sftpPassword = deviceResult.data["sftpPassword"].asString();
-        std::string sftpUser     = deviceResult.data["sftpUser"].asString();
+        utils::ConnectionParams connParams;
+        auto extractResult =
+                utils::DeviceMetadataHelper::extractConnectionParamsFromJson(deviceResult.data,
+                                                                              connParams);
+        if (!extractResult.success) {
+            return services::ServiceResult::createError("Invalid device metadata: " +
+                                                        extractResult.errorMessage);
+        }
 
-        std::string sftpHost = ip;  // ip를 sftpHost로 사용
-        std::string apiUrl = "http://" + ip + ":" + std::to_string(apiPort);
+        std::string sftpHost = connParams.sftpHost;
+        std::string sftpUser = connParams.sftpUser;
+        std::string apiUrl   = connParams.apiUrl;
 
         utils::logging::info("Device info: apiUrl=" + apiUrl + ", sftpHost=" + sftpHost +
                              ", sftpUser=" + sftpUser);
@@ -55,11 +61,11 @@ services::ServiceResult FileTransferService::backupFromRemote(const std::string 
         }
 
         // 4. SFTP 연결
-        SFTPConfig sftpConfig(sftpHost, sftpPort, sftpUser, sftpPassword);
+        SFTPConfig sftpConfig = utils::DeviceMetadataHelper::createSFTPConfig(connParams);
         SFTPClient sftpClient(sftpConfig);
         if (!sftpClient.connect()) {
-            return services::ServiceResult::createError("SFTP 연결 실패: " +
-                                                        sftpClient.getLastError());
+            return services::ServiceResult::createError(
+                    utils::ConnectionValidator::formatSFTPError(sftpClient));
         }
 
         // 5. 원격 파일 경로 구성 (output.tgz 고정)
@@ -142,14 +148,18 @@ services::ServiceResult FileTransferService::applyWorkspace(const std::string &w
         }
 
         // 2. Device metadata에서 SFTP 및 API 정보 추출
-        std::string ip           = deviceResult.data["ip"].asString();
-        int         apiPort      = deviceResult.data["apiPort"].asInt();
-        int         sftpPort     = deviceResult.data["sftpPort"].asInt();
-        std::string sftpPassword = deviceResult.data["sftpPassword"].asString();
-        std::string sftpUser     = deviceResult.data["sftpUser"].asString();
+        utils::ConnectionParams connParams;
+        auto extractResult =
+                utils::DeviceMetadataHelper::extractConnectionParamsFromJson(deviceResult.data,
+                                                                              connParams);
+        if (!extractResult.success) {
+            return services::ServiceResult::createError("Invalid device metadata: " +
+                                                        extractResult.errorMessage);
+        }
 
-        std::string sftpHost = ip;  // ip를 sftpHost로 사용
-        std::string api = "http://" + ip + ":" + std::to_string(apiPort);
+        std::string sftpHost = connParams.sftpHost;
+        std::string sftpUser = connParams.sftpUser;
+        std::string api      = connParams.apiUrl;
 
         utils::logging::info("Device info: api=" + api + ", sftpHost=" + sftpHost +
                              ", sftpUser=" + sftpUser);
@@ -173,13 +183,13 @@ services::ServiceResult FileTransferService::applyWorkspace(const std::string &w
         }
 
         // 5. SFTP로 원격 서버에 파일 업로드
-        SFTPConfig sftpConfig(sftpHost, sftpPort, sftpUser, sftpPassword);
+        SFTPConfig sftpConfig = utils::DeviceMetadataHelper::createSFTPConfig(connParams);
         SFTPClient sftpClient(sftpConfig);
 
         if (!sftpClient.connect()) {
             fs::remove(tempFile);
-            return services::ServiceResult::createError("SFTP 연결 실패: " +
-                                                        sftpClient.getLastError());
+            return services::ServiceResult::createError(
+                    utils::ConnectionValidator::formatSFTPError(sftpClient));
         }
 
         std::string remotePath = "/home/" + sftpUser + "/input.tgz";
