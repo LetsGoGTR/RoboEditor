@@ -1,12 +1,11 @@
 #include "ApplyPage.h"
 
-#include <QTimer>
-
 #include <QDir>
 #include <QFile>
 #include <QFileDialog>
 #include <QJsonObject>
 #include <QMessageBox>
+#include <QTimer>
 #include <QVBoxLayout>
 
 #include "ConfirmSelection.h"
@@ -72,8 +71,8 @@ void ApplyPage::confirmSelection()
         return;
     }
 
-    for (auto cur : selectedControllerList) {
-        qDebug() << "selected : " << cur;
+    for (const auto &cur : selectedControllerList) {
+        qDebug() << "selected:" << cur;
     }
 
     showPasswordUI();
@@ -83,13 +82,9 @@ void ApplyPage::confirmSelection()
 void ApplyPage::importAnyspace()
 {
     QString fileName =
-            QFileDialog::getOpenFileName(nullptr,             // 부모 위젯 포인터
-                                         "Select WorkSpace",  // 대화 상자 제목
-                                         QDir::homePath(),    //초기 디렉토리 경로
-
-                                         //표시할 파일 형식 필터
-                                         //"설명 (확장자1 확장자2);;다른설명 (확장자3)"
-
+            QFileDialog::getOpenFileName(nullptr,            // 부모 위젯 포인터
+                                         "Select WorkSpace", // 대화 상자 제목
+                                         QDir::homePath(),   // 초기 디렉터리 경로
                                          "All Files (*);;YAML Files (*.yaml *.yml);;Python Files "
                                          "(*.py *.srl);;ZIP Archives (*.zip)");
 
@@ -110,8 +105,7 @@ void ApplyPage::showPasswordUI()
             confirmDialog.setApplyPage(this);
             apiPassword_ = inputPassword;
 
-            connect(
-                    &confirmDialog,
+            connect(&confirmDialog,
                     &ConfirmSelection::applyRequested,
                     this,
                     [this]() {
@@ -122,14 +116,13 @@ void ApplyPage::showPasswordUI()
                     Qt::SingleShotConnection);
 
             if (confirmDialog.exec() == QDialog::Accepted) {
+                // 실제 처리(startPreBackup)는 applyRequested 시그널에서 시작됨
             }
         } else {
-            // 비밀번호 틀림
             LogManager::append("Apply password not match");
             QMessageBox::warning(this, tr("오류"), tr("비밀번호가 올바르지 않습니다."));
         }
     } else {
-        // 사용자가 취소함
         LogManager::append("Password dialog cancelled");
     }
 }
@@ -155,10 +148,11 @@ QString ApplyPage::determineBackupRoot() const
     if (ok1 && ok2)
         return tmp.path(); // ex) C:/backup
 
-    // 안전장치: 실패 시 그냥 현재 경로 반환
+    // 실패 시 그냥 현재 경로 반환
     return dir.absolutePath();
 }
 
+// 사전 백업 시작
 void ApplyPage::startPreBackup()
 {
     if (selectedControllerList.isEmpty()) {
@@ -170,6 +164,31 @@ void ApplyPage::startPreBackup()
         qWarning() << "[ApplyPage] Pre-backup already in progress.";
         return;
     }
+
+    // 진행 다이얼로그 새로 생성 (백업+적용 통합)
+    if (applyProgressDialog_) {
+        applyProgressDialog_->close();
+        applyProgressDialog_->deleteLater();
+        applyProgressDialog_ = nullptr;
+    }
+
+    applyProgressDialog_ = new ProgressDialog(this);
+    applyProgressDialog_->setWindowTitle("사전 백업 및 적용 진행 중...");
+    applyProgressDialog_->setSerialNumber("-");
+    applyProgressDialog_->setTotalCount(0);   // 상단 countLabel은 전체 개수 대신 따로 쓰므로 0으로 시작
+    applyProgressDialog_->setCurrentIndex(0);
+    applyProgressDialog_->setProgress(0);
+    applyProgressDialog_->setFinishedMode(false);
+    applyProgressDialog_->show();
+
+    QApplication::processEvents();
+
+    connect(applyProgressDialog_, &ProgressDialog::cancelRequested, this, [this]() {
+        if (applyProgressDialog_) {
+            applyProgressDialog_->close();
+            // 실제 백업/적용 취소까지 하려면 별도 설계 필요
+        }
+    });
 
     ControllerManager *manager = ControllerManager::instance();
 
@@ -219,13 +238,24 @@ void ApplyPage::startPreBackup()
         return;
     }
 
-    // 사전 백업 초기화
+    // 사전 백업 상태 초기화
     preBackupInProgress_         = true;
     preBackupTotal_              = selectedControllerList.size();
     preBackupCompleted_          = 0;
     preBackupFailed_             = 0;
     preBackupSuccessControllers_.clear();
     preBackupFailedControllers_.clear();
+
+    // Apply 관련 카운터도 초기화
+    applyTargetControllers_.clear();
+    applyQueue_.clear();
+    totalApplyRequests_     = 0;
+    completedApplyRequests_ = 0;
+    failedApplyRequests_    = 0;
+    applyInProgress_        = false;
+
+    // 텍스트 초기 상태
+    updateApplyProgressStatus();
 
     QString backupRoot = determineBackupRoot();
     qDebug() << "[ApplyPage] Pre-backup root:" << backupRoot;
@@ -250,7 +280,14 @@ void ApplyPage::startPreBackup()
             preBackupFailed_++;
             preBackupFailedControllers_.append(sn);
             LogManager::append(
-                    QString("[ApplyPage] Pre-backup start failed: %1").arg(sn));
+                    QString("Pre-backup start failed: %1").arg(sn));
+
+            if (applyProgressDialog_ && preBackupTotal_ > 0) {
+                int doneCount = preBackupCompleted_ + preBackupFailed_;
+                int percent   = (doneCount * 50) / preBackupTotal_; // 0~50
+                applyProgressDialog_->setProgress(percent);
+            }
+            updateApplyProgressStatus();
         }
     }
 
@@ -269,6 +306,7 @@ void ApplyPage::startPreBackup()
     }
 }
 
+// 사전 백업 콜백
 void ApplyPage::onPreBackupCompleted(const QString &serialNumber)
 {
     if (!preBackupInProgress_)
@@ -277,13 +315,26 @@ void ApplyPage::onPreBackupCompleted(const QString &serialNumber)
     preBackupCompleted_++;
     preBackupSuccessControllers_.append(serialNumber);
 
-    QString msg = QString("[ApplyPage] Pre-backup completed: %1 (%2/%3)")
-                          .arg(serialNumber)
-                          .arg(preBackupCompleted_)
-                          .arg(preBackupTotal_);
+    int doneCount = preBackupCompleted_ + preBackupFailed_;
+
+    QString msg =
+            QString("Pre-backup completed: %1 (done: %2/%3, success: %4, fail: %5)")
+                    .arg(serialNumber)
+                    .arg(doneCount)
+                    .arg(preBackupTotal_)
+                    .arg(preBackupCompleted_)
+                    .arg(preBackupFailed_);
     LogManager::append(msg);
 
-    int doneCount = preBackupCompleted_ + preBackupFailed_;
+    // 백업 진행률: 0~50% 사이에서만 사용
+    if (applyProgressDialog_ && preBackupTotal_ > 0) {
+        int doneCount = preBackupCompleted_ + preBackupFailed_;
+        int percent   = (doneCount * 50) / preBackupTotal_; // 0~50
+        applyProgressDialog_->setProgress(percent);
+    }
+
+    updateApplyProgressStatus();
+
     if (doneCount < preBackupTotal_)
         return;
 
@@ -304,8 +355,6 @@ void ApplyPage::onPreBackupCompleted(const QString &serialNumber)
     }
 
     // 일부만 성공한 경우:
-    //   - 성공한 제어기만 apply 대상으로 사용
-    //   - 실패한 제어기는 Log + 안내 메시지
     applyTargetControllers_ = preBackupSuccessControllers_;
 
     if (!preBackupFailedControllers_.isEmpty()) {
@@ -317,7 +366,7 @@ void ApplyPage::onPreBackupCompleted(const QString &serialNumber)
         QMessageBox::warning(this, "사전 백업 경고", warnMsg);
 
         LogManager::append(
-                QString("[ApplyPage] Pre-backup failed controllers (skipped in apply): %1")
+                QString("Pre-backup failed controllers (skipped in apply): %1")
                         .arg(failList));
     }
 
@@ -333,18 +382,31 @@ void ApplyPage::onPreBackupFailed(const QString &serialNumber, const QString &er
     preBackupFailed_++;
     preBackupFailedControllers_.append(serialNumber);
 
-    QString msg = QString("[ApplyPage] Pre-backup failed: %1 (%2/%3) - %4")
-                          .arg(serialNumber)
-                          .arg(preBackupFailed_)
-                          .arg(preBackupTotal_)
-                          .arg(error);
+    int doneCount = preBackupCompleted_ + preBackupFailed_;
+
+    QString msg =
+            QString("Pre-backup failed: %1 (done: %2/%3, success: %4, fail: %5) - %6")
+                    .arg(serialNumber)
+                    .arg(doneCount)
+                    .arg(preBackupTotal_)
+                    .arg(preBackupCompleted_)
+                    .arg(preBackupFailed_)
+                    .arg(error);
     LogManager::append(msg);
 
-    int doneCount = preBackupCompleted_ + preBackupFailed_;
+    // 백업 진행률: 0~50% 사이에서만 사용
+    if (applyProgressDialog_ && preBackupTotal_ > 0) {
+        int doneCount = preBackupCompleted_ + preBackupFailed_;
+        int percent   = (doneCount * 50) / preBackupTotal_;
+        applyProgressDialog_->setProgress(percent);
+    }
+
+    updateApplyProgressStatus();
+
     if (doneCount < preBackupTotal_)
         return;
 
-    // 🔚 전체 사전 백업 응답 완료 → 최종 처리는 onPreBackupCompleted 쪽에서 공통 처리
+    // 전체 사전 백업 응답 완료
     preBackupInProgress_ = false;
 
     ControllerManager *manager = ControllerManager::instance();
@@ -352,7 +414,6 @@ void ApplyPage::onPreBackupFailed(const QString &serialNumber, const QString &er
     disconnect(manager, &ControllerManager::backupFailed, this, &ApplyPage::onPreBackupFailed);
 
     if (preBackupSuccessControllers_.isEmpty()) {
-        // 전부 실패
         QMessageBox::warning(
                 this,
                 "백업 실패",
@@ -360,7 +421,6 @@ void ApplyPage::onPreBackupFailed(const QString &serialNumber, const QString &er
         return;
     }
 
-    // 일부 성공한 경우는 onPreBackupCompleted에서 처리되므로 여기선 따로 안 건드려도 됨
     applyTargetControllers_ = preBackupSuccessControllers_;
 
     if (!preBackupFailedControllers_.isEmpty()) {
@@ -372,14 +432,14 @@ void ApplyPage::onPreBackupFailed(const QString &serialNumber, const QString &er
         QMessageBox::warning(this, "사전 백업 경고", warnMsg);
 
         LogManager::append(
-                QString("[ApplyPage] Pre-backup failed controllers (skipped in apply): %1")
+                QString("Pre-backup failed controllers (skipped in apply): %1")
                         .arg(failList));
     }
 
     startApplyQueue();
 }
 
-// 큐 시작
+// Apply 큐 시작
 void ApplyPage::startApplyQueue()
 {
     if (applyTargetControllers_.isEmpty() || selectedBackupDir.isEmpty()) {
@@ -413,21 +473,20 @@ void ApplyPage::startApplyQueue()
     }
 
     if (!unknownControllers.isEmpty()) {
-        QMessageBox::warning(this,
-                             "오류",
-                             QString("등록 정보가 없는 제어기가 선택되었습니다:\n%1")
-                                     .arg(unknownControllers.join(", ")));
+        QMessageBox::warning(
+                this,
+                "오류",
+                QString("등록 정보가 없는 제어기가 선택되었습니다:\n%1")
+                        .arg(unknownControllers.join(", ")));
 
-        // 로그 추가
         for (const QString &sn : unknownControllers) {
             QString msg = QString("[%1] Apply canceled: Controller is NOT REGISTERED").arg(sn);
             LogManager::append(msg);
         }
 
-        // 전체 메시지
         {
             QString msg = QString("Apply aborted: Unknown controller(s) selected (%1)")
-                                  .arg(unknownControllers.join(", "));
+            .arg(unknownControllers.join(", "));
             LogManager::append(msg);
         }
 
@@ -435,21 +494,20 @@ void ApplyPage::startApplyQueue()
     }
 
     if (!disconnectedControllers.isEmpty()) {
-        QMessageBox::warning(this,
-                             "오류",
-                             QString("다음 제어기가 오프라인 상태입니다:\n%1")
-                                     .arg(disconnectedControllers.join(", ")));
+        QMessageBox::warning(
+                this,
+                "오류",
+                QString("다음 제어기가 오프라인 상태입니다:\n%1")
+                        .arg(disconnectedControllers.join(", ")));
 
-        // 로그 추가
         for (const QString &sn : disconnectedControllers) {
             QString msg = QString("[%1] Apply canceled: Controller is OFFLINE").arg(sn);
             LogManager::append(msg);
         }
 
-        // 전체 메시지
         {
             QString msg = QString("Apply aborted: Offline controller(s) detected (%1)")
-                                  .arg(disconnectedControllers.join(", "));
+            .arg(disconnectedControllers.join(", "));
             LogManager::append(msg);
         }
 
@@ -457,65 +515,52 @@ void ApplyPage::startApplyQueue()
     }
 
     if (!runningControllers.isEmpty()) {
-        QMessageBox::warning(this,
-                             "오류",
-                             QString("제어기가 동작중입니다. 전체 적용을 취소합니다:\n%1")
-                                     .arg(runningControllers.join(", ")));
+        QMessageBox::warning(
+                this,
+                "오류",
+                QString("제어기가 동작중입니다. 전체 적용을 취소합니다:\n%1")
+                        .arg(runningControllers.join(", ")));
 
-        // 로그 추가
         for (const auto &sn : runningControllers) {
             QString msg = QString("[%1] Apply canceled: Controller is RUNNING").arg(sn);
             LogManager::append(msg);
         }
 
-        // 전체 적용 취소 로그
         {
             QString msg = QString("Apply aborted: %1 controller(s) running (%2)")
-                                  .arg(runningControllers.size())
-                                  .arg(runningControllers.join(", "));
+            .arg(runningControllers.size())
+                    .arg(runningControllers.join(", "));
             LogManager::append(msg);
         }
         return;
     }
 
-    // 큐 및 카운터 초기화
+    // 큐 및 카운터 초기화 (Apply 단계용)
     applyQueue_.clear();
-    totalApplyRequests_     = selectedControllerList.size();
+    totalApplyRequests_     = applyTargetControllers_.size();
     completedApplyRequests_ = 0;
     failedApplyRequests_    = 0;
     applyInProgress_        = true;
 
-    // 진행 다이얼로그 새로 생성
+    // 진행 다이얼로그는 재사용, 게이지는 "백업 단계에서 올라간 값" 유지
     if (applyProgressDialog_) {
-        applyProgressDialog_->close();
-        applyProgressDialog_->deleteLater();
-        applyProgressDialog_ = nullptr;
+        applyProgressDialog_->setWindowTitle("적용 진행 중...");
+        applyProgressDialog_->setTotalCount(totalApplyRequests_);
+        applyProgressDialog_->setCurrentIndex(0);
+        applyProgressDialog_->setFinishedMode(false);
+        applyProgressDialog_->show();
     }
 
-    applyProgressDialog_ = new ProgressDialog(this);
-    applyProgressDialog_->setWindowTitle("적용 진행 중...");
-    applyProgressDialog_->setTotalCount(totalApplyRequests_);
-    applyProgressDialog_->setCurrentIndex(0);
-    applyProgressDialog_->setSerialNumber("-");
-    applyProgressDialog_->setProgress(0);
-    applyProgressDialog_->setFinishedMode(false);
-    applyProgressDialog_->show();
-
-    QApplication::processEvents();
-
-    connect(applyProgressDialog_, &ProgressDialog::cancelRequested, this, [this]() {
-        if (applyProgressDialog_) {
-            applyProgressDialog_->close();
-        }
-    });
-
-    // Disable controls during apply
     if (ui->applyBtn)
         ui->applyBtn->setEnabled(false);
 
-    for (const QString &sn : selectedControllerList) {
+    // Apply 큐 구성
+    for (const QString &sn : applyTargetControllers_) {
         applyQueue_.enqueue(sn);
     }
+
+    // Apply 시작 시점 텍스트 갱신
+    updateApplyProgressStatus();
 
     QTimer::singleShot(0, this, &ApplyPage::processNextApply);
 }
@@ -523,10 +568,8 @@ void ApplyPage::startApplyQueue()
 // 큐 처리
 void ApplyPage::processNextApply()
 {
-    // 큐가 비어있으면 완료 처리
     if (applyQueue_.isEmpty()) {
         qDebug() << "[ApplyPage] Apply queue finished.";
-
         onAllAppliesCompleted();
         return;
     }
@@ -555,21 +598,26 @@ void ApplyPage::onApplyCompleted(const QString &serialNumber)
         return;
 
     completedApplyRequests_++;
-    QString msg = QString("Apply completed: %1 (%2/%3)")
-                          .arg(serialNumber)
-                          .arg(completedApplyRequests_)
-                          .arg(totalApplyRequests_);
+    QString msg =
+            QString("Apply completed: %1 (%2/%3)")
+                    .arg(serialNumber)
+                    .arg(completedApplyRequests_)
+                    .arg(totalApplyRequests_);
     LogManager::append(msg);
 
     int doneCount = completedApplyRequests_ + failedApplyRequests_;
 
     if (applyProgressDialog_ && totalApplyRequests_ > 0) {
         applyProgressDialog_->setCurrentIndex(doneCount);
-        int percent = (doneCount * 100) / totalApplyRequests_;
+
+        // Apply 진행률: 백업에서 0~50, Apply는 50~100 구간 사용
+        int percent = 50 + (doneCount * 50) / totalApplyRequests_;
+        if (percent > 99) percent = 99; // 전체 완료 전까지는 99까지만
         applyProgressDialog_->setProgress(percent);
     }
 
-    // 다음 작업 처리
+    updateApplyProgressStatus();
+
     processNextApply();
 }
 
@@ -581,26 +629,31 @@ void ApplyPage::onApplyFailed(const QString &serialNumber, const QString &error)
 
     failedApplyRequests_++;
     qWarning() << "[ApplyPage] Apply failed:" << serialNumber << error;
-    QString msg = QString("[Apply failed: %1 (%2/%3)")
-                          .arg(serialNumber)
-                          .arg(failedApplyRequests_)
-                          .arg(totalApplyRequests_);
+    QString msg =
+            QString("[Apply failed: %1 (%2/%3) - %4]")
+                    .arg(serialNumber)
+                    .arg(failedApplyRequests_)
+                    .arg(totalApplyRequests_)
+                    .arg(error);
     LogManager::append(msg);
 
     int doneCount = completedApplyRequests_ + failedApplyRequests_;
 
     if (applyProgressDialog_ && totalApplyRequests_ > 0) {
         applyProgressDialog_->setCurrentIndex(doneCount);
-        int percent = (doneCount * 100) / totalApplyRequests_;
+
+        int percent = 50 + (doneCount * 50) / totalApplyRequests_;
+        if (percent > 99) percent = 99;
         applyProgressDialog_->setProgress(percent);
     }
 
-    // 다음 작업 처리
+    updateApplyProgressStatus();
+
     processNextApply();
 }
 
-// 모든 Apply 완료 시 창 닫기
-void ApplyPage::onAllAppliesCompleted()  //
+// 모든 Apply 완료 시
+void ApplyPage::onAllAppliesCompleted()
 {
     qDebug() << "[ApplyPage] All applies processed.";
     LogManager::append("All applies processed");
@@ -608,6 +661,7 @@ void ApplyPage::onAllAppliesCompleted()  //
     ControllerManager::instance()->resumeStateUpdates();
 
     if (applyProgressDialog_) {
+        applyProgressDialog_->setProgress(100);
         applyProgressDialog_->setFinishedMode(true);
 
         QString statusText;
@@ -622,13 +676,37 @@ void ApplyPage::onAllAppliesCompleted()  //
         applyProgressDialog_->setStatusText(statusText);
     }
 
-    // 창을 자동으로 닫지 않고 사용자가 계속 작업할 수 있도록 유지
-    // 필요 시 외부에서 직접 닫을 수 있게 한다.
-    // this->window()->close();
-
-    // Re-enable controls after processing
     if (ui->applyBtn)
         ui->applyBtn->setEnabled(true);
+}
+
+void ApplyPage::updateApplyProgressStatus()
+{
+    if (!applyProgressDialog_)
+        return;
+
+    // 사전 백업 진행 상황
+    int      backupDone = preBackupCompleted_ + preBackupFailed_;
+    QString  backupLine = QString("사전 백업: %1 / %2")
+                                 .arg(backupDone)
+                                 .arg(preBackupTotal_);
+
+    // 적용 진행 상황
+    QString applyLine;
+    if (totalApplyRequests_ > 0) {
+        int applyDone = completedApplyRequests_ + failedApplyRequests_;
+        applyLine     = QString("적용: %1 / %2")
+                            .arg(applyDone)
+                            .arg(totalApplyRequests_);
+    } else {
+        applyLine = QString("적용: 0 / 0");
+    }
+
+    // 위쪽 "0 / 0" 라벨(countLabel_)에 표시
+    applyProgressDialog_->setCountText(backupLine + "\n" + applyLine);
+
+    // 아래쪽 statusLabel_은 비워두거나, 다른 용도로 쓸 경우만 세팅
+    applyProgressDialog_->setStatusText(QString());
 }
 
 ApplyPage::~ApplyPage()
