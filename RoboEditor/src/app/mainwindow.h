@@ -26,8 +26,9 @@ class MainWindow : public QMainWindow
       public:
         explicit MainWindow(QWidget *parent = nullptr);
         ~MainWindow();
-        static bool dark;
-        static bool manualMode;
+        static bool        dark;
+        static bool        manualMode;
+        ControllerManager *getControllerManager();
 
       public slots:
         void toggleTheme();
@@ -47,9 +48,17 @@ class MainWindow : public QMainWindow
         void selectAllFromMenu();
 
         void addCtrlFromMenu();
-        void removeCtrlFromMenu();
-        void modifyCtrlFromMenu();
         void refreshCtrlFromMenu();
+        void populateModifyMenu(QMenu * menu);
+        void populateRemoveMenu(QMenu * menu);
+
+        void setFullScreen(bool enable);
+        void setMaximize(bool enable);
+
+        void applyFromMenu();
+        void backupFromMenu();
+        void compareFileFromMenu();
+        void compareFolderFromMenu();
 
       protected:
         void closeEvent(QCloseEvent * event) override;
@@ -74,6 +83,8 @@ class MainWindow : public QMainWindow
         void wire();
 
         void loadTheme(bool isDark);
+
+        bool isFullScreen_ = false;
 
         bool isDarkMode_ = false;
 

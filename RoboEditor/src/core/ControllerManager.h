@@ -39,6 +39,7 @@ class ControllerManager : public QObject
         void registerController();
         void removeController(int index);
         void removeController(const ControllerInfo *curCon);
+        void removeControllerBySN(const QString &SN);
         void updateInfo(const ControllerInfo &newInfo);
 
         // 상태 업데이트
