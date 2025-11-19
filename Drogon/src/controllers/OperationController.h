@@ -36,7 +36,9 @@ namespace api
           private:
             // Helper function to check if robot is running
             void
-            checkRobotStatus(const std::string    &ip,
+            checkRobotStatus(const std::string    &scheme,
+                             const std::string    &host,
+                             int                   port,
                              std::function<void()> onNotRunning,
                              std::shared_ptr<std::function<void(const drogon::HttpResponsePtr &)>>
                                      callbackPtr);

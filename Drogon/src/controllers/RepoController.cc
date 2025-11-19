@@ -164,8 +164,10 @@ void api::v1::Repo::update(const drogon::HttpRequestPtr                         
         metadata.description  = json->isMember("description")
                                         ? (*json)["description"].asString()
                                         : existingResult.data["description"].asString();
-        metadata.ip           = json->isMember("ip") ? (*json)["ip"].asString()
-                                                     : existingResult.data["ip"].asString();
+        metadata.host         = json->isMember("host") ? (*json)["host"].asString()
+                                                       : existingResult.data["host"].asString();
+        metadata.scheme       = json->isMember("scheme") ? (*json)["scheme"].asString()
+                                                         : existingResult.data["scheme"].asString();
         metadata.apiPort      = json->isMember("apiPort") ? (*json)["apiPort"].asInt()
                                                           : existingResult.data["apiPort"].asInt();
         metadata.sftpPort     = json->isMember("sftpPort") ? (*json)["sftpPort"].asInt()

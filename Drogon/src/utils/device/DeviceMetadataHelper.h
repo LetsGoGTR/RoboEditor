@@ -15,7 +15,7 @@ namespace utils
         int         sftpPort;
         std::string sftpUser;
         std::string sftpPassword;
-        std::string apiUrl;  // "http://ip:port"
+        std::string apiUrl;  // "scheme://host:port"
 
         bool hasSFTPInfo() const;
         bool hasAPIInfo() const;

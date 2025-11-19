@@ -40,10 +40,19 @@ void api::v1::Operation::apply(const drogon::HttpRequestPtr                     
         return sendError(callback, drogon::k404NotFound, "Device not found", deviceId);
     }
 
-    // Get IP from device metadata
-    std::string ip = deviceResult.data["ip"].asString();
-    if (ip.empty()) {
-        ip = "localhost";
+    // Get connection info from device metadata
+    std::string host   = deviceResult.data["host"].asString();
+    std::string scheme = deviceResult.data["scheme"].asString();
+    int         port   = deviceResult.data["apiPort"].asInt();
+
+    if (host.empty()) {
+        host = "localhost";
+    }
+    if (scheme.empty()) {
+        scheme = "http";
+    }
+    if (port == 0) {
+        port = 80;
     }
 
     // Wrap callback in shared_ptr for lambda capture
@@ -52,8 +61,10 @@ void api::v1::Operation::apply(const drogon::HttpRequestPtr                     
 
     // Check if robot is running before proceeding
     checkRobotStatus(
-            ip,
-            [callbackPtr, ip, deviceId, workspaceId, this]() {
+            scheme,
+            host,
+            port,
+            [callbackPtr, scheme, host, port, deviceId, workspaceId, this]() {
                 try {
                     // Export workspace to temp file
                     std::string tempDir = getTempApplyDir();
@@ -76,7 +87,9 @@ void api::v1::Operation::apply(const drogon::HttpRequestPtr                     
 
                     // Upload workspace to robot
                     utils::RobotHttpClient::uploadWorkspace(
-                            ip,
+                            scheme,
+                            host,
+                            port,
                             tempFile,
                             [callbackPtr, tempFile, deviceId, workspaceId](
                                     bool success, const std::string &error) {
@@ -126,10 +139,19 @@ void api::v1::Operation::backup(const drogon::HttpRequestPtr                    
         return sendError(callback, drogon::k404NotFound, "Device not found", deviceId);
     }
 
-    // Get IP from device metadata
-    std::string ip = deviceResult.data["ip"].asString();
-    if (ip.empty()) {
-        ip = "localhost";
+    // Get connection info from device metadata
+    std::string host   = deviceResult.data["host"].asString();
+    std::string scheme = deviceResult.data["scheme"].asString();
+    int         port   = deviceResult.data["apiPort"].asInt();
+
+    if (host.empty()) {
+        host = "localhost";
+    }
+    if (scheme.empty()) {
+        scheme = "http";
+    }
+    if (port == 0) {
+        port = 80;
     }
 
     // Wrap callback in shared_ptr for lambda capture
@@ -138,11 +160,15 @@ void api::v1::Operation::backup(const drogon::HttpRequestPtr                    
 
     // Check if robot is running before proceeding
     checkRobotStatus(
-            ip,
-            [callbackPtr, ip, deviceId, this]() {
+            scheme,
+            host,
+            port,
+            [callbackPtr, scheme, host, port, deviceId, this]() {
                 // Download workspace from robot
                 utils::RobotHttpClient::downloadWorkspace(
-                        ip,
+                        scheme,
+                        host,
+                        port,
                         [callbackPtr, deviceId, this](const std::string &content,
                                                       const std::string &error) {
                             if (!error.empty()) {
@@ -220,12 +246,14 @@ void api::v1::Operation::backup(const drogon::HttpRequestPtr                    
 }
 
 void api::v1::Operation::checkRobotStatus(
-        const std::string                                                    &ip,
+        const std::string                                                    &scheme,
+        const std::string                                                    &host,
+        int                                                                   port,
         std::function<void()>                                                 onNotRunning,
         std::shared_ptr<std::function<void(const drogon::HttpResponsePtr &)>> callbackPtr)
 {
     utils::RobotHttpClient::checkRunning(
-            ip, [callbackPtr, onNotRunning](bool isRunning, const std::string &error) {
+            scheme, host, port, [callbackPtr, onNotRunning](bool isRunning, const std::string &error) {
                 if (!error.empty()) {
                     return sendError(*callbackPtr,
                                      drogon::k500InternalServerError,

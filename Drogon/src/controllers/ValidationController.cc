@@ -16,20 +16,21 @@ void api::v1::Validation::device(
     }
 
     // Extract connection info from body
-    if (!json->isMember("ip")) {
-        return sendError(callback, drogon::k400BadRequest, "Missing required field: ip");
+    if (!json->isMember("host")) {
+        return sendError(callback, drogon::k400BadRequest, "Missing required field: host");
     }
 
     try {
         // Build connection params from body
         utils::ConnectionParams params;
-        params.sftpHost     = (*json)["ip"].asString();
+        params.sftpHost     = (*json)["host"].asString();
         params.sftpPort     = json->isMember("sftpPort") ? (*json)["sftpPort"].asInt() : 22;
         params.sftpUser     = json->isMember("sftpUser") ? (*json)["sftpUser"].asString() : "";
         params.sftpPassword = json->isMember("sftpPassword") ? (*json)["sftpPassword"].asString() : "";
 
-        int apiPort   = json->isMember("apiPort") ? (*json)["apiPort"].asInt() : 80;
-        params.apiUrl = "http://" + params.sftpHost + ":" + std::to_string(apiPort);
+        std::string scheme = json->isMember("scheme") ? (*json)["scheme"].asString() : "http";
+        int apiPort        = json->isMember("apiPort") ? (*json)["apiPort"].asInt() : 80;
+        params.apiUrl      = scheme + "://" + params.sftpHost + ":" + std::to_string(apiPort);
 
         // Validate connections
         auto validationResult = utils::ConnectionValidator::validateDeviceFromParams(params);

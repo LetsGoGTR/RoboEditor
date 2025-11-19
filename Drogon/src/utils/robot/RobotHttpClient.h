@@ -9,22 +9,32 @@ namespace utils
     class RobotHttpClient
     {
       public:
-        static void checkRunning(const std::string                             &ip,
+        static void checkRunning(const std::string                             &scheme,
+                                 const std::string                             &host,
+                                 int                                            port,
                                  std::function<void(bool, const std::string &)> callback);
 
-        static void uploadWorkspace(const std::string                             &ip,
+        static void uploadWorkspace(const std::string                             &scheme,
+                                    const std::string                             &host,
+                                    int                                            port,
                                     const std::string                             &filePath,
                                     std::function<void(bool, const std::string &)> callback);
 
         static void
-        downloadWorkspace(const std::string                                            &ip,
+        downloadWorkspace(const std::string                                            &scheme,
+                          const std::string                                            &host,
+                          int                                                           port,
                           std::function<void(const std::string &, const std::string &)> callback);
 
         static void
-        archiveWorkspace(const std::string                                            &ip,
+        archiveWorkspace(const std::string                                            &scheme,
+                         const std::string                                            &host,
+                         int                                                           port,
                          std::function<void(const std::string &, const std::string &)> callback);
 
-        static void extractArchive(const std::string                             &ip,
+        static void extractArchive(const std::string                             &scheme,
+                                   const std::string                             &host,
+                                   int                                            port,
                                    const std::string                             &remoteArchivePath,
                                    std::function<void(bool, const std::string &)> callback);
 
