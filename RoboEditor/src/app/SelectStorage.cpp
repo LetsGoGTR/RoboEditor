@@ -32,7 +32,7 @@ selectTableWidget::selectTableWidget(QWidget *parent) : QWidget(parent)
     // 오른쪽 테이블
     rightTable = new QTableView(splitter);
     rightModel = new QStandardItemModel(this);
-    rightModel->setHorizontalHeaderLabels({"Folder Name", "Last Modified", "선택"});
+    rightModel->setHorizontalHeaderLabels({"Folder Name", "Last Modified", "Select"});
     rightTable->setModel(rightModel);
     rightTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
 
@@ -42,7 +42,7 @@ selectTableWidget::selectTableWidget(QWidget *parent) : QWidget(parent)
     header->setSectionResizeMode(0, QHeaderView::Stretch);
     header->setSectionResizeMode(1, QHeaderView::Stretch);
     header->setSectionResizeMode(2, QHeaderView::Fixed);
-    header->resizeSection(2, 40);
+    header->resizeSection(2, 50);
 
     header->setStretchLastSection(false);
     splitter->setStretchFactor(0, 2);  // 왼쪽 영역 비율 2

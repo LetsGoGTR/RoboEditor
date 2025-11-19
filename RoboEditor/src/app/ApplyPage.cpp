@@ -62,12 +62,12 @@ void ApplyPage::confirmSelection()
     selectedControllerList = selectcontrollerWidget->getSelectedControllers();
 
     if (selectedControllerList.isEmpty()) {
-        QMessageBox::warning(this, "오류", "제어기를 선택해주세요.");
+        QMessageBox::warning(this, tr("Error"), tr("Please select at least one controller."));
         return;
     }
 
     if (selectedBackupDir.isEmpty()) {
-        QMessageBox::warning(this, "오류", "백업 파일을 선택해주세요.");
+        QMessageBox::warning(this, tr("Error"), tr("Please select a backup file."));
         return;
     }
 
@@ -120,7 +120,7 @@ void ApplyPage::showPasswordUI()
             }
         } else {
             LogManager::append("Apply password not match");
-            QMessageBox::warning(this, tr("오류"), tr("비밀번호가 올바르지 않습니다."));
+            QMessageBox::warning(this, tr("Error"), tr("The password you entered is incorrect."));
         }
     } else {
         LogManager::append("Password dialog cancelled");
@@ -156,7 +156,7 @@ QString ApplyPage::determineBackupRoot() const
 void ApplyPage::startPreBackup()
 {
     if (selectedControllerList.isEmpty()) {
-        QMessageBox::warning(this, "오류", "선택된 제어기가 없습니다.");
+        QMessageBox::warning(this, tr("Error"), tr("No controllers have been selected."));
         return;
     }
 
@@ -173,7 +173,7 @@ void ApplyPage::startPreBackup()
     }
 
     applyProgressDialog_ = new ProgressDialog(this);
-    applyProgressDialog_->setWindowTitle("사전 백업 및 적용 진행 중...");
+    applyProgressDialog_->setWindowTitle("Pre-backup and apply in progress...");
     applyProgressDialog_->setSerialNumber("-");
     applyProgressDialog_->setTotalCount(0);   // 상단 countLabel은 전체 개수 대신 따로 쓰므로 0으로 시작
     applyProgressDialog_->setCurrentIndex(0);
@@ -216,24 +216,24 @@ void ApplyPage::startPreBackup()
     if (!unknownControllers.isEmpty()) {
         QMessageBox::warning(
                 this,
-                "오류",
-                QString("등록 정보가 없는 제어기가 선택되었습니다:\n%1")
+                tr("Error"),
+                QString("The following controllers are not registered:\n%1")
                         .arg(unknownControllers.join(", ")));
         return;
     }
     if (!disconnectedControllers.isEmpty()) {
         QMessageBox::warning(
                 this,
-                "오류",
-                QString("다음 제어기가 오프라인 상태입니다:\n%1")
+                tr("Error"),
+                QString("The following controllers are offline:\n%1")
                         .arg(disconnectedControllers.join(", ")));
         return;
     }
     if (!runningControllers.isEmpty()) {
         QMessageBox::warning(
                 this,
-                "오류",
-                QString("제어기가 동작중입니다. 적용을 진행할 수 없습니다:\n%1")
+                tr("Error"),
+                QString("The following controllers are currently running. Apply cannot proceed:\n%1")
                         .arg(runningControllers.join(", ")));
         return;
     }
@@ -301,8 +301,8 @@ void ApplyPage::startPreBackup()
 
         QMessageBox::warning(
                 this,
-                "백업 오류",
-                "적용 전에 수행할 백업 요청을 시작하지 못했습니다.\n적용을 취소합니다.");
+                tr("Backup Error"),
+                tr("Failed to start the pre-backup request.\nThe apply operation will be canceled."));
     }
 }
 
@@ -349,8 +349,8 @@ void ApplyPage::onPreBackupCompleted(const QString &serialNumber)
     if (preBackupSuccessControllers_.isEmpty()) {
         QMessageBox::warning(
                 this,
-                "백업 오류",
-                "모든 제어기의 사전 백업이 실패했습니다.\n적용을 진행할 수 없습니다.");
+                tr("Backup Error"),
+                tr("Pre-backup failed for all controllers.\nApply cannot be performed."));
         return;
     }
 
@@ -360,10 +360,10 @@ void ApplyPage::onPreBackupCompleted(const QString &serialNumber)
     if (!preBackupFailedControllers_.isEmpty()) {
         QString failList = preBackupFailedControllers_.join(", ");
         QString warnMsg  = QString(
-                                  "일부 제어기의 사전 백업이 실패했습니다.\n"
-                                  "다음 제어기는 적용 대상에서 제외됩니다:\n%1")
+                                  "Pre-backup failed for some controllers.\n"
+                                  "The following controllers will be excluded from apply:\n%1")
                                   .arg(failList);
-        QMessageBox::warning(this, "사전 백업 경고", warnMsg);
+        QMessageBox::warning(this, tr("Pre-backup Warning"), warnMsg);
 
         LogManager::append(
                 QString("Pre-backup failed controllers (skipped in apply): %1")
@@ -416,8 +416,8 @@ void ApplyPage::onPreBackupFailed(const QString &serialNumber, const QString &er
     if (preBackupSuccessControllers_.isEmpty()) {
         QMessageBox::warning(
                 this,
-                "백업 실패",
-                "적용 전에 수행한 사전 백업이 모두 실패했습니다.\n적용을 진행할 수 없습니다.");
+                tr("Backup Failed"),
+                tr("All pre-backup operations failed.\nApply cannot be performed."));
         return;
     }
 
@@ -426,10 +426,10 @@ void ApplyPage::onPreBackupFailed(const QString &serialNumber, const QString &er
     if (!preBackupFailedControllers_.isEmpty()) {
         QString failList = preBackupFailedControllers_.join(", ");
         QString warnMsg  = QString(
-                                  "일부 제어기의 사전 백업이 실패했습니다.\n"
-                                  "다음 제어기는 적용 대상에서 제외됩니다:\n%1")
+                                  "Pre-backup failed for some controllers.\n"
+                                  "The following controllers will be excluded from apply:\n%1")
                                   .arg(failList);
-        QMessageBox::warning(this, "사전 백업 경고", warnMsg);
+        QMessageBox::warning(this, tr("Pre-backup Warning"), warnMsg);
 
         LogManager::append(
                 QString("Pre-backup failed controllers (skipped in apply): %1")
@@ -443,7 +443,7 @@ void ApplyPage::onPreBackupFailed(const QString &serialNumber, const QString &er
 void ApplyPage::startApplyQueue()
 {
     if (applyTargetControllers_.isEmpty() || selectedBackupDir.isEmpty()) {
-        QMessageBox::warning(this, "오류", "선택된 제어기 또는 백업 파일 정보가 없습니다.");
+        QMessageBox::warning(this, tr("Error"), tr("No controller or backup file information is available."));
         return;
     }
 
@@ -475,8 +475,8 @@ void ApplyPage::startApplyQueue()
     if (!unknownControllers.isEmpty()) {
         QMessageBox::warning(
                 this,
-                "오류",
-                QString("등록 정보가 없는 제어기가 선택되었습니다:\n%1")
+                tr("Error"),
+                QString("The following controllers are not registered:\n%1")
                         .arg(unknownControllers.join(", ")));
 
         for (const QString &sn : unknownControllers) {
@@ -496,8 +496,8 @@ void ApplyPage::startApplyQueue()
     if (!disconnectedControllers.isEmpty()) {
         QMessageBox::warning(
                 this,
-                "오류",
-                QString("다음 제어기가 오프라인 상태입니다:\n%1")
+                tr("Error"),
+                QString("The following controllers are offline:\n%1")
                         .arg(disconnectedControllers.join(", ")));
 
         for (const QString &sn : disconnectedControllers) {
@@ -517,8 +517,8 @@ void ApplyPage::startApplyQueue()
     if (!runningControllers.isEmpty()) {
         QMessageBox::warning(
                 this,
-                "오류",
-                QString("제어기가 동작중입니다. 전체 적용을 취소합니다:\n%1")
+                tr("Error"),
+                QString("Some controllers are currently running. The apply operation has been canceled:\n%1")
                         .arg(runningControllers.join(", ")));
 
         for (const auto &sn : runningControllers) {
@@ -544,7 +544,7 @@ void ApplyPage::startApplyQueue()
 
     // 진행 다이얼로그는 재사용, 게이지는 "백업 단계에서 올라간 값" 유지
     if (applyProgressDialog_) {
-        applyProgressDialog_->setWindowTitle("적용 진행 중...");
+        applyProgressDialog_->setWindowTitle("Apply in progress...");
         applyProgressDialog_->setTotalCount(totalApplyRequests_);
         applyProgressDialog_->setCurrentIndex(0);
         applyProgressDialog_->setFinishedMode(false);
@@ -587,7 +587,7 @@ void ApplyPage::processNextApply()
     if (!ok) {
         QString msg = QString("[%1] Apply request could not be started").arg(serialNumber);
         LogManager::append(msg);
-        onApplyFailed(serialNumber, tr("적용 요청을 시작하지 못했습니다."));
+        onApplyFailed(serialNumber, tr("Failed to start apply request."));
     }
 }
 
@@ -666,11 +666,11 @@ void ApplyPage::onAllAppliesCompleted()
 
         QString statusText;
         if (failedApplyRequests_ > 0) {
-            statusText = QString("적용이 완료되었습니다.\n성공: %1대, 실패: %2대")
+            statusText = QString("Apply completed.\nSucceeded: %1, Failed: %2")
                                  .arg(completedApplyRequests_)
                                  .arg(failedApplyRequests_);
         } else {
-            statusText = QString("적용이 완료되었습니다. (총 %1대, 모두 성공)")
+            statusText = QString("Apply completed. (Total %1 controller(s), all succeeded)")
                                  .arg(completedApplyRequests_);
         }
         applyProgressDialog_->setStatusText(statusText);
@@ -687,7 +687,7 @@ void ApplyPage::updateApplyProgressStatus()
 
     // 사전 백업 진행 상황
     int      backupDone = preBackupCompleted_ + preBackupFailed_;
-    QString  backupLine = QString("사전 백업: %1 / %2")
+    QString  backupLine = QString("Pre-backup: %1 / %2")
                                  .arg(backupDone)
                                  .arg(preBackupTotal_);
 
@@ -695,11 +695,11 @@ void ApplyPage::updateApplyProgressStatus()
     QString applyLine;
     if (totalApplyRequests_ > 0) {
         int applyDone = completedApplyRequests_ + failedApplyRequests_;
-        applyLine     = QString("적용: %1 / %2")
+        applyLine     = QString("Apply: %1 / %2")
                             .arg(applyDone)
                             .arg(totalApplyRequests_);
     } else {
-        applyLine = QString("적용: 0 / 0");
+        applyLine = QString("Apply: 0 / 0");
     }
 
     // 위쪽 "0 / 0" 라벨(countLabel_)에 표시
