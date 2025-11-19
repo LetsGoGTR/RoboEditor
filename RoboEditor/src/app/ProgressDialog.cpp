@@ -12,7 +12,7 @@ ProgressDialog::ProgressDialog(QWidget *parent) : QDialog(parent)
     //setWindowTitle("진행 중...");
     resize(400, 180);
 
-    serialLabel_ = new QLabel("현재 제어기: -");
+    serialLabel_ = new QLabel("Current controller: -");
     countLabel_  = new QLabel("0 / 0");
     timeLabel_   = new QLabel("0s...");
     progressBar_ = new QProgressBar();
@@ -32,7 +32,7 @@ ProgressDialog::ProgressDialog(QWidget *parent) : QDialog(parent)
     statusLabel_ = new QLabel("");
     statusLabel_->setWordWrap(true);
 
-    cancelBtn_ = new QPushButton("취소");
+    cancelBtn_ = new QPushButton("Cancel");
 
     auto layout = new QVBoxLayout(this);
     layout->addWidget(serialLabel_);
@@ -68,7 +68,7 @@ void ProgressDialog::setCurrentIndex(int index)
 
 void ProgressDialog::setSerialNumber(const QString &sn)
 {
-    serialLabel_->setText(QString("현재 제어기: %1").arg(sn));
+    serialLabel_->setText(QString("Current controller: %1").arg(sn));
 }
 
 void ProgressDialog::setProgress(int percent)
@@ -93,15 +93,15 @@ void ProgressDialog::setFinishedMode(bool finished)
 {
     if (finished) {
         // 완료 모드
-        cancelBtn_->setText("닫기");
-        //setWindowTitle("백업 완료");
+        cancelBtn_->setText("Close");
+        //setWindowTitle("Backup completed");
 
         if (timer_)
             timer_->stop();
     } else {
         // 진행 모드
-        cancelBtn_->setText("취소");
-        //setWindowTitle("진행 중...");
+        cancelBtn_->setText("Cancel");
+        //setWindowTitle("In progress...");
         if (timer_) timer_->start(1000);
     }
 }
@@ -112,7 +112,7 @@ void ProgressDialog::reset()
     currentIndex_ = 0;
     useCustomCountText_ = false;
 
-    serialLabel_->setText("현재 제어기: -");
+    serialLabel_->setText("Current controller: -");
     countLabel_->setText("0 / 0");
     progressBar_->setValue(0);
     statusLabel_->setText("");
@@ -120,8 +120,8 @@ void ProgressDialog::reset()
     elapsed_.restart();
     if (timer_) timer_->start(1000);
 
-    cancelBtn_->setText("취소");
-    setWindowTitle("진행 중...");
+    cancelBtn_->setText("Cancel");
+    setWindowTitle("In progress...");
 }
 
 void ProgressDialog::setCountText(const QString &text)

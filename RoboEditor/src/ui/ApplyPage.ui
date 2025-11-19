@@ -19,9 +19,12 @@
   <property name="windowTitle">
    <string>ApplyView</string>
   </property>
-  <layout class="QVBoxLayout" name="verticalLayout" stretch="10,1,0">
+  <layout class="QVBoxLayout" name="verticalLayout" stretch="1,1,0">
    <item>
     <layout class="QHBoxLayout" name="horizontalLayout" stretch="3,0,2">
+     <property name="spacing">
+      <number>6</number>
+     </property>
      <item>
       <widget class="QWidget" name="widget_2" native="true">
        <property name="sizePolicy">
@@ -31,20 +34,59 @@
         </sizepolicy>
        </property>
        <layout class="QVBoxLayout" name="verticalLayout_3">
+        <property name="leftMargin">
+         <number>0</number>
+        </property>
+        <property name="topMargin">
+         <number>0</number>
+        </property>
+        <property name="rightMargin">
+         <number>0</number>
+        </property>
+        <property name="bottomMargin">
+         <number>0</number>
+        </property>
         <item>
          <layout class="QVBoxLayout" name="leftLayout" stretch="0,0,0,10">
+          <property name="leftMargin">
+           <number>6</number>
+          </property>
+          <property name="topMargin">
+           <number>0</number>
+          </property>
           <item>
-           <widget class="QLabel" name="label_2">
-            <property name="styleSheet">
-             <string notr="true">font: 700 9pt &quot;맑은 고딕&quot;;</string>
+           <layout class="QHBoxLayout" name="horizontalLayout_3">
+            <property name="topMargin">
+             <number>5</number>
             </property>
-            <property name="text">
-             <string>Select Backup</string>
+            <property name="bottomMargin">
+             <number>6</number>
             </property>
-            <property name="indent">
-             <number>20</number>
-            </property>
-           </widget>
+            <item>
+             <widget class="QLabel" name="label_2">
+              <property name="font">
+               <font>
+                <family>맑은 고딕</family>
+                <pointsize>9</pointsize>
+                <italic>false</italic>
+                <bold>true</bold>
+               </font>
+              </property>
+              <property name="styleSheet">
+               <string notr="true">font: 700 9pt &quot;맑은 고딕&quot;;</string>
+              </property>
+              <property name="text">
+               <string>Select Backup</string>
+              </property>
+              <property name="margin">
+               <number>0</number>
+              </property>
+              <property name="indent">
+               <number>20</number>
+              </property>
+             </widget>
+            </item>
+           </layout>
           </item>
           <item>
            <widget class="Line" name="line_3">
@@ -54,7 +96,20 @@
            </widget>
           </item>
           <item>
-           <layout class="QHBoxLayout" name="horizontalLayout_5" stretch="1,7,1">
+           <layout class="QHBoxLayout" name="horizontalLayout_5" stretch="0,1,7,1">
+            <item>
+             <spacer name="horizontalSpacer_2">
+              <property name="orientation">
+               <enum>Qt::Orientation::Horizontal</enum>
+              </property>
+              <property name="sizeHint" stdset="0">
+               <size>
+                <width>40</width>
+                <height>20</height>
+               </size>
+              </property>
+             </spacer>
+            </item>
             <item>
              <widget class="QLabel" name="label_4">
               <property name="text">
@@ -108,19 +163,35 @@
         </sizepolicy>
        </property>
        <layout class="QVBoxLayout" name="verticalLayout_4">
+        <property name="leftMargin">
+         <number>0</number>
+        </property>
+        <property name="topMargin">
+         <number>0</number>
+        </property>
+        <property name="rightMargin">
+         <number>0</number>
+        </property>
+        <property name="bottomMargin">
+         <number>0</number>
+        </property>
         <item>
-         <layout class="QVBoxLayout" name="rightLayout" stretch="0,0,10">
+         <layout class="QVBoxLayout" name="rightLayout" stretch="0,0,0,10">
           <item>
-           <widget class="Line" name="line_4">
-            <property name="orientation">
-             <enum>Qt::Orientation::Horizontal</enum>
+           <layout class="QHBoxLayout" name="horizontalLayout_2" stretch="0,0">
+            <property name="topMargin">
+             <number>5</number>
             </property>
-           </widget>
-          </item>
-          <item>
-           <layout class="QHBoxLayout" name="horizontalLayout_2" stretch="0,0,0">
             <item>
              <widget class="QLabel" name="label">
+              <property name="font">
+               <font>
+                <family>맑은 고딕</family>
+                <pointsize>9</pointsize>
+                <italic>false</italic>
+                <bold>true</bold>
+               </font>
+              </property>
               <property name="layoutDirection">
                <enum>Qt::LayoutDirection::LeftToRight</enum>
               </property>
@@ -137,6 +208,30 @@
             </item>
             <item>
              <spacer name="horizontalSpacer_5">
+              <property name="orientation">
+               <enum>Qt::Orientation::Horizontal</enum>
+              </property>
+              <property name="sizeHint" stdset="0">
+               <size>
+                <width>40</width>
+                <height>20</height>
+               </size>
+              </property>
+             </spacer>
+            </item>
+           </layout>
+          </item>
+          <item>
+           <widget class="Line" name="line_4">
+            <property name="orientation">
+             <enum>Qt::Orientation::Horizontal</enum>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="horizontalLayout_7">
+            <item>
+             <spacer name="horizontalSpacer_3">
               <property name="orientation">
                <enum>Qt::Orientation::Horizontal</enum>
               </property>

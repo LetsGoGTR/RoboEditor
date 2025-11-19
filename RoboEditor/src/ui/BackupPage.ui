@@ -10,7 +10,7 @@
     <x>0</x>
     <y>0</y>
     <width>385</width>
-    <height>119</height>
+    <height>134</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -29,10 +29,8 @@
       <layout class="QHBoxLayout" name="horizontalLayout_4">
        <item>
         <widget class="QLabel" name="label_4">
-         <property name="font">
-          <font>
-           <bold>true</bold>
-          </font>
+         <property name="styleSheet">
+          <string notr="true">font: 700 9pt &quot;맑은 고딕&quot;;</string>
          </property>
          <property name="text">
           <string>Select Controller</string>
