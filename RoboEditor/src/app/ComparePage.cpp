@@ -139,61 +139,14 @@ QWidget *ComparePage::buildRightPanel()
     topLayout->addWidget(btnSelectFile);
     btnSelectFile->setObjectName("fileBtn");
 
-    connect(btnSelectFile, &QPushButton::clicked, this, [this]() {
-        showCompareEditor(true);
-        QString path = QFileDialog::getOpenFileName(
-                this,
-                tr("Select file to compare"),
-                "C:/backup",
-                tr("All Files (*.*);;YAML Files (*.yaml *.yml);;Text Files (*.txt)"));
-
-        if (!path.isEmpty()) {
-            setRightFile(path);
-        }
-    });
+    connect(btnSelectFile, &QPushButton::clicked, this, &ComparePage::triggerFileCompare);
 
     auto btnSelectFolder = new QPushButton(tr("Compare Folders"), topBar);
     btnSelectFolder->setFixedSize(120, 26);
     topLayout->addWidget(btnSelectFolder);
     btnSelectFolder->setObjectName("folderBtn");
-    connect(btnSelectFolder, &QPushButton::clicked, this, [this]() {
-        showCompareEditor(false);
-        QFileDialog dialog(this, tr("Select folder or archive (compare)"), "C:/backup");
-        dialog.setFileMode(QFileDialog::Directory);
-        dialog.setOption(QFileDialog::ShowDirsOnly, false);
-        dialog.setOption(QFileDialog::DontUseNativeDialog, true);
-        dialog.setNameFilter(tr("Folders and Archives (*.zip *.tar *.tar.gz *.tgz)"));
 
-        QListView *listView = dialog.findChild<QListView *>("listView");
-        if (listView)
-            listView->setSelectionMode(QAbstractItemView::SingleSelection);
-
-        QString leftPath;
-        if (dialog.exec() == QDialog::Accepted) {
-            QStringList paths = dialog.selectedFiles();
-            if (!paths.isEmpty())
-                leftPath = paths.first();
-        }
-        if (leftPath.isEmpty())
-            return;
-
-        QFileDialog dialog2(this, tr("Select folder or archive (base)"), "C:/backup");
-        dialog2.setFileMode(QFileDialog::Directory);
-        dialog2.setOption(QFileDialog::ShowDirsOnly, false);
-        dialog2.setOption(QFileDialog::DontUseNativeDialog, true);
-        dialog2.setNameFilter(tr("Folders and Archives (*.zip *.tar *.tar.gz *.tgz)"));
-
-        QString rightPath;
-        if (dialog2.exec() == QDialog::Accepted) {
-            QStringList paths = dialog2.selectedFiles();
-            if (!paths.isEmpty())
-                rightPath = paths.first();
-        }
-        if (rightPath.isEmpty())
-            return;
-
-        performFolderDiff(leftPath, rightPath);
-    });
+    connect(btnSelectFolder, &QPushButton::clicked, this, &ComparePage::triggerFolderCompare);
 
     layout->addWidget(topBar);
 
@@ -864,4 +817,58 @@ void ComparePage::showCompareEditor(bool show)
         tabPanel->hide();
         rightSplit_->setSizes({0, 1});  // right only
     }
+}
+void ComparePage::triggerFileCompare()
+{
+    showCompareEditor(true);
+    QString path = QFileDialog::getOpenFileName(
+            this,
+            tr("Select file to compare"),
+            "C:/backup",
+            tr("All Files (*.*);;YAML Files (*.yaml *.yml);;Text Files (*.txt)"));
+
+    if (!path.isEmpty()) {
+        setRightFile(path);
+    }
+}
+
+void ComparePage::triggerFolderCompare()
+{
+    showCompareEditor(false);
+
+    QFileDialog dialog(this, tr("Select folder or archive (compare)"), "C:/backup");
+    dialog.setFileMode(QFileDialog::Directory);
+    dialog.setOption(QFileDialog::ShowDirsOnly, false);
+    dialog.setOption(QFileDialog::DontUseNativeDialog, true);
+    dialog.setNameFilter(tr("Folders and Archives (*.zip *.tar *.tar.gz *.tgz)"));
+
+    QListView *listView = dialog.findChild<QListView *>("listView");
+    if (listView)
+        listView->setSelectionMode(QAbstractItemView::SingleSelection);
+
+    QString leftPath;
+    if (dialog.exec() == QDialog::Accepted) {
+        QStringList paths = dialog.selectedFiles();
+        if (!paths.isEmpty())
+            leftPath = paths.first();
+    }
+    if (leftPath.isEmpty())
+        return;
+
+    QFileDialog dialog2(this, tr("Select folder or archive (base)"), "C:/backup");
+    dialog2.setFileMode(QFileDialog::Directory);
+    dialog2.setOption(QFileDialog::ShowDirsOnly, false);
+    dialog2.setOption(QFileDialog::DontUseNativeDialog, true);
+    dialog2.setNameFilter(tr("Folders and Archives (*.zip *.tar *.tar.gz *.tgz)"));
+
+    QString rightPath;
+    if (dialog2.exec() == QDialog::Accepted) {
+        QStringList paths = dialog2.selectedFiles();
+        if (!paths.isEmpty())
+            rightPath = paths.first();
+    }
+    if (rightPath.isEmpty())
+        return;
+
+    performFolderDiff(leftPath, rightPath);
 }

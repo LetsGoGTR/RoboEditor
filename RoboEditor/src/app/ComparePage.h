@@ -41,6 +41,8 @@ class ComparePage : public QWidget
 
       public slots:
         void recalcDiff(const QString &leftText, const QString &leftPath = QString());
+        void triggerFileCompare();
+        void triggerFolderCompare();
 
       private slots:
         void onFolderFileClicked(const QString &path);
