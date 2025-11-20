@@ -49,12 +49,12 @@ void BackupPage::confirmSelection()
     selectedControllerList = selectcontrollerWidget->getSelectedControllers();
 
     if (selectedControllerList.isEmpty()) {
-        QMessageBox::warning(this, "오류", "제어기를 선택해주세요.");
+        QMessageBox::warning(this, tr("Error"), tr("Please select at least one controller."));
         return;
     }
 
     if (selectedBackupDir.isEmpty()) {
-        QMessageBox::warning(this, "오류", "백업 저장 경로를 선택해주세요.");
+        QMessageBox::warning(this, tr("Error"), tr("Please select a backup destination folder."));
         return;
     }
 
@@ -84,7 +84,7 @@ void BackupPage::confirmSelection()
         }
     });
 
-    backupProgressDialog_->setWindowTitle("백업 진행 중...");
+    backupProgressDialog_->setWindowTitle("Backup in progress...");
     backupProgressDialog_->setTotalCount(totalBackupRequests_);
     backupProgressDialog_->setCurrentIndex(0);
     backupProgressDialog_->setSerialNumber("-");
@@ -104,13 +104,13 @@ void BackupPage::confirmSelection()
 
         if (info.serialNumber.isEmpty()) {
             qWarning() << "[BackupPage] Unknown controller:" << serialNumber;
-            onBackupFailed(serialNumber, tr("등록 정보가 없는 제어기입니다."));
+            onBackupFailed(serialNumber, tr("Controller is not registered."));
             continue;
         }
 
         if (!info.isConnected) {
             qWarning() << "[BackupPage] Controller offline:" << serialNumber;
-            onBackupFailed(serialNumber, tr("제어기가 오프라인 상태입니다."));
+            onBackupFailed(serialNumber, tr("Controller is offline."));
             continue;
         }
 
@@ -122,7 +122,7 @@ void BackupPage::confirmSelection()
 
         // "백업 요청을 아예 시작 못했을 때"만 즉시 실패 처리
         if (!ok) {
-            onBackupFailed(serialNumber, tr("백업 요청을 시작하지 못했습니다."));
+            onBackupFailed(serialNumber, tr("Failed to start backup request."));
         }
     }
 }
@@ -184,11 +184,11 @@ void BackupPage::onBackupCompleted(const QString &serialNumber)
 
             if (failedBackupRequests_ == 0) {
                 backupProgressDialog_->setStatusText(
-                        QString("백업이 완료되었습니다. (총 %1대, 모두 성공)")
+                        QString("Backup completed. (Total %1 controller(s), all succeeded)")
                                 .arg(completedBackupRequests_));
             } else {
                 backupProgressDialog_->setStatusText(
-                        QString("백업이 완료되었습니다.\n성공: %1대, 실패: %2대")
+                        QString("Backup completed.\nSucceeded: %1, Failed: %2")
                                 .arg(completedBackupRequests_)
                                 .arg(failedBackupRequests_));
             }
@@ -232,7 +232,7 @@ void BackupPage::onBackupFailed(const QString &serialNumber, const QString &erro
         // ProgressDialog 닫고 정리
         if (backupProgressDialog_) {
             backupProgressDialog_->setStatusText(
-                    QString("백업이 완료되었습니다.\n성공: %1대, 실패: %2대")
+                    QString("Backup completed.\nSucceeded: %1, Failed: %2")
                             .arg(completedBackupRequests_)
                             .arg(failedBackupRequests_));
         }

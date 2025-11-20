@@ -66,16 +66,39 @@ void ControllerManager::registerController()
         // SN 폴더 자동 생성
         QString folderPath = "C:/backup/" + newConInfo.serialNumber;
         QDir    dir;
+        bool    folderCreated = false;
 
         if (!dir.exists(folderPath)) {
             if (dir.mkpath(folderPath)) {
                 qDebug() << "폴더 생성 완료:" << folderPath;
+                folderCreated = true;
             } else {
                 QMessageBox::warning(nullptr,
                                      "폴더 생성 실패",
                                      "작업 경로에 폴더를 생성할 수 없습니다:\n" + folderPath);
                 return;
             }
+        }
+
+        // 연결 검증
+        if (!validateConnection(newConInfo)) {
+            QString msg = QString("[%1] registration failed: connection validation failed")
+                                  .arg(newConInfo.serialNumber);
+            LogManager::append(msg);
+            QMessageBox::warning(nullptr,
+                                 "등록 실패",
+                                 "제어기와의 연결을 확인할 수 없습니다.\n"
+                                 "API 또는 SFTP 연결이 실패했습니다.\n"
+                                 "IP 주소, 포트, 계정 정보를 확인해주세요.");
+            if (folderCreated) {
+                if (dir.rmpath(folderPath)) {
+                    qDebug() << "등록 실패로 인한 폴더 삭제:" << folderPath;
+                } else {
+                    qDebug() << "폴더 삭제 실패:" << folderPath;
+                }
+            }
+
+            return;
         }
 
         // 초기 상태 설정
@@ -114,7 +137,18 @@ void ControllerManager::removeController(int index)
         emit controllerListChanged();
     }
 }
+void ControllerManager::removeControllerBySN(const QString &SN)
+{
+    for (int i = 0; i < controllers_.size(); ++i) {
+        if (controllers_[i].serialNumber == SN) {
+            removeController(i);  // 기존 함수 재사용
+            return;
+        }
+    }
 
+    QString msg = QString("[%1] not found for removal").arg(SN);
+    LogManager::append(msg);
+}
 void ControllerManager::removeController(const ControllerInfo *curCon)
 {
     QMutexLocker locker(&mutex_);
@@ -215,9 +249,6 @@ void ControllerManager::setupApiClient(const QString &serialNumber)
 
                 qWarning() << "[ControllerManager]" << serialNumber << " " << url << " "
                            << "request failed:" << error;
-
-                QString msg = QString("[%1] API request failed: %2").arg(info.serialNumber, error);
-                LogManager::append(msg);
 
                 updateConnectionState(serialNumber, false);
                 updateRunningState(serialNumber, false);
@@ -1065,4 +1096,111 @@ QPair<QString, quint16> ControllerManager::parseHostPort(const QString &hostStri
     }
 
     return qMakePair(host, defaultPort);
+}
+bool ControllerManager::validateConnection(const ControllerInfo &info)
+{
+    qDebug() << "[validateConnection] Validating connection for" << info.serialNumber;
+
+    bool apiValid  = validateApiConnection(info);
+    bool sftpValid = validateSftpConnection(info);
+
+    return apiValid && sftpValid;
+}
+
+bool ControllerManager::validateApiConnection(const ControllerInfo &info)
+{
+    QString baseUrl       = QString("%1").arg(info.ip);
+    QString normalizedUrl = ApiClient::normalizeBaseUrl(baseUrl);
+
+    QNetworkAccessManager manager;
+    QNetworkRequest       request;
+    QString               fullUrl = normalizedUrl + "/api/robot/running";
+    request.setUrl(QUrl(fullUrl));
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    request.setRawHeader("Connection", "keep-alive");
+
+    qDebug() << "[validateApiConnection] Testing API connection:" << fullUrl;
+
+    QNetworkReply *reply = manager.get(request);
+
+    // 동기식 대기 (최대 5초)
+    QEventLoop loop;
+    QTimer     timer;
+    timer.setSingleShot(true);
+    timer.setInterval(5000);
+
+    connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+    connect(&timer, &QTimer::timeout, &loop, &QEventLoop::quit);
+
+    timer.start();
+    loop.exec();
+
+    bool    success = false;
+    QString errorMsg;
+
+    if (timer.isActive()) {
+        timer.stop();
+
+        if (reply->error() == QNetworkReply::NoError) {
+            int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+            if (statusCode >= 200 && statusCode < 300) {
+                success = true;
+                qDebug() << "[validateApiConnection] API connection successful:" << statusCode;
+            } else {
+                errorMsg = QString("HTTP %1 error").arg(statusCode);
+            }
+        } else {
+            errorMsg = reply->errorString();
+        }
+    } else {
+        reply->abort();
+        errorMsg = "Timeout - no response within 5 seconds";
+    }
+
+    reply->deleteLater();
+
+    if (!success) {
+        QString msg = QString("[%1] API connection failed: %2 (%3)")
+                              .arg(info.serialNumber, errorMsg, fullUrl);
+        LogManager::append(msg);
+        qWarning() << msg;
+    }
+
+    return success;
+}
+
+bool ControllerManager::validateSftpConnection(const ControllerInfo &info)
+{
+    QPair<QString, quint16> hostPort = parseHostPort(info.ip, info.sftpPort);
+    QString                 host     = hostPort.first;
+    quint16                 port     = hostPort.second;
+
+    SFTPClient client(host, port, info.username, info.pswd);
+
+    bool success = client.connectToServer();
+
+    if (success) {
+        qDebug() << "[validateSftpConnection] SFTP connection successful";
+        client.disconnect();
+
+        QString msg = QString("[%1] SFTP connection validated successfully (host=%2, port=%3)")
+                              .arg(info.serialNumber)
+                              .arg(host)
+                              .arg(port);
+        LogManager::append(msg);
+    } else {
+        // lastError_에서 상세 에러 메시지 가져오기
+        QString errorMsg = client.getLastError();
+
+        QString msg = QString("[%1] SFTP connection failed - %2 (host=%3, port=%4, user=%5)")
+                              .arg(info.serialNumber)
+                              .arg(errorMsg)
+                              .arg(host)
+                              .arg(port)
+                              .arg(info.username);
+        LogManager::append(msg);
+        qWarning() << msg;
+    }
+
+    return success;
 }

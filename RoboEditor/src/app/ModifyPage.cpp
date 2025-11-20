@@ -524,6 +524,23 @@ void ModifyPage::closeDocument(Document *doc)
         documents.removeAt(idx);
     }
 }
+
+void ModifyPage::closeFile()
+{
+    if (documents.isEmpty() || currentDocumentIndex < 0 || currentDocumentIndex >= documents.size())
+        return;
+
+    int index = currentDocumentIndex;
+
+    closeFile(index);
+}
+void ModifyPage::closeAll()
+{
+    for (auto d : documents) {
+        closeFile();
+    }
+}
+
 void ModifyPage::closeFile(int index)
 {
     if (documents.isEmpty())
@@ -592,6 +609,56 @@ void ModifyPage::openFile()
         return;
 }
 
+void ModifyPage::createNewFile()
+{
+    Document *doc = new Document("");
+    doc->setContent("");
+    doc->setModified(true);
+
+    // 2) 탭 페이지 생성
+    QWidget     *tabPage = new QWidget(tabWidget);
+    QVBoxLayout *layout  = new QVBoxLayout(tabPage);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(0);
+
+    // 3) 상단 경로 라벨
+    QLabel *pathLabel = new QLabel("untitled", tabPage);
+    pathLabel->setObjectName("pathLabel");
+
+    // 4) CodeEditor 생성
+    CodeEditor *editor = new CodeEditor(tabPage);
+    editor->setPlainText("");
+    layout->addWidget(editor);
+
+    // 5) 탭 추가
+    int index = tabWidget->addTab(tabPage, "untitled");
+    tabWidget->setCurrentIndex(index);
+
+    // 6) signal 연결
+    connect(editor, &QPlainTextEdit::textChanged, [this, doc, editor]() {
+        doc->setContent(editor->toPlainText());
+        doc->setModified(true);
+        updateTitle();
+        if (comparePane_) {
+            emit editorTextChangedForDiff();
+        }
+    });
+
+    connect(editor, &DropTextEdit::fileDropped, this, [this](const QString &path) {
+        openDocument(path);
+    });
+
+    // 7) 내부 관리 변수 업데이트
+    currentDoc = doc;
+    editor_    = editor;
+    documents.append(doc);
+    setCurrentDocument(documents.size() - 1);
+
+    updateTitle();  // 탭 제목 갱신
+
+    LogManager::append("New document created: untitled");
+}
+
 void ModifyPage::saveFile()
 {
     if (documents.isEmpty() || currentDocumentIndex < 0 ||
@@ -605,7 +672,7 @@ void ModifyPage::saveFile()
 
     QString filePath = doc->gfilePath();
     if (filePath.isEmpty()) {
-        qWarning() << "File path is empty";
+        saveAsFile();
         return;
     }
 
@@ -634,12 +701,14 @@ void ModifyPage::saveFile()
 }
 void ModifyPage::saveAsFile()
 {
-    if (documents.isEmpty() || currentDocumentIndex < 0 ||
-        currentDocumentIndex >= documents.size()) {
+    saveAsFile(currentDocumentIndex);
+}
+void ModifyPage::saveAsFile(int index)
+{
+    if (index < 0 || index >= documents.size())
         return;
-    }
 
-    Document *doc = documents[currentDocumentIndex];
+    Document *doc = documents[index];
     if (!doc)
         return;
 
@@ -679,24 +748,49 @@ void ModifyPage::saveAsFile()
     QString shortAfter  = shortenBackupPath(newFilePath);
 
     QString msg = QString("[%1] is saved to [%2]").arg(shortBefore).arg(shortAfter);
-
     LogManager::append(msg);
 
     doc->setFilePath(newFilePath);
     doc->setModified(false);
     updateTitle();
     file.close();
-
-    qDebug() << "File saved as:" << newFilePath;
-
-    if (comparePane_) {
-        ComparePage *pane = comparePane_;
-        if (pane == comparePane_) {
-            pane->recalcDiff(currentLeftText(), currentLeftPath());
-        }
-    }
 }
+void ModifyPage::saveAll()
+{
+    if (documents.isEmpty())
+        return;
 
+    for (int curIdx = 0; curIdx < documents.size(); curIdx++) {
+        Document *doc = documents[curIdx];
+        if (!doc)
+            continue;  // return이 아닌 continue
+
+        QString filePath = doc->gfilePath();
+
+        // untitled 파일 별도 처리
+        if (filePath.isEmpty()) {
+            saveAsFile(curIdx);
+            continue;
+        }
+
+        // 파일 저장 시도
+        QFile file(filePath);
+        if (!file.open(QFile::WriteOnly | QFile::Text)) {
+            qWarning() << "Failed to open file:" << filePath;
+            QString msg = QString("Save Failed : [%1] cant open").arg(filePath);
+            LogManager::append(msg);
+            continue;  // 다음 파일 계속 저장
+        }
+
+        QTextStream out(&file);
+        out << doc->gcontent();
+        file.close();
+
+        doc->setModified(false);
+    }
+
+    updateTitle();
+}
 bool ModifyPage::hasUnsavedChanges(Document *doc)
 {
     if (!doc)

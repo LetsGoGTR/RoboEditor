@@ -32,6 +32,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 
     wire();
 
+    qApp->installEventFilter(this);
+
     applyStyleSheet();
 
     statusBar()->showMessage("UI Ready");
@@ -41,6 +43,10 @@ void MainWindow::ensureMenu()
 {
     if (!menu_)
         menu_ = std::make_unique<TopMenu>(this);
+    connect(menu_.get(), &TopMenu::requestModifyMenuUpdate, this, &MainWindow::populateModifyMenu);
+    connect(menu_.get(), &TopMenu::requestRemoveMenuUpdate, this, &MainWindow::populateRemoveMenu);
+    connect(menu_.get(), &TopMenu::fullScreenRequested, this, &MainWindow::setFullScreen);
+    connect(menu_.get(), &TopMenu::maximizeRequested, this, &MainWindow::setMaximize);
 }
 
 void MainWindow::ensureCenter()
@@ -132,7 +138,9 @@ void MainWindow::wire()
 
     connect(shortcutMgr, &ShortcutManager::openRequested, modifyPage, &ModifyPage::openFile);
     connect(shortcutMgr, &ShortcutManager::saveRequested, modifyPage, &ModifyPage::saveFile);
-    connect(shortcutMgr, &ShortcutManager::saveAsRequested, modifyPage, &ModifyPage::saveAsFile);
+    connect(shortcutMgr, &ShortcutManager::saveAsRequested, this, [this]() {
+        modifyPage->saveAsFile();
+    });
     connect(shortcutMgr,
             &ShortcutManager::closeRequested,
             modifyPage,
@@ -186,6 +194,276 @@ void MainWindow::toggleTheme()
     }
 }
 
+void MainWindow::createNewDocument()
+{
+    if (center_) {
+        auto *modify = center_->getModifyPage();
+        modify->createNewFile();
+
+        LogManager::append("New document created: untitled");
+    }
+}
+void MainWindow::openFileFromMenu()
+{
+    if (center_) {
+        auto *modify = center_->getModifyPage();
+        modify->openFile();
+    }
+}
+void MainWindow::saveFileFromMenu()
+{
+    if (center_) {
+        auto *modify = center_->getModifyPage();
+        modify->saveFile();
+    }
+}
+void MainWindow::saveAsFileFromMenu()
+{
+    if (center_) {
+        auto *modify = center_->getModifyPage();
+        modify->saveAsFile();
+    }
+}
+void MainWindow::saveAllFromMenu()
+{
+    if (center_) {
+        auto *modify = center_->getModifyPage();
+        modify->saveAll();
+    }
+}
+void MainWindow::closeFileFromMenu()
+{
+    if (center_) {
+        auto *modify = center_->getModifyPage();
+        modify->closeFile();
+    }
+}
+void MainWindow::closeAllFromMenu()
+{
+    if (center_) {
+        auto *modify = center_->getModifyPage();
+        modify->closeAll();
+    }
+}
+void MainWindow::undoFromMenu()
+{
+    if (center_) {
+        auto *modify = center_->getModifyPage();
+        if (auto *ed = modify->getEditor()) {
+            ed->undo();
+        }
+    }
+}
+void MainWindow::redoFromMenu()
+{
+    if (center_) {
+        auto *modify = center_->getModifyPage();
+        if (auto *ed = modify->getEditor()) {
+            ed->redo();
+        }
+    }
+}
+void MainWindow::cutFromMenu()
+{
+    if (center_) {
+        auto *modify = center_->getModifyPage();
+        if (auto *ed = modify->getEditor()) {
+            ed->cut();
+        }
+    }
+}
+void MainWindow::copyFromMenu()
+{
+    if (center_) {
+        auto *modify = center_->getModifyPage();
+        if (auto *ed = modify->getEditor()) {
+            ed->copy();
+        }
+    }
+}
+void MainWindow::pasteFromMenu()
+{
+    if (center_) {
+        auto *modify = center_->getModifyPage();
+        if (auto *ed = modify->getEditor()) {
+            ed->paste();
+        }
+    }
+}
+void MainWindow::selectAllFromMenu()
+{
+    if (center_) {
+        auto *modify = center_->getModifyPage();
+        if (auto *ed = modify->getEditor()) {
+            ed->selectAll();
+            ;
+        }
+    }
+}
+void MainWindow::addCtrlFromMenu()
+{
+    ControllerManager::instance()->registerController();
+    statusBar()->showMessage("Controller registration dialog opened");
+}
+
+ControllerManager *MainWindow::getControllerManager()
+{
+    return ControllerManager::instance();
+}
+void MainWindow::refreshCtrlFromMenu()
+{
+    ControllerManager::instance()->updateControllersStates();
+    statusBar()->showMessage("Controller list refreshed");
+}
+void MainWindow::populateModifyMenu(QMenu *menu)
+{
+    if (!menu)
+        return;
+
+    menu->clear();
+
+    //컨트롤러 매니저 가져오기
+    auto *mgr = getControllerManager();
+    if (!mgr)
+        return;
+
+    //컨트롤러 리스트 가져오기
+    auto list = mgr->getControllers();
+
+    if (list.isEmpty()) {
+        menu->addAction("(No Controllers)")->setEnabled(false);
+        return;
+    }
+
+    // action 추가, 발생 시 수정함수 호출
+    for (const auto &info : list) {
+        QAction *a = menu->addAction(info.serialNumber);
+
+        // ControllerManager::modifyController 직접 호출
+        connect(a, &QAction::triggered, this, [mgr, info]() { mgr->updateInfo(info); });
+    }
+}
+
+void MainWindow::populateRemoveMenu(QMenu *menu)
+{
+    if (!menu)
+        return;
+
+    menu->clear();
+
+    auto *mgr = getControllerManager();
+    if (!mgr)
+        return;
+
+    auto list = mgr->getControllers();
+
+    if (list.isEmpty()) {
+        menu->addAction("(No Controllers)")->setEnabled(false);
+        return;
+    }
+
+    for (const auto &info : list) {
+        QString  serial = info.serialNumber;
+        QAction *a      = menu->addAction(serial);
+
+        connect(a, &QAction::triggered, this, [this, mgr, serial]() {
+            QMessageBox::StandardButton reply = QMessageBox::question(
+                    this,
+                    "Remove Controller",
+                    QString("Are you sure you want to remove controller [%1]?").arg(serial),
+                    QMessageBox::Yes | QMessageBox::No);
+
+            if (reply == QMessageBox::Yes) {
+                mgr->removeControllerBySN(serial);
+            }
+        });
+    }
+}
+void MainWindow::setFullScreen(bool enable)
+{
+    if (enable) {
+        // 풀스크린 진입
+        isFullScreen_ = true;
+        showFullScreen();
+        statusBar()->showMessage("Full Screen Mode", 2000);
+        LogManager::append("Entered Full Screen mode");
+    } else {
+        // 풀스크린 해제
+        isFullScreen_ = false;
+        showNormal();
+        statusBar()->showMessage("Exited Full Screen Mode", 2000);
+        LogManager::append("Exited Full Screen mode");
+    }
+}
+
+void MainWindow::setMaximize(bool enable)
+{
+    if (enable) {
+        // 최대화
+        if (isFullScreen_) {
+            // 풀스크린이면 먼저 해제
+            showNormal();
+            isFullScreen_ = false;
+        }
+        showMaximized();
+        statusBar()->showMessage("Window Maximized", 2000);
+        LogManager::append("Window maximized");
+    } else {
+        // 일반 크기로
+        showNormal();
+        statusBar()->showMessage("Window Restored", 2000);
+        LogManager::append("Window restored to normal size");
+    }
+}
+
+void MainWindow::compareFileFromMenu()
+{
+    center_->showModifyWithCompare();
+}
+void MainWindow::compareFolderFromMenu()
+{
+    center_->showModifyWithCompare();
+}
+void MainWindow::backupFromMenu()
+{
+    if (backupPopup_ && backupPopup_->isVisible()) {
+        backupPopup_->raise();
+        backupPopup_->activateWindow();
+        return;
+    }
+    backupPopup_ = new QWidget(nullptr, Qt::Window);
+    backupPopup_->setAttribute(Qt::WA_DeleteOnClose);
+    backupPopup_->setWindowTitle("Backup from Robot Controller");
+    backupPopup_->resize(900, 600);
+    auto *backupPage = new BackupPage(backupPopup_);
+    auto *layout     = new QVBoxLayout(backupPopup_);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->addWidget(backupPage);
+    connect(backupPopup_, &QWidget::destroyed, this, [this]() { backupPopup_ = nullptr; });
+    backupPopup_->show();
+}
+void MainWindow::applyFromMenu()
+{
+    if (applyPopup_ && applyPopup_->isVisible()) {
+        applyPopup_->raise();
+        applyPopup_->activateWindow();
+        return;
+    }
+
+    applyPopup_ = new QWidget(nullptr, Qt::Window);
+    applyPopup_->setAttribute(Qt::WA_DeleteOnClose);
+    applyPopup_->setWindowTitle("Apply to Robot Controller");
+    applyPopup_->resize(900, 600);
+
+    auto *applyPage = new ApplyPage(applyPopup_);
+    auto *layout    = new QVBoxLayout(applyPopup_);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->addWidget(applyPage);
+
+    QObject::connect(applyPopup_, &QWidget::destroyed, this, [this]() { applyPopup_ = nullptr; });
+
+    applyPopup_->show();
+}
 void MainWindow::closeEvent(QCloseEvent *event)
 {
     QMainWindow::closeEvent(event);

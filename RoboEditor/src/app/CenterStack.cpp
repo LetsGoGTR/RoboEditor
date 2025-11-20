@@ -97,6 +97,7 @@ void CenterStack::showModifyWithCompare()
         modifyPage_->showCompare();
     }
 }
+
 void CenterStack::setupUI()
 {
     QVBoxLayout *mainLayout = new QVBoxLayout(this);

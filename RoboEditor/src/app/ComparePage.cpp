@@ -124,6 +124,24 @@ QWidget *ComparePage::buildRightPanel()
     btnSelectFile->setObjectName("fileBtn");
 
     connect(btnSelectFile, &QPushButton::clicked, this, [this]() {
+        // 1) ModifyPage에서 왼쪽 편집기를 넘겨준 경우: 그걸 그대로 사용
+        if (leftText_) {
+            QString leftContent = leftText_->toPlainText();
+            QString leftPath = leftText_->lastLoadedPath();  // 비어 있어도 recalcDiff에서 보정함
+
+            // 오른쪽 파일만 선택 (기준/base)
+            QString rightPath = QFileDialog::getOpenFileName(
+                    this, tr("Select right file (base)"), "C:/backup", tr("All Files (*.*)"));
+            if (rightPath.isEmpty())
+                return;
+
+            // ComparePage의 오른쪽 탭에 파일 로드 + diff 재계산
+            setTargetPath(rightPath);
+            recalcDiff(leftContent, leftPath);
+            return;
+        }
+
+        // 2) 왼쪽 편집기가 없는 경우(단독 ComparePage 사용 시): 기존 동작 유지
         QString leftPath = QFileDialog::getOpenFileName(
                 this, tr("Select left file (compare)"), "C:/backup", tr("All Files (*.*)"));
         if (leftPath.isEmpty())
@@ -552,11 +570,12 @@ QList<DiffRow> ComparePage::parseDiffResult(const Json::Value &result, const QSt
         for (const auto &change : changes) {
             DiffRow row;
 
+            // 1) type → state 매핑 (deleted 도 지원)
             if (change.isMember("type")) {
                 std::string t = change["type"].asString();
                 if (t == "added")
                     row.state = "ADDED";
-                else if (t == "removed")
+                else if (t == "removed" || t == "deleted")
                     row.state = "REMOVED";
                 else if (t == "modified")
                     row.state = "CHANGED";
@@ -564,51 +583,128 @@ QList<DiffRow> ComparePage::parseDiffResult(const Json::Value &result, const QSt
                     row.state = "SAME";
             }
 
+            // YAML / 나머지(text, python 등) 포맷이 서로 다르므로 분기
             if (fileType == "yaml") {
-                if (change.isMember("newLineNumber") && !change["newLineNumber"].isNull())
-                    row.line = row.leftLineNumber = change["newLineNumber"].asInt();
-                if (change.isMember("oldLineNumber") && !change["oldLineNumber"].isNull()) {
-                    row.rightLineNumber = change["oldLineNumber"].asInt();
-                    if (row.line == -1)
-                        row.line = row.rightLineNumber;
+                // ---------------- YAML ----------------
+                int baseLine    = -1;
+                int compareLine = -1;
+
+                // 새 스키마 우선: baseLineNumber / compareLineNumber
+                if (change.isMember("baseLineNumber") && !change["baseLineNumber"].isNull())
+                    baseLine = change["baseLineNumber"].asInt();
+                if (change.isMember("compareLineNumber") && !change["compareLineNumber"].isNull())
+                    compareLine = change["compareLineNumber"].asInt();
+
+                // 없으면 예전 스키마(oldLineNumber / newLineNumber)로 폴백
+                if (baseLine == -1 && compareLine == -1) {
+                    if (change.isMember("oldLineNumber") && !change["oldLineNumber"].isNull())
+                        baseLine = change["oldLineNumber"].asInt();
+                    if (change.isMember("newLineNumber") && !change["newLineNumber"].isNull())
+                        compareLine = change["newLineNumber"].asInt();
                 }
-                if (change.isMember("path"))
+
+                row.leftLineNumber  = (compareLine > 0 ? compareLine : -1);
+                row.rightLineNumber = (baseLine > 0 ? baseLine : -1);
+                row.line = (row.leftLineNumber > 0 ? row.leftLineNumber : row.rightLineNumber);
+
+                // key(경로) 설정
+                if (change.isMember("path") && !change["path"].isNull())
                     row.key = QString::fromStdString(change["path"].asString());
+                else if (row.line > 0)
+                    row.key = QString::number(row.line);
 
-                if (change.isMember("oldValue")) {
+                // 값(oldValue/newValue 또는 baseValue/compareValue 둘 다 지원)
+                const Json::Value *oldV = nullptr;
+                const Json::Value *newV = nullptr;
+
+                if (change.isMember("oldValue") || change.isMember("newValue")) {
+                    if (change.isMember("oldValue"))
+                        oldV = &change["oldValue"];
+                    if (change.isMember("newValue"))
+                        newV = &change["newValue"];
+                } else {
+                    if (change.isMember("baseValue"))
+                        oldV = &change["baseValue"];
+                    if (change.isMember("compareValue"))
+                        newV = &change["compareValue"];
+                }
+
+                if (oldV && !oldV->isNull()) {
                     Json::StreamWriterBuilder builder;
                     builder["indentation"] = "";
-                    row.origin =
-                            QString::fromStdString(Json::writeString(builder, change["oldValue"]));
+                    row.origin = QString::fromStdString(Json::writeString(builder, *oldV));
                 }
-                if (change.isMember("newValue")) {
+                if (newV && !newV->isNull()) {
                     Json::StreamWriterBuilder builder;
                     builder["indentation"] = "";
-                    row.target =
-                            QString::fromStdString(Json::writeString(builder, change["newValue"]));
+                    row.target = QString::fromStdString(Json::writeString(builder, *newV));
                 }
 
-            } else {  // python, text
+            } else {
+                // ---------------- TEXT / PYTHON / 기타 ----------------
+
+                // 1) 먼저 예전 스키마(lineNumber / oldLine / newLine) 체크
                 if (change.isMember("lineNumber")) {
                     row.line = change["lineNumber"].asInt();
-                    row.key  = QString::number(row.line);
-                }
-                if (change.isMember("oldLine"))
-                    row.origin = QString::fromStdString(change["oldLine"].asString());
-                if (change.isMember("newLine"))
-                    row.target = QString::fromStdString(change["newLine"].asString());
+                    if (row.line > 0)
+                        row.key = QString::number(row.line);
 
-                if (row.state == "ADDED")
-                    row.leftLineNumber = row.line;
-                else if (row.state == "REMOVED")
-                    row.rightLineNumber = row.line;
-                else {
-                    row.leftLineNumber = row.rightLineNumber = row.line;
+                    if (change.isMember("oldLine"))
+                        row.origin = QString::fromStdString(change["oldLine"].asString());
+                    if (change.isMember("newLine"))
+                        row.target = QString::fromStdString(change["newLine"].asString());
+
+                    if (row.state == "ADDED") {
+                        row.leftLineNumber = row.line;
+                    } else if (row.state == "REMOVED") {
+                        row.rightLineNumber = row.line;
+                    } else {
+                        row.leftLineNumber = row.rightLineNumber = row.line;
+                    }
+                } else {
+                    // 2) 새 스키마(baseLineNumber / compareLineNumber, baseValue / compareValue)
+                    int baseLine    = -1;
+                    int compareLine = -1;
+
+                    if (change.isMember("baseLineNumber") && !change["baseLineNumber"].isNull())
+                        baseLine = change["baseLineNumber"].asInt();
+                    if (change.isMember("compareLineNumber") &&
+                        !change["compareLineNumber"].isNull())
+                        compareLine = change["compareLineNumber"].asInt();
+
+                    // 대표 line & key
+                    row.line = (compareLine > 0 ? compareLine : baseLine);
+                    if (change.isMember("path") && !change["path"].isNull())
+                        row.key = QString::fromStdString(change["path"].asString());
+                    else if (row.line > 0)
+                        row.key = QString::number(row.line);
+
+                    if (change.isMember("baseValue") && !change["baseValue"].isNull())
+                        row.origin = QString::fromStdString(change["baseValue"].asString());
+                    if (change.isMember("compareValue") && !change["compareValue"].isNull())
+                        row.target = QString::fromStdString(change["compareValue"].asString());
+
+                    // 라인 번호 매핑 (좌: compare, 우: base)
+                    if (row.state == "ADDED") {
+                        // 왼쪽에만 있는 줄
+                        row.leftLineNumber  = compareLine;
+                        row.rightLineNumber = -1;
+                    } else if (row.state == "REMOVED") {
+                        // 오른쪽에만 있는 줄
+                        row.leftLineNumber  = -1;
+                        row.rightLineNumber = baseLine;
+                    } else {
+                        // CHANGED or SAME
+                        row.leftLineNumber  = compareLine;
+                        row.rightLineNumber = baseLine;
+                    }
                 }
             }
+
             rows.append(row);
         }
     } catch (...) {
+        // 필요하면 로깅 추가 가능
     }
     return rows;
 }
