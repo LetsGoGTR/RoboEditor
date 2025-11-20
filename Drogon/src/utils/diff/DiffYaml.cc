@@ -427,8 +427,8 @@ Json::Value diff_utils::DiffYaml::generateResult(const std::vector<diff_utils::D
 
 Json::Value diff_utils::fileToJson(const std::string &content)
 {
-        // YAML 파일 파싱
-        YAML::Node yamlNode = YAML::Load(content);
-        // JSON으로 변환
-        return diff_utils::nodeToJson(yamlNode);
+    // YAML 파일 파싱
+    YAML::Node yamlNode = YAML::Load(content);
+    // JSON으로 변환
+    return diff_utils::nodeToJson(yamlNode);
 }

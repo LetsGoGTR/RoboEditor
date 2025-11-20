@@ -5,3 +5,5 @@ services:
     build: .
     ports:
       - "8889:5555"
+    volumes:
+      - C:\Users\SSAFY\Desktop\S13P31S205\Svelte\build:/app/web:ro
