@@ -29,6 +29,7 @@ WantedBy=multi-user.target
 3. ExecStart :\
     workspace-controller 바이너리 파일의 절대 경로를 넣어줍니다.\
     경로 뒤에 1 ~ 65535 범위의 정수를 실행할 포트로 지정할 수 있습니다.\
+    지정하지 않은 경우 포트는 기본값(8888)으로 지정 됩니다.\
     ex) /home/test/daemon/workspace-controller 9999
 4. LogsDirectory :\
     로그 파일이 저장될 디렉토리 이름입니다.\
