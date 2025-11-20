@@ -140,6 +140,7 @@ QWidget *ComparePage::buildRightPanel()
     btnSelectFile->setObjectName("fileBtn");
 
     connect(btnSelectFile, &QPushButton::clicked, this, [this]() {
+        showCompareEditor(true);
         QString path = QFileDialog::getOpenFileName(
                 this,
                 tr("Select file to compare"),
@@ -156,6 +157,7 @@ QWidget *ComparePage::buildRightPanel()
     topLayout->addWidget(btnSelectFolder);
     btnSelectFolder->setObjectName("folderBtn");
     connect(btnSelectFolder, &QPushButton::clicked, this, [this]() {
+        showCompareEditor(false);
         QFileDialog dialog(this, tr("Select folder or archive (compare)"), "C:/backup");
         dialog.setFileMode(QFileDialog::Directory);
         dialog.setOption(QFileDialog::ShowDirsOnly, false);
@@ -284,6 +286,10 @@ void ComparePage::setRightFile(const QString &path)
     rightText_      = createCompareTab(path, content);
 
     emit rightFileChanged(path);
+
+    if (leftText_ && !cachedLeftText_.isEmpty()) {
+        recalcDiff(cachedLeftText_, cachedLeftPath_);
+    }
 }
 
 // 새로운 compareTab 생성

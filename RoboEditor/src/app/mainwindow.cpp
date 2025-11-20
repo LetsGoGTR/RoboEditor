@@ -75,7 +75,7 @@ void MainWindow::ensureLog()
 }
 void MainWindow::wire()
 {
-    if (!nav_ || !center_) {
+    if (!center_) {
         qDebug() << "[wire] Some component is null!"
                  << "nav=" << nav_.get() << "center=" << center_.get();
         return;
