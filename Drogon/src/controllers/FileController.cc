@@ -39,7 +39,6 @@ void api::v1::File::fileCreate(const drogon::HttpRequestPtr                     
     }
 
     std::string path    = (*json)["path"].asString();
-    std::string path    = (*json)["path"].asString();
     std::string content = (*json)["content"].asString();
 
     auto result = services::FileService::createFile(path, content);
@@ -59,11 +58,7 @@ void api::v1::File::fileUpdate(const drogon::HttpRequestPtr                     
     auto json = req->getJsonObject();
     if (!json || !json->isMember("path")) {
         return sendError(callback, drogon::k400BadRequest, "Missing 'path' field in request body");
-    if (!json || !json->isMember("path")) {
-        return sendError(callback, drogon::k400BadRequest, "Missing 'path' field in request body");
     }
-
-    std::string path = (*json)["path"].asString();
 
     std::string path = (*json)["path"].asString();
 
@@ -119,12 +114,7 @@ void api::v1::File::fileDelete(const drogon::HttpRequestPtr                     
     auto json = req->getJsonObject();
     if (!json || !json->isMember("path")) {
         return sendError(callback, drogon::k400BadRequest, "Missing 'path' field in request body");
-    auto json = req->getJsonObject();
-    if (!json || !json->isMember("path")) {
-        return sendError(callback, drogon::k400BadRequest, "Missing 'path' field in request body");
     }
-
-    std::string path = (*json)["path"].asString();
 
     std::string path = (*json)["path"].asString();
 

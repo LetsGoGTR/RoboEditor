@@ -1,7 +1,7 @@
 #include "FileTransferService.h"
 
 #include <algorithm>
-#include <bcrypt.h>
+#include <extbcrypt.h>
 #include <ctime>
 #include <drogon/HttpClient.h>
 #include <drogon/utils/Utilities.h>
@@ -9,6 +9,7 @@
 #include <fstream>
 #include <iomanip>
 #include <sstream>
+#include <future>
 
 #include "../services/DeviceService.h"
 #include "../services/WorkspaceService.h"

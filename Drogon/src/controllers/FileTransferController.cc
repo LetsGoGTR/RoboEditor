@@ -70,8 +70,7 @@ void FT::apply(const HttpRequestPtr &req, std::function<void(const HttpResponseP
     }
 
     auto task = [workspaceId, deviceId, password, callback]() {
-        FileTransferService service;
-        auto                result = service.applyWorkspace(workspaceId, deviceId, password);
+        auto result = FileTransferService::applyWorkspace(workspaceId, deviceId, password);
 
         Json::Value response;
         response["success"] = result.success;
@@ -116,8 +115,7 @@ void FT::backup(const HttpRequestPtr &req, std::function<void(const HttpResponse
     std::string deviceId = (*jsonBody)["deviceId"].asString();
 
     auto task = [deviceId, callback]() {
-        FileTransferService service;
-        auto                result = service.backupFromRemote(deviceId);
+        auto result = FileTransferService::backupFromRemote(deviceId);
 
         if (!result.success) {
             Json::Value error;

@@ -1,17 +1,16 @@
-#ifndef DIFFYAML_H
-#    define DIFFYAML_H
+#pragma once
 
-#    include <algorithm>
-#    include <cctype>
-#    include <cstdio>
-#    include <filesystem>
-#    include <functional>
-#    include <iostream>
-#    include <json/json.h>
-#    include <set>
-#    include <string>
-#    include <vector>
-#    include <yaml-cpp/yaml.h>
+#include <algorithm>
+#include <cctype>
+#include <cstdio>
+#include <filesystem>
+#include <functional>
+#include <iostream>
+#include <json/json.h>
+#include <set>
+#include <string>
+#include <vector>
+#include <yaml-cpp/yaml.h>
 
 namespace diff_utils
 {
@@ -165,6 +164,5 @@ namespace diff_utils
 
     Json::Value fileToJson(const std::string &content);
 
-#endif  // DIFFYAML_H
-
 }  // namespace diff_utils
+

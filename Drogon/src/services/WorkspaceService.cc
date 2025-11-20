@@ -298,6 +298,8 @@ services::ServiceResult services::WorkspaceService::listWorkspaces(const std::st
             // List workspaces from specific device
             std::string devicePath = baseDir + deviceId;
 
+            utils::logging::info("path = " + devicePath);
+
             if (!fs::exists(devicePath) || !fs::is_directory(devicePath)) {
                 return ServiceResult::createError("Device not found: " + deviceId);
             }

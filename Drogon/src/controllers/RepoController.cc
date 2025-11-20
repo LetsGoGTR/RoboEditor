@@ -548,12 +548,6 @@ void api::v1::Repo::workspaceUpdate(const drogon::HttpRequestPtr                
         services::WorkspaceMetadata metadata;
         metadata.name        = json->isMember("name") ? (*json)["name"].asString()
                                                       : existingResult.data["metadata"]["name"].asString();
-<<<<<<< HEAD
-=======
-        metadata.target      = json->isMember("target")
-                                       ? (*json)["target"].asString()
-                                       : existingResult.data["metadata"]["target"].asString();
->>>>>>> 2a92951 (fix: update api url structure)
         metadata.description = json->isMember("description")
                                        ? (*json)["description"].asString()
                                        : existingResult.data["metadata"]["description"].asString();
@@ -628,25 +622,15 @@ void api::v1::Repo::workspaceImport(const drogon::HttpRequestPtr                
         return sendError(callback, drogon::k400BadRequest, "Unsupported file format");
 
     // Build metadata
-<<<<<<< HEAD
     std::string workspaceName = fileUpload.getParameter<std::string>("name");
-=======
-    std::string workspaceName = req->getParameter("name");
->>>>>>> 2a92951 (fix: update api url structure)
     if (workspaceName.empty())
         workspaceName = fs::path(filename).stem().string();
 
     services::WorkspaceMetadata metadata;
     metadata.uuid        = drogon::utils::getUuid();
-<<<<<<< HEAD
     metadata.target      = fileUpload.getParameter<std::string>("target");
     metadata.name        = workspaceName;
     metadata.description = fileUpload.getParameter<std::string>("description");
-=======
-    metadata.target      = req->getParameter("target");
-    metadata.name        = workspaceName;
-    metadata.description = req->getParameter("description");
->>>>>>> 2a92951 (fix: update api url structure)
     metadata.createdAt   = utils::getCurrentTimestamp();
     metadata.updatedAt   = metadata.createdAt;
 
@@ -689,7 +673,6 @@ void api::v1::Repo::workspaceExport(const drogon::HttpRequestPtr                
                                     std::function<void(const drogon::HttpResponsePtr &)> &&callback)
 {
     auto json = req->getJsonObject();
-<<<<<<< HEAD
     if (!json || !json->isMember("id") || !json->isMember("deviceId"))
         return sendError(callback, drogon::k400BadRequest, "Missing 'id' or 'deviceId' field");
 
@@ -699,16 +682,6 @@ void api::v1::Repo::workspaceExport(const drogon::HttpRequestPtr                
     try {
         // Read workspace to get metadata
         auto readResult = services::WorkspaceService::readWorkspace(workspaceId, deviceId);
-=======
-    if (!json || !json->isMember("id"))
-        return sendError(callback, drogon::k400BadRequest, "Missing 'id' field");
-
-    std::string workspaceId = (*json)["id"].asString();
-
-    try {
-        // Read workspace to get metadata
-        auto readResult = services::WorkspaceService::readWorkspace(workspaceId);
->>>>>>> 2a92951 (fix: update api url structure)
         if (!readResult.success)
             return sendError(callback, drogon::k404NotFound, "Workspace not found", workspaceId);
 
@@ -722,11 +695,7 @@ void api::v1::Repo::workspaceExport(const drogon::HttpRequestPtr                
         std::string outputFilename = workspaceName + ".tar.gz";
         std::string outputPath     = tempDir + outputFilename;
 
-<<<<<<< HEAD
         auto result = services::WorkspaceService::exportWorkspace(workspaceId, outputPath, deviceId);
-=======
-        auto result = services::WorkspaceService::exportWorkspace(workspaceId, outputPath);
->>>>>>> 2a92951 (fix: update api url structure)
 
         if (!result.success)
             return sendError(callback,
