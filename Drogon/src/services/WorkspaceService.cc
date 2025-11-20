@@ -162,7 +162,8 @@ services::WorkspaceService::importWorkspace(const std::string       &archivePath
         result.success = true;
         result.data    = metadata.toJson();
 
-        utils::logging::info("Imported workspace: " + metadata.name + " (ID: " + metadata.uuid + ")");
+        utils::logging::info("Imported workspace: " + metadata.name + " (ID: " + metadata.uuid +
+                             ")");
         return result;
 
     } catch (const std::exception &e) {
@@ -436,7 +437,8 @@ services::WorkspaceService::createWorkspace(const WorkspaceMetadata &metadata,
         result.success = true;
         result.data    = newMetadata.toJson();
 
-        utils::logging::info("Created workspace: " + metadata.name + " (ID: " + metadata.uuid + ")");
+        utils::logging::info("Created workspace: " + metadata.name + " (ID: " + metadata.uuid +
+                             ")");
         return result;
 
     } catch (const std::exception &e) {
@@ -633,7 +635,7 @@ services::ServiceResult services::WorkspaceService::moveWorkspace(const std::str
         fs::rename(oldPath, newPath);
 
         // Update metadata with new ID and timestamp
-        metadata.uuid        = newWorkspaceId;
+        metadata.uuid      = newWorkspaceId;
         metadata.updatedAt = utils::getCurrentTimestamp();
 
         // Save updated metadata to new location
