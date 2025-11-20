@@ -1,24 +1,83 @@
 <script lang="ts">
   import ControllerList from '@features/ApplyControllerList.svelte';
-  import { dummyController } from '@/testData';
+  import type { Controller, ControllerMeta } from '@/types';
+  import { _listDevices } from '@/apis/controller';
+  import { _ftBackup } from '@/apis/sftp';
+  import { onMount } from 'svelte';
 
   let selected = $state<string[]>([]);
   let showBackupOnly = $state(false);
+
+  let controllers = $state<Controller[]>([]);
+  let loading = $state(false);
+  let error = $state<string | null>(null);
 
   function handleSelectChange(ids: string[]) {
     selected = ids;
   }
 
+  function wrapDeviceAsController(raw: any): Controller {
+    const meta: ControllerMeta = {
+      serialNumber: raw.serialNumber,
+      name: raw.name,
+      description: raw.description ?? null,
+      api: raw.api,
+      sftpHost: raw.sftpHost,
+      sftpPort: raw.sftpPort,
+      sftpUser: raw.sftpUser,
+      sftpPassword: raw.sftpPassword,
+      createdAt: raw.createdAt,
+      updatedAt: raw.updatedAt,
+      state: raw.state ?? 'idle'
+    };
+
+    return {
+      controllerMeta: meta,
+      workspaces: []
+    };
+  }
+
+  async function loadControllers() {
+    loading = true;
+    error = null;
+    try {
+      const res: any = await _listDevices();
+
+      if (!res?.success) {
+        error = '제어기 목록 조회 실패';
+        controllers = [];
+        return;
+      }
+
+      const rawList = res.data?.devices ?? res.devices ?? [];
+      controllers = rawList.map(wrapDeviceAsController);
+    } catch (e) {
+      console.error(e);
+      error = '제어기 목록 조회 중 오류가 발생했습니다.';
+      controllers = [];
+    } finally {
+      loading = false;
+    }
+  }
+
+  onMount(loadControllers);
+
   const filteredControllers = $derived(
     showBackupOnly
-      ? dummyController.filter(
-          (c) => c.state === 'idle' || c.state === 'error'
+      ? controllers.filter(
+          (c) =>
+            c.controllerMeta.state === 'idle' ||
+            c.controllerMeta.state === 'error'
         )
-      : dummyController
+      : controllers
   );
 
-  function handleConfirm() {
+
+  async function handleConfirm() {
+    if (selected.length === 0) return;
     alert(`선택된 제어기: ${selected.join(', ')}`);
+    const res = await _ftBackup({ deviceId: selected[0] });
+    console.log('백업 결과:', res);
   }
 
   function toggleBackupFilter() {
@@ -39,10 +98,16 @@
     </label>
   </div>
 
-  <ControllerList
-    controllers={filteredControllers}
-    onSelectChange={handleSelectChange}
-  />
+  {#if loading}
+    <p>제어기 목록을 불러오는 중입니다...</p>
+  {:else if error}
+    <p>{error}</p>
+  {:else}
+    <ControllerList
+      controllers={filteredControllers}
+      onSelectChange={handleSelectChange}
+    />
+  {/if}
 
   <button disabled={selected.length === 0} onclick={handleConfirm}>
     백업하기

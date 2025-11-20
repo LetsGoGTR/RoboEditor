@@ -1,4 +1,5 @@
-const FOLDER_API_PATH = '/api/v1/folder';
+const API_BASE = import.meta.env.DEV ? '/proxy' : '';
+const FOLDER_API_PATH = `${API_BASE}/api/v1/folder`;
 
 export const _getFolder = async (path: string) => {
 	const params = new URLSearchParams({ path });

@@ -1,4 +1,5 @@
-const DIFF_API_PATH = '/api/v1/diff';
+const API_BASE = import.meta.env.DEV ? '/proxy' : '';
+const DIFF_API_PATH = `${API_BASE}/api/v1/diff`;
 
 export const _diffFiles = async (filePathA: string, filePathB: string) => {
 	const res = await fetch(`${DIFF_API_PATH}/files`, {
