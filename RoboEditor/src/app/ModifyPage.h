@@ -119,16 +119,26 @@ class ModifyPage : public QWidget
         // 외부에서 접근 가능한 메서드들
         Document *openDocument(const QString &path);
         Document *currentDocument();  // private에서 public으로 이동
+        void      createNewFile();
         void      closeFile(int index);
+        void      closeFile();
+        void      closeAll();
         void      openFile();
         void      saveFile();
         void      saveAsFile();
+        void      saveAsFile(int index);
+        void      saveAll();
         bool      hasUnsavedChanges(Document * doc);
         void      updateTitle();
         void      onTabChanged(int index);
         // 트리뷰 연동용 (함수만 준비)
         void openFromTree(const QString &path);
         void compareWithFromTree(const QString &path);
+
+        QPlainTextEdit *getEditor() const
+        {
+            return editor_;
+        }
 
       private:
         int cursorLine;
@@ -144,13 +154,6 @@ class ModifyPage : public QWidget
         void showCompare();  // Compare 버튼 진입: "닫힘→파일선택", "열림→재비교"
         void showCompareFolders();  // 폴더 비교 버튼: 파일 유무에 따라 동작 분기
         void closeCompare();        // ComparePane의 [X] 클릭 시 호출
-
-      public:
-        // 설정 저장/복원
-        QByteArray saveSplitterState() const;
-        void       restoreSplitterState(const QByteArray &state);
-        void       saveComparePageState();    // ComparePage의 상태 저장
-        void       restoreCompareSettings();  // ComparePage 설정 복원
 
       protected:
         void dragEnterEvent(QDragEnterEvent * event) override;

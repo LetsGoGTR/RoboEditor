@@ -18,12 +18,14 @@
   let selectedFolder = $state<FolderNode | null>(null);
 
   function handleSelect(node: TreeNode) {
-    if (node.type === "directory") selectedFolder = node;
+    if (node.type === "directory" && node.path) {
+      selectedFolder = node as FolderNode;
+    }
   }
 
   function confirm() {
     const name = filename.trim();
-    if (!name || !selectedFolder) return;
+    if (!name || !selectedFolder || !selectedFolder.path) return;
     onConfirm({ name, folder: selectedFolder });
     close();
   }

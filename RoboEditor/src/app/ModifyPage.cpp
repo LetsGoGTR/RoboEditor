@@ -10,11 +10,12 @@
 #include <QLabel>
 #include <QMessageBox>
 #include <QMimeData>
-#include <QSettings>
 #include <QShortcut>
 
 #include "CodeEditor.h"
 #include "ComparePage.h"
+#include "LogManager.h"
+#include "mainwindow.h"
 
 ModifyPage::ModifyPage(QWidget *parent) : QWidget(parent), currentDoc(nullptr)
 {
@@ -101,13 +102,25 @@ Document *ModifyPage::openDocument(const QString &path)
     // 파일 경로 레이블 생성
     QLabel *pathLabel = new QLabel(tabPage);
     pathLabel->setObjectName("pathLabel");  // 나중에 찾기 위한 이름 설정
-    pathLabel->setStyleSheet("QLabel {"
-                             "  padding: 4px 8px;"
-                             "  background-color: #f0f0f0;"
-                             "  border-bottom: 1px solid #d0d0d0;"
-                             "  font-size: 9pt;"
-                             "  color: #666;"
-                             "}");
+    if (MainWindow::dark) {
+        //다크
+        pathLabel->setStyleSheet("QLabel {"
+                                 "  padding: 4px 8px;"
+                                 "  background-color: #2d2d2d;"
+                                 "  border-bottom: 1px solid #3a3a3a;"
+                                 "  font-size: 9pt;"
+                                 "  color: #a0a0a0;"
+                                 "}");
+    } else {
+        //라이트
+        pathLabel->setStyleSheet("QLabel {"
+                                 "  padding: 4px 8px;"
+                                 "  background-color: #f0f0f0;"
+                                 "  border-bottom: 1px solid #d0d0d0;"
+                                 "  font-size: 9pt;"
+                                 "  color: #666;"
+                                 "}");
+    }
     pathLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
 
     // 경로 포맷팅
@@ -240,64 +253,12 @@ void ModifyPage::showCompare()
     lastComparedPath_ = targetPath;
     ensureCompare(targetPath);
     comparePane_->recalcDiff(currentLeftText(), currentLeftPath());
-
-    // ComparePage가 완전히 생성된 후 설정 복원
-    restoreCompareSettings();
-}
-
-void ModifyPage::restoreCompareSettings()
-{
-    if (!comparePane_ || !mainSplit_)
-        return;
-
-    QString configFile = "C:/backup/config/settings.ini";
-    if (!QFile::exists(configFile))
-        return;
-
-    // ComparePage 포인터를 로컬에 저장하여 삭제 후 접근 방지
-    ComparePage *pane = comparePane_;
-
-    // ComparePage가 완전히 렌더링될 때까지 대기
-    QTimer::singleShot(100, this, [this, configFile, pane]() {
-        // comparePane_가 변경되었거나 삭제되었는지 확인
-        if (!pane || pane != comparePane_ || !mainSplit_)
-            return;
-
-        QSettings settings(configFile, QSettings::IniFormat);
-
-        // ModifyPage의 Splitter 상태 복원 (에디터 ↔ Compare 패널)
-        if (settings.contains("ModifyPage/splitterState")) {
-            QByteArray modifyState = settings.value("ModifyPage/splitterState").toByteArray();
-            if (!modifyState.isEmpty() && mainSplit_->count() >= 2) {
-                // 위젯이 모두 준비되었는지 확인
-                if (mainSplit_->widget(0) && mainSplit_->widget(1)) {
-                    mainSplit_->restoreState(modifyState);
-                }
-            }
-        }
-
-        // ComparePage 내부의 Splitter 상태 복원 (좌측 파일 ↔ 우측 Diff 패널)
-        // ModifyPage splitter 복원 후에 실행
-        QTimer::singleShot(50, this, [this, configFile, pane]() {
-            // comparePane_가 변경되었거나 삭제되었는지 확인
-            if (!pane || pane != comparePane_)
-                return;
-
-            QSettings settings(configFile, QSettings::IniFormat);
-            if (settings.contains("ComparePage/splitterState")) {
-                QByteArray compareState = settings.value("ComparePage/splitterState").toByteArray();
-                if (!compareState.isEmpty()) {
-                    pane->restoreSplitterState(compareState);
-                }
-            }
-        });
-    });
 }
 
 void ModifyPage::ensureCompare(const QString &targetPath)
 {
     // 현재 활성 탭의 편집기 가져오기
-    QWidget *tabPage      = tabWidget->currentWidget();
+    QWidget    *tabPage    = tabWidget->currentWidget();
     CodeEditor *leftEditor = tabPage ? tabPage->findChild<CodeEditor *>() : nullptr;
 
     if (comparePane_) {
@@ -305,8 +266,6 @@ void ModifyPage::ensureCompare(const QString &targetPath)
         comparePane_->setTargetPath(targetPath);
         comparePane_->setLeftEditor(leftEditor);
         comparePane_->show();
-        // 이미 존재하는 경우에도 설정 복원 (크기가 변경되었을 수 있음)
-        restoreCompareSettings();
         return;
     }
 
@@ -323,6 +282,9 @@ void ModifyPage::ensureCompare(const QString &targetPath)
     connect(comparePane_, &ComparePage::targetPathChanged, this, [this](const QString &path) {
         lastComparedPath_ = path;
     });
+
+    // 폴더 비교 트리에서 더블클릭 → ModifyPage가 파일을 열도록 연결
+    connect(comparePane_, &ComparePage::requestOpenFile, this, &ModifyPage::openFromTree);
 
     // 탭 변경 시 ComparePage 업데이트는 생성자에서 이미 연결되어 있음
 
@@ -367,9 +329,6 @@ void ModifyPage::closeCompare()
     // 먼저 포인터를 nullptr로 설정하여 다른 곳에서 접근하는 것을 방지
     comparePane_ = nullptr;
 
-    // ComparePage를 닫기 전에 상태 저장
-    saveComparePageState();
-
     // Debounce 타이머 정리
     if (diffDebounceTimer_) {
         diffDebounceTimer_->stop();  // 실행 중인 타이머 중지
@@ -392,47 +351,6 @@ void ModifyPage::closeCompare()
 
     // editorTextChangedForDiff 연결은 해제하지 않음 (다음 ComparePage 생성 시 재사용)
     // 하지만 comparePane_가 nullptr이므로 람다에서 자동으로 무시됨
-}
-
-QByteArray ModifyPage::saveSplitterState() const
-{
-    if (mainSplit_) {
-        return mainSplit_->saveState();
-    }
-    return QByteArray();
-}
-
-void ModifyPage::restoreSplitterState(const QByteArray &state)
-{
-    if (mainSplit_ && !state.isEmpty()) {
-        mainSplit_->restoreState(state);
-    }
-}
-
-void ModifyPage::saveComparePageState()
-{
-    if (!comparePane_)
-        return;
-
-    QString configDir = "C:/backup/config";
-    QDir    dir;
-    if (!dir.exists(configDir)) {
-        dir.mkpath(configDir);
-    }
-
-    QString   configFile = configDir + "/settings.ini";
-    QSettings settings(configFile, QSettings::IniFormat);
-
-    // ComparePage 내부의 Splitter 상태 저장 (좌측 파일 ↔ 우측 Diff 패널)
-    QByteArray compareSplitterState = comparePane_->saveSplitterState();
-    settings.setValue("ComparePage/splitterState", compareSplitterState);
-
-    // ModifyPage의 Splitter 상태 저장 (에디터 ↔ Compare 패널)
-    // ComparePage가 열려있을 때만 저장
-    QByteArray modifySplitterState = saveSplitterState();
-    settings.setValue("ModifyPage/splitterState", modifySplitterState);
-
-    settings.sync();
 }
 
 void ModifyPage::showCompareFolders()
@@ -529,6 +447,7 @@ void ModifyPage::showCompareFolders()
     // ComparePage가 없으면 생성
     if (!comparePane_) {
         comparePane_ = new ComparePage(this);
+        comparePane_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
         mainSplit_->addWidget(comparePane_);
         mainSplit_->setStretchFactor(0, 1);
         mainSplit_->setStretchFactor(1, 0);
@@ -566,7 +485,7 @@ void ModifyPage::openFromTree(const QString &path)
     if (comparePane_) {
         ComparePage *pane = comparePane_;
         if (pane == comparePane_) {
-            QWidget *tabPage = tabWidget->currentWidget();
+            QWidget    *tabPage       = tabWidget->currentWidget();
             CodeEditor *currentEditor = tabPage ? tabPage->findChild<CodeEditor *>() : nullptr;
             pane->setLeftEditor(currentEditor);
             pane->recalcDiff(currentLeftText(), currentLeftPath());
@@ -605,6 +524,23 @@ void ModifyPage::closeDocument(Document *doc)
         documents.removeAt(idx);
     }
 }
+
+void ModifyPage::closeFile()
+{
+    if (documents.isEmpty() || currentDocumentIndex < 0 || currentDocumentIndex >= documents.size())
+        return;
+
+    int index = currentDocumentIndex;
+
+    closeFile(index);
+}
+void ModifyPage::closeAll()
+{
+    for (auto d : documents) {
+        closeFile();
+    }
+}
+
 void ModifyPage::closeFile(int index)
 {
     if (documents.isEmpty())
@@ -639,7 +575,15 @@ void ModifyPage::closeFile(int index)
     }
     updateTitle();
 }
+static QString shortenBackupPath(const QString &fullPath)
+{
+    QString base = "C:/backup/";
 
+    if (fullPath.startsWith(base, Qt::CaseInsensitive)) {
+        return fullPath.mid(base.length());
+    }
+    return fullPath;  // 백업 경로가 아니면 원문 그대로
+}
 Document *ModifyPage::currentDocument()
 {
     if (currentDocumentIndex >= 0 && currentDocumentIndex < documents.size()) {
@@ -665,10 +609,60 @@ void ModifyPage::openFile()
         return;
 }
 
+void ModifyPage::createNewFile()
+{
+    Document *doc = new Document("");
+    doc->setContent("");
+    doc->setModified(true);
+
+    // 2) 탭 페이지 생성
+    QWidget     *tabPage = new QWidget(tabWidget);
+    QVBoxLayout *layout  = new QVBoxLayout(tabPage);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(0);
+
+    // 3) 상단 경로 라벨
+    QLabel *pathLabel = new QLabel("untitled", tabPage);
+    pathLabel->setObjectName("pathLabel");
+
+    // 4) CodeEditor 생성
+    CodeEditor *editor = new CodeEditor(tabPage);
+    editor->setPlainText("");
+    layout->addWidget(editor);
+
+    // 5) 탭 추가
+    int index = tabWidget->addTab(tabPage, "untitled");
+    tabWidget->setCurrentIndex(index);
+
+    // 6) signal 연결
+    connect(editor, &QPlainTextEdit::textChanged, [this, doc, editor]() {
+        doc->setContent(editor->toPlainText());
+        doc->setModified(true);
+        updateTitle();
+        if (comparePane_) {
+            emit editorTextChangedForDiff();
+        }
+    });
+
+    connect(editor, &DropTextEdit::fileDropped, this, [this](const QString &path) {
+        openDocument(path);
+    });
+
+    // 7) 내부 관리 변수 업데이트
+    currentDoc = doc;
+    editor_    = editor;
+    documents.append(doc);
+    setCurrentDocument(documents.size() - 1);
+
+    updateTitle();  // 탭 제목 갱신
+
+    LogManager::append("New document created: untitled");
+}
+
 void ModifyPage::saveFile()
 {
-    if (documents.isEmpty() || currentDocumentIndex < 0
-        || currentDocumentIndex >= documents.size()) {
+    if (documents.isEmpty() || currentDocumentIndex < 0 ||
+        currentDocumentIndex >= documents.size()) {
         return;
     }
 
@@ -678,7 +672,7 @@ void ModifyPage::saveFile()
 
     QString filePath = doc->gfilePath();
     if (filePath.isEmpty()) {
-        qWarning() << "File path is empty";
+        saveAsFile();
         return;
     }
 
@@ -691,6 +685,9 @@ void ModifyPage::saveFile()
     QTextStream out(&file);
     out << doc->gcontent();  // 문서 내용 쓰기
 
+    QString shortPath = shortenBackupPath(filePath);
+    QString msg       = QString("[%1] is saved").arg(shortPath);
+    LogManager::append(msg);
     doc->setModified(false);
     updateTitle();
     file.close();
@@ -704,12 +701,14 @@ void ModifyPage::saveFile()
 }
 void ModifyPage::saveAsFile()
 {
-    if (documents.isEmpty() || currentDocumentIndex < 0
-        || currentDocumentIndex >= documents.size()) {
+    saveAsFile(currentDocumentIndex);
+}
+void ModifyPage::saveAsFile(int index)
+{
+    if (index < 0 || index >= documents.size())
         return;
-    }
 
-    Document *doc = documents[currentDocumentIndex];
+    Document *doc = documents[index];
     if (!doc)
         return;
 
@@ -724,7 +723,7 @@ void ModifyPage::saveAsFile()
     }
 
     QString newFilePath = QFileDialog::getSaveFileName(
-            nullptr, "Save As", initialDir, "Text Files (*.txt);;All Files (*)");
+            nullptr, "Save As", initialDir, "All Files (*);;Text Files (*.txt)");
 
     if (newFilePath.isEmpty()) {
         return;
@@ -736,23 +735,62 @@ void ModifyPage::saveAsFile()
         return;
     }
 
+    QFileInfo infoAfter(newFilePath);
+    QString   newName = infoAfter.fileName();
+
+    QFileInfo infoBefore(currentPath);
+    QString   beforeName = infoBefore.fileName();
+
     QTextStream out(&file);
     out << doc->gcontent();
+
+    QString shortBefore = shortenBackupPath(currentPath);
+    QString shortAfter  = shortenBackupPath(newFilePath);
+
+    QString msg = QString("[%1] is saved to [%2]").arg(shortBefore).arg(shortAfter);
+    LogManager::append(msg);
+
     doc->setFilePath(newFilePath);
     doc->setModified(false);
     updateTitle();
     file.close();
-
-    qDebug() << "File saved as:" << newFilePath;
-
-    if (comparePane_) {
-        ComparePage *pane = comparePane_;
-        if (pane == comparePane_) {
-            pane->recalcDiff(currentLeftText(), currentLeftPath());
-        }
-    }
 }
+void ModifyPage::saveAll()
+{
+    if (documents.isEmpty())
+        return;
 
+    for (int curIdx = 0; curIdx < documents.size(); curIdx++) {
+        Document *doc = documents[curIdx];
+        if (!doc)
+            continue;  // return이 아닌 continue
+
+        QString filePath = doc->gfilePath();
+
+        // untitled 파일 별도 처리
+        if (filePath.isEmpty()) {
+            saveAsFile(curIdx);
+            continue;
+        }
+
+        // 파일 저장 시도
+        QFile file(filePath);
+        if (!file.open(QFile::WriteOnly | QFile::Text)) {
+            qWarning() << "Failed to open file:" << filePath;
+            QString msg = QString("Save Failed : [%1] cant open").arg(filePath);
+            LogManager::append(msg);
+            continue;  // 다음 파일 계속 저장
+        }
+
+        QTextStream out(&file);
+        out << doc->gcontent();
+        file.close();
+
+        doc->setModified(false);
+    }
+
+    updateTitle();
+}
 bool ModifyPage::hasUnsavedChanges(Document *doc)
 {
     if (!doc)

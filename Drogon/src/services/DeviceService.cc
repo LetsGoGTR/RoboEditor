@@ -1,16 +1,16 @@
 #include "DeviceService.h"
 
-#include "../utils/ConfigUtils.h"
-#include "../utils/JsonFileUtils.h"
-#include "../utils/PathValidator.h"
-#include "../utils/TimeUtils.h"
-#include "../utils/logging/Logger.h"
-
 #include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <sstream>
+
+#include "../utils/ConfigUtils.h"
+#include "../utils/JsonFileUtils.h"
+#include "../utils/PathValidator.h"
+#include "../utils/TimeUtils.h"
+#include "../utils/logging/Logger.h"
 
 namespace fs = std::filesystem;
 
@@ -20,8 +20,9 @@ Json::Value services::DeviceMetadata::toJson() const
 {
     Json::Value json;
     json["serialNumber"]  = serialNumber;
-    json["api"]           = api;
-    json["sftpHost"]      = sftpHost;
+    json["host"]          = host;
+    json["scheme"]        = scheme;
+    json["apiPort"]       = apiPort;
     json["sftpPort"]      = sftpPort;
     json["sftpPassword"]  = sftpPassword;
     json["sftpUser"]      = sftpUser;
@@ -38,12 +39,18 @@ services::DeviceMetadata services::DeviceMetadata::fromJson(const Json::Value &j
 
     if (json.isMember("serialNumber"))
         metadata.serialNumber = json["serialNumber"].asString();
-    if (json.isMember("api"))
-        metadata.api = json["api"].asString();
-    if (json.isMember("sftpHost"))
-        metadata.sftpHost = json["sftpHost"].asString();
+    if (json.isMember("host"))
+        metadata.host = json["host"].asString();
+    if (json.isMember("scheme"))
+        metadata.scheme = json["scheme"].asString();
+    else
+        metadata.scheme = "http";  // 기본값
+    if (json.isMember("apiPort"))
+        metadata.apiPort = json["apiPort"].asInt();
     if (json.isMember("sftpPort"))
         metadata.sftpPort = json["sftpPort"].asInt();
+    else
+        metadata.sftpPort = 22;  // 기본값
     if (json.isMember("sftpPassword"))
         metadata.sftpPassword = json["sftpPassword"].asString();
     if (json.isMember("sftpUser"))
@@ -66,8 +73,7 @@ services::DeviceMetadata services::DeviceService::loadMetadata(const std::string
     return utils::loadJsonFromFile<DeviceMetadata>(metadataPath);
 }
 
-services::ServiceResult
-services::DeviceService::createDevice(const DeviceMetadata &metadata)
+services::ServiceResult services::DeviceService::createDevice(const DeviceMetadata &metadata)
 {
     // Validate device serialNumber
     if (metadata.serialNumber.empty()) {
@@ -110,7 +116,8 @@ services::DeviceService::createDevice(const DeviceMetadata &metadata)
         result.success = true;
         result.data    = newMetadata.toJson();
 
-        utils::logging::info("Created device: " + metadata.name + " (serialNumber: " + metadata.serialNumber + ")");
+        utils::logging::info("Created device: " + metadata.name +
+                             " (serialNumber: " + metadata.serialNumber + ")");
         return result;
 
     } catch (const std::exception &e) {
@@ -149,8 +156,8 @@ services::ServiceResult services::DeviceService::readDevice(const std::string &d
     return result;
 }
 
-services::ServiceResult services::DeviceService::updateDevice(
-        const std::string &deviceId, const DeviceMetadata &metadata)
+services::ServiceResult services::DeviceService::updateDevice(const std::string    &deviceId,
+                                                              const DeviceMetadata &metadata)
 {
     // Validate path for security
     if (!utils::validatePath(deviceId)) {
@@ -174,10 +181,10 @@ services::ServiceResult services::DeviceService::updateDevice(
 
     try {
         // Prepare updated metadata
-        DeviceMetadata updatedMetadata      = metadata;
-        updatedMetadata.serialNumber = deviceId;  // Ensure serialNumber doesn't change
-        updatedMetadata.createdAt    = existingMetadata.createdAt;
-        updatedMetadata.updatedAt    = utils::getCurrentTimestamp();
+        DeviceMetadata updatedMetadata = metadata;
+        updatedMetadata.serialNumber   = deviceId;  // Ensure serialNumber doesn't change
+        updatedMetadata.createdAt      = existingMetadata.createdAt;
+        updatedMetadata.updatedAt      = utils::getCurrentTimestamp();
 
         // Save metadata
         std::string metadataPath = devicePath + "/" + metadataFilename_;
@@ -241,7 +248,8 @@ services::ServiceResult services::DeviceService::listDevices()
         try {
             fs::create_directories(baseDir);
         } catch (const std::exception &e) {
-            return ServiceResult::createError("Failed to create base directory: " + std::string(e.what()));
+            return ServiceResult::createError("Failed to create base directory: " +
+                                              std::string(e.what()));
         }
     }
 

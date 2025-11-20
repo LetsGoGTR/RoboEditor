@@ -8,6 +8,13 @@
 #include "../utils/sftp/SFTPConfig.h"
 #include "ServiceResult.h"
 
+struct RemoteApiResult
+{
+    bool        success;
+    std::string errorMessage;       // Drogon 레벨 에러 메시지
+    std::string remoteMessage;      // 제어기 서버의 message 필드
+};
+
 class FileTransferService
 {
   public:
@@ -28,8 +35,8 @@ class FileTransferService
 
   private:
     // Workspace API 호출 메서드
-    static std::pair<bool, std::string> extractWorkspace(const std::string &user,
-                                                  const std::string &api);
+    RemoteApiResult compressWorkspace(const std::string &user, const std::string &api);
+    RemoteApiResult extractWorkspace(const std::string &user, const std::string &api);
 
     // 비밀번호 파일 경로 가져오기
     static std::string getPasswordFilePath();

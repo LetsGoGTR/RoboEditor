@@ -5,7 +5,7 @@ import { _getFolder } from '@apis/folder';
 export const ssr = false;
 
 export const load = (async () => {
-	const tree = await fetchFolderTreeRecursively('', _getFolder);
+	const tree = await fetchFolderTreeRecursively('/', _getFolder);
 	// console.log(tree);
 
 	// 필요하다면 즉시 store 업데이트

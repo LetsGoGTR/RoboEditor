@@ -6,7 +6,7 @@
         "session_same_site": "Null",
         "session_cookie_key": "JSESSIONID",
         "session_max_age": -1,
-        "document_root": "./app", ///app/web
+        "document_root": "./app", // ./app (빌드 용) /app/web (docker 용)
         "home_page": "index.html",
         "use_implicit_page": true,
         "implicit_page": "index.html",
@@ -104,9 +104,6 @@
         }
     ],
     "custom_config": {
-        "auth": {
-            "device_password_hash": "$2b$12$V/CMuppdu98zKBfJOSKO/ueOcpAWVAyzBHzg9TAyqJ7Lqc/Pdm9yW"
-        },
         "storage": {
             "base_dir": "/tmp/drogon-app/storage/",
             "temp_apply_dir": "/tmp/drogon-app/temp/apply/",

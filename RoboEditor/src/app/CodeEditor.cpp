@@ -9,6 +9,8 @@
 #include <QResizeEvent>
 #include <QWheelEvent>
 
+#include "mainwindow.h"
+
 LineNumberArea::LineNumberArea(CodeEditor *e) : QWidget(e), editor_(e) {}
 QSize LineNumberArea::sizeHint() const
 {
@@ -25,6 +27,7 @@ CodeEditor::CodeEditor(QWidget *parent) :
 {
     // CodeEditor는 편집 가능해야 함 (DropTextEdit는 기본 readOnly)
     setReadOnly(false);
+    isDarkMode_ = MainWindow::dark;
 
     font_.setPointSize(10);
     setFont(font_);
@@ -36,7 +39,23 @@ CodeEditor::CodeEditor(QWidget *parent) :
     updateLineNumberAreaWidth(0);
     highlightCurrentLine();
 }
+void CodeEditor::applyTheme(bool isDark)
+{
+    isDarkMode_ = isDark;
 
+    // DiffHighlighter 색상 업데이트
+    if (diffHighlighter_) {
+        diffHighlighter_->updateColorsForTheme(isDark);
+    }
+
+    // 라인 번호 영역 다시 그리기
+    if (lineNumberArea_) {
+        lineNumberArea_->update();
+    }
+
+    // 현재 라인 하이라이트 다시 그리기
+    updateAllHighlights();
+}
 int CodeEditor::lineNumberAreaWidth() const
 {
     int digits = 1, max = qMax(1, blockCount());
@@ -72,15 +91,30 @@ void CodeEditor::resizeEvent(QResizeEvent *ev)
 void CodeEditor::lineNumberAreaPaintEvent(QPaintEvent *ev)
 {
     QPainter p(lineNumberArea_);
-    // 팔레트 브러시는 QBrush라 darker가 없으니 color()로 꺼내세요
-    p.fillRect(ev->rect(), palette().base().color().darker(105));
+
+    QColor bgColor;
+    QColor textColor;
+
+    if (isDarkMode_) {
+        // 다크 모드: 약간 더 어두운 배경
+        bgColor   = palette().base().color().lighter(110);
+        textColor = QColor("#858585");  // 회색 텍스트
+    } else {
+        // 라이트 모드: 약간 더 어두운 배경
+        bgColor   = palette().base().color().darker(105);
+        textColor = palette().mid().color();
+    }
+
+    p.fillRect(ev->rect(), bgColor);
+
     QTextBlock blk    = firstVisibleBlock();
     int        bn     = blk.blockNumber();
     qreal      top    = blockBoundingGeometry(blk).translated(contentOffset()).top();
     qreal      bottom = top + blockBoundingRect(blk).height();
+
     while (blk.isValid() && top <= ev->rect().bottom()) {
         if (blk.isVisible() && bottom >= ev->rect().top()) {
-            p.setPen(palette().mid().color());
+            p.setPen(textColor);
             p.drawText(0,
                        int(top),
                        lineNumberArea_->width() - 4,
@@ -137,7 +171,15 @@ void CodeEditor::updateAllHighlights()
     // 2. 현재 커서 라인 하이라이트 (읽기 전용이 아닐 때만)
     if (!isReadOnly()) {
         QTextEdit::ExtraSelection sel;
-        sel.format.setBackground(palette().alternateBase());
+
+        QColor currentLineColor;
+        if (isDarkMode_) {
+            currentLineColor = QColor(45, 45, 48);  // 어두운 회색
+        } else {
+            currentLineColor = palette().alternateBase().color();
+        }
+
+        sel.format.setBackground(currentLineColor);
         sel.format.setProperty(QTextFormat::FullWidthSelection, true);
         sel.cursor = textCursor();
         sel.cursor.clearSelection();
@@ -165,11 +207,12 @@ void CodeEditor::setDiffHighlighter(core::DiffHighlighter *highlighter)
                 &core::DiffHighlighter::highlightChanged,
                 this,
                 &CodeEditor::updateAllHighlights);
+
+        diffHighlighter_->updateColorsForTheme(isDarkMode_);
     }
 
     updateAllHighlights();
 }
-
 core::DiffHighlighter *CodeEditor::getDiffHighlighter() const
 {
     return diffHighlighter_;

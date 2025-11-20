@@ -1,10 +1,7 @@
 import { writable } from 'svelte/store';
-import type { DiffFilter, FileDiffItem, FileDiffResult } from '@/types';
+import type { DiffFilter, FileDiffItem, FileDiffResult, ApiDiffResponse } from '@/types';
 
-/* ===========================
- * Store State
- * =========================== */
-interface FileDiffState {
+export interface FileDiffState {
 	isOpen: boolean;
 
 	leftFileName: string;
@@ -21,9 +18,6 @@ interface FileDiffState {
 
 	filter: DiffFilter;
 }
-/* ===========================
- * 초기값
- * =========================== */
 const initialState: FileDiffState = {
 	isOpen: false,
 
@@ -76,15 +70,49 @@ function createFileDiffStore() {
 			}));
 		},
 
-		setApiDiffResult(result: FileDiffResult) {
-			update((s) => ({
-				...s,
-				diffs: result.diff,
-				statistics: result.statistics
-			}));
+		/** ⭐ 서버 raw response를 받아 UI-friendly 구조로 변환 ⭐ */
+		/** API Raw Response를 그대로 저장하는 모드 */
+		setApiDiffResult(api: ApiDiffResponse) {
+			update((s) => {
+				console.log('[fileDiffStore] api =', api);
+
+				// 실패 시 초기화 형태로 반환
+				if (!api.success || !api.data) {
+					return {
+						...s,
+						diffs: [],
+						statistics: {
+							added: 0,
+							modified: 0,
+							removed: 0,
+							totalChanges: 0
+						}
+					};
+				}
+
+				// ⭐ API 응답 구조를 그대로 반영 ⭐
+				const { file1, file2, changes, statistics } = api.data;
+
+				return {
+					...s,
+
+					// 파일 이름은 API 기준으로 갱신
+					leftFileName: file1,
+					rightFileName: file2,
+
+					// diff 결과도 API 원본 그대로 저장
+					diffs: changes ?? [],
+
+					statistics: {
+						added: statistics.added,
+						modified: statistics.modified,
+						removed: statistics.deleted,
+						totalChanges: statistics.totalChanges
+					}
+				};
+			});
 		},
 
-		/** 필터 변경 */
 		setFilter(filter: DiffFilter) {
 			update((s) => ({ ...s, filter }));
 		},

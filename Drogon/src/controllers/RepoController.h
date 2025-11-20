@@ -22,12 +22,6 @@ namespace api
             METHOD_ADD(Repo::workspaceInfo, "/{deviceId}/{workspaceId}", drogon::Get);
             METHOD_ADD(Repo::workspaceUpdate, "/{deviceId}/{workspaceId}", drogon::Put);
             METHOD_ADD(Repo::workspaceRemove, "/{deviceId}/{workspaceId}", drogon::Delete);
-
-            // Etc
-            METHOD_ADD(Repo::workspaceImport, "/workspace/import", drogon::Post);
-            METHOD_ADD(Repo::workspaceExport, "/workspace/export", drogon::Post);
-            METHOD_ADD(Repo::apply, "/device/{deviceId}/apply", drogon::Post);
-            METHOD_ADD(Repo::backup, "/device/{deviceId}/backup", drogon::Get);
             METHOD_LIST_END
 
             // Device methods
@@ -42,12 +36,6 @@ namespace api
                         std::function<void(const drogon::HttpResponsePtr &)> &&callback,
                         const std::string                                     &deviceId);
             void remove(const drogon::HttpRequestPtr                          &req,
-                        std::function<void(const drogon::HttpResponsePtr &)> &&callback,
-                        const std::string                                     &deviceId);
-            void apply(const drogon::HttpRequestPtr                          &req,
-                       std::function<void(const drogon::HttpResponsePtr &)> &&callback,
-                       const std::string                                     &deviceId);
-            void backup(const drogon::HttpRequestPtr                          &req,
                         std::function<void(const drogon::HttpResponsePtr &)> &&callback,
                         const std::string                                     &deviceId);
 
@@ -67,18 +55,6 @@ namespace api
                                  std::function<void(const drogon::HttpResponsePtr &)> &&callback,
                                  const std::string                                     &deviceId,
                                  const std::string &workspaceId);
-            void workspaceImport(const drogon::HttpRequestPtr                          &req,
-                                 std::function<void(const drogon::HttpResponsePtr &)> &&callback);
-            void workspaceExport(const drogon::HttpRequestPtr                          &req,
-                                 std::function<void(const drogon::HttpResponsePtr &)> &&callback);
-
-          private:
-            // Helper function to check if robot is running
-            void
-            checkRobotStatus(const std::string    &ip,
-                             std::function<void()> onNotRunning,
-                             std::shared_ptr<std::function<void(const drogon::HttpResponsePtr &)>>
-                                     callbackPtr);
         };
     }  // namespace v1
 }  // namespace api

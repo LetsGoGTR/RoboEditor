@@ -1,26 +1,38 @@
 #include "ProgressDialog.h"
-#include <QVBoxLayout>
+
+#include <QTimer>
+
 #include <QLabel>
 #include <QProgressBar>
 #include <QPushButton>
-#include <QTimer>
+#include <QVBoxLayout>
 
-ProgressDialog::ProgressDialog(QWidget *parent)
-    : QDialog(parent)
+ProgressDialog::ProgressDialog(QWidget *parent) : QDialog(parent)
 {
-    setWindowTitle("진행 중...");
+    //setWindowTitle("진행 중...");
     resize(400, 180);
 
-    serialLabel_ = new QLabel("현재 제어기: -");
+    serialLabel_ = new QLabel("Current controller: -");
     countLabel_  = new QLabel("0 / 0");
     timeLabel_   = new QLabel("0s...");
     progressBar_ = new QProgressBar();
     progressBar_->setRange(0, 100);
 
+    progressBar_->setStyleSheet(
+               "QProgressBar {"
+               "  border: 1px solid #d0d0d0;"
+               "  border-radius: 4px;"
+               "  text-align: center;"
+               "}"
+               "QProgressBar::chunk {"
+               "  background-color: #2d89ef;"   // 파란색 계열
+               "}"
+           );
+
     statusLabel_ = new QLabel("");
     statusLabel_->setWordWrap(true);
 
-    cancelBtn_ = new QPushButton("취소");
+    cancelBtn_ = new QPushButton("Cancel");
 
     auto layout = new QVBoxLayout(this);
     layout->addWidget(serialLabel_);
@@ -30,12 +42,10 @@ ProgressDialog::ProgressDialog(QWidget *parent)
     layout->addWidget(statusLabel_);
     layout->addWidget(cancelBtn_);
 
-    connect(cancelBtn_, &QPushButton::clicked,
-            this, &ProgressDialog::cancelRequested);
+    connect(cancelBtn_, &QPushButton::clicked, this, &ProgressDialog::cancelRequested);
 
     timer_ = new QTimer(this);
-    connect(timer_, &QTimer::timeout,
-            this, &ProgressDialog::updateElapsedTime);
+    connect(timer_, &QTimer::timeout, this, &ProgressDialog::updateElapsedTime);
     timer_->start(1000);
     elapsed_.start();
 }
@@ -43,18 +53,22 @@ ProgressDialog::ProgressDialog(QWidget *parent)
 void ProgressDialog::setTotalCount(int total)
 {
     totalCount_ = total;
-    countLabel_->setText(QString("%1 / %2").arg(currentIndex_).arg(totalCount_));
+    if (!useCustomCountText_ && countLabel_) {
+        countLabel_->setText(QString("%1 / %2").arg(currentIndex_).arg(totalCount_));
+    }
 }
 
 void ProgressDialog::setCurrentIndex(int index)
 {
     currentIndex_ = index;
-    countLabel_->setText(QString("%1 / %2").arg(currentIndex_).arg(totalCount_));
+    if (!useCustomCountText_ && countLabel_) {
+        countLabel_->setText(QString("%1 / %2").arg(currentIndex_).arg(totalCount_));
+    }
 }
 
 void ProgressDialog::setSerialNumber(const QString &sn)
 {
-    serialLabel_->setText(QString("현재 제어기: %1").arg(sn));
+    serialLabel_->setText(QString("Current controller: %1").arg(sn));
 }
 
 void ProgressDialog::setProgress(int percent)
@@ -79,15 +93,41 @@ void ProgressDialog::setFinishedMode(bool finished)
 {
     if (finished) {
         // 완료 모드
-        cancelBtn_->setText("닫기");
-        setWindowTitle("백업 완료");
+        cancelBtn_->setText("Close");
+        //setWindowTitle("Backup completed");
 
-        if (timer_) timer_->stop();
-    }
-    else {
+        if (timer_)
+            timer_->stop();
+    } else {
         // 진행 모드
-        cancelBtn_->setText("취소");
-        setWindowTitle("진행 중...");
+        cancelBtn_->setText("Cancel");
+        //setWindowTitle("In progress...");
         if (timer_) timer_->start(1000);
+    }
+}
+
+void ProgressDialog::reset()
+{
+    totalCount_ = 0;
+    currentIndex_ = 0;
+    useCustomCountText_ = false;
+
+    serialLabel_->setText("Current controller: -");
+    countLabel_->setText("0 / 0");
+    progressBar_->setValue(0);
+    statusLabel_->setText("");
+
+    elapsed_.restart();
+    if (timer_) timer_->start(1000);
+
+    cancelBtn_->setText("Cancel");
+    setWindowTitle("In progress...");
+}
+
+void ProgressDialog::setCountText(const QString &text)
+{
+    useCustomCountText_ = true;
+    if (countLabel_) {
+        countLabel_->setText(text);
     }
 }

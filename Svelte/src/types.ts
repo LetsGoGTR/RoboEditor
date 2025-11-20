@@ -42,7 +42,7 @@ export interface BaseNode {
 export interface FileNode extends BaseNode {
 	type: 'file';
 	size?: number; // byte
-	lastModified?: number; // epoch ms
+	lastModified?: string; // epoch ms
 }
 
 export interface FileDetail extends FileNode {
@@ -65,7 +65,7 @@ export type TreeNode = FolderNode | FileNode;
  * ============================================================ */
 
 export interface WorkspaceMeta {
-	id: string;
+	uuid: string;
 	name: string;
 	target?: string | null;
 	description?: string | null;
@@ -84,14 +84,19 @@ export interface Workspace extends FolderNode {
 export type ControllerState = 'idle' | 'active' | 'error' | 'disconnected';
 
 export interface ControllerMeta {
-	id: string; // device-id
-	name: string;
+	
 	serialNumber: string;
+	name: string;
 	description?: string | null;
 
-	ipAddress?: string;
-	sftpPort?: number;
+	api: string;
+	sftpHost: string;
+	sftpPort: number;
+	sftpUser?: string;
+	sftpPassword?: string;
 
+	createdAt?: string;
+  	updatedAt?: string;
 	state: ControllerState;
 }
 
@@ -99,7 +104,7 @@ export interface ControllerMeta {
  * Controller는 폴더처럼 트리 구조를 가지며(FolderNode),
  * 그 안에 controllerMeta와 workspaces가 추가됩니다.
  */
-export interface Controller extends FolderNode {
+export interface Controller {
 	controllerMeta: ControllerMeta;
 	workspaces: Workspace[];
 }
@@ -108,20 +113,17 @@ export interface Controller extends FolderNode {
  * 6. 백업 루트(BackupRoot)
  * ============================================================ */
 
-export interface BackupRoot extends FolderNode {
+export interface BackupRoot {
 	controllers: Controller[];
 }
 
 /* ============================================================
  * 7. Diff 타입 — Monaco Diff 및 Drogon Diff API 기반
  * ============================================================ */
-export type DiffState = 'added' | 'removed' | 'changed';
+export type DiffState = 'added' | 'removed' | 'modified';
 export type DiffFilter = 'all' | DiffState;
 
 export interface FileDiffItem {
-	line: number;
-	path: string;
-
 	oldLineNumber: number;
 	oldLineCount: number;
 	oldValue: string | number | null;
@@ -130,7 +132,8 @@ export interface FileDiffItem {
 	newLineCount: number;
 	newValue: string | number | null;
 
-	state: DiffState;
+	path: string;
+	type: DiffState;
 }
 
 export interface FileDiffResult {
@@ -145,6 +148,25 @@ export interface FileDiffResult {
 		modified: number;
 		removed: number;
 		totalChanges: number;
-		fileType: string;
 	};
+}
+
+export interface ApiDiffResponse {
+	success: boolean;
+
+	data?: {
+		file1: string;
+		file2: string;
+
+		changes: FileDiffItem[];
+
+		statistics: {
+			added: number;
+			deleted: number;
+			modified: number;
+			totalChanges: number;
+		};
+	};
+
+	message?: string; // 실패 시 존재
 }
