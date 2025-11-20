@@ -1,0 +1,13 @@
+[Unit]
+Description=Workspace Controller Service
+After=network.target
+
+[Service]
+User=
+WorkingDirectory=
+ExecStart=
+Restart=always
+LogsDirectory=workspace-controller
+
+[Install]
+WantedBy=multi-user.target

@@ -19,16 +19,17 @@ const std::string services::DeviceService::metadataFilename_ = ".device.json";
 Json::Value services::DeviceMetadata::toJson() const
 {
     Json::Value json;
-    json["serialNumber"] = serialNumber;
-    json["api"]          = api;
-    json["sftpHost"]     = sftpHost;
-    json["sftpPort"]     = sftpPort;
-    json["sftpPassword"] = sftpPassword;
-    json["sftpUser"]     = sftpUser;
-    json["name"]         = name;
-    json["description"]  = description;
-    json["createdAt"]    = createdAt;
-    json["updatedAt"]    = updatedAt;
+    json["serialNumber"]  = serialNumber;
+    json["host"]          = host;
+    json["scheme"]        = scheme;
+    json["apiPort"]       = apiPort;
+    json["sftpPort"]      = sftpPort;
+    json["sftpPassword"]  = sftpPassword;
+    json["sftpUser"]      = sftpUser;
+    json["name"]          = name;
+    json["description"]   = description;
+    json["createdAt"]     = createdAt;
+    json["updatedAt"]     = updatedAt;
     return json;
 }
 
@@ -38,12 +39,18 @@ services::DeviceMetadata services::DeviceMetadata::fromJson(const Json::Value &j
 
     if (json.isMember("serialNumber"))
         metadata.serialNumber = json["serialNumber"].asString();
-    if (json.isMember("api"))
-        metadata.api = json["api"].asString();
-    if (json.isMember("sftpHost"))
-        metadata.sftpHost = json["sftpHost"].asString();
+    if (json.isMember("host"))
+        metadata.host = json["host"].asString();
+    if (json.isMember("scheme"))
+        metadata.scheme = json["scheme"].asString();
+    else
+        metadata.scheme = "http";  // 기본값
+    if (json.isMember("apiPort"))
+        metadata.apiPort = json["apiPort"].asInt();
     if (json.isMember("sftpPort"))
         metadata.sftpPort = json["sftpPort"].asInt();
+    else
+        metadata.sftpPort = 22;  // 기본값
     if (json.isMember("sftpPassword"))
         metadata.sftpPassword = json["sftpPassword"].asString();
     if (json.isMember("sftpUser"))

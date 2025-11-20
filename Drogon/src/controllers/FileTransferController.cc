@@ -16,7 +16,7 @@ void FT::apply(const HttpRequestPtr &req, std::function<void(const HttpResponseP
     if (!jsonBody) {
         Json::Value error;
         error["success"] = false;
-        error["error"]   = "Invalid JSON";
+        error["message"] = "Invalid JSON";
         auto resp        = HttpResponse::newHttpJsonResponse(error);
         resp->setStatusCode(k400BadRequest);
         callback(resp);
@@ -27,7 +27,7 @@ void FT::apply(const HttpRequestPtr &req, std::function<void(const HttpResponseP
     if (!jsonBody->isMember("workspaceId") || (*jsonBody)["workspaceId"].asString().empty()) {
         Json::Value error;
         error["success"] = false;
-        error["error"]   = "Missing required field: workspaceId";
+        error["message"] = "Missing required field: workspaceId";
         auto resp        = HttpResponse::newHttpJsonResponse(error);
         resp->setStatusCode(k400BadRequest);
         callback(resp);
@@ -37,7 +37,7 @@ void FT::apply(const HttpRequestPtr &req, std::function<void(const HttpResponseP
     if (!jsonBody->isMember("deviceId") || (*jsonBody)["deviceId"].asString().empty()) {
         Json::Value error;
         error["success"] = false;
-        error["error"]   = "Missing required field: deviceId";
+        error["message"] = "Missing required field: deviceId";
         auto resp        = HttpResponse::newHttpJsonResponse(error);
         resp->setStatusCode(k400BadRequest);
         callback(resp);
@@ -47,7 +47,7 @@ void FT::apply(const HttpRequestPtr &req, std::function<void(const HttpResponseP
     if (!jsonBody->isMember("password") || (*jsonBody)["password"].asString().empty()) {
         Json::Value error;
         error["success"] = false;
-        error["error"]   = "Missing required field: password";
+        error["message"] = "Missing required field: password";
         auto resp        = HttpResponse::newHttpJsonResponse(error);
         resp->setStatusCode(k400BadRequest);
         callback(resp);
@@ -62,7 +62,7 @@ void FT::apply(const HttpRequestPtr &req, std::function<void(const HttpResponseP
     if (!FileTransferService::verifyPassword(password)) {
         Json::Value error;
         error["success"] = false;
-        error["error"]   = "Invalid password";
+        error["message"] = "Invalid password";
         auto resp        = HttpResponse::newHttpJsonResponse(error);
         resp->setStatusCode(k401Unauthorized);
         callback(resp);
@@ -78,7 +78,7 @@ void FT::apply(const HttpRequestPtr &req, std::function<void(const HttpResponseP
         if (result.success) {
             response["data"] = result.data;
         } else {
-            response["error"] = result.errorMessage;
+            response["message"] = result.errorMessage;
         }
 
         auto resp = HttpResponse::newHttpJsonResponse(response);
@@ -95,7 +95,7 @@ void FT::backup(const HttpRequestPtr &req, std::function<void(const HttpResponse
     if (!jsonBody) {
         Json::Value error;
         error["success"] = false;
-        error["error"]   = "Invalid JSON";
+        error["message"] = "Invalid JSON";
         auto resp        = HttpResponse::newHttpJsonResponse(error);
         resp->setStatusCode(k400BadRequest);
         callback(resp);
@@ -106,7 +106,7 @@ void FT::backup(const HttpRequestPtr &req, std::function<void(const HttpResponse
     if (!jsonBody->isMember("deviceId") || (*jsonBody)["deviceId"].asString().empty()) {
         Json::Value error;
         error["success"] = false;
-        error["error"]   = "Missing required field: deviceId";
+        error["message"] = "Missing required field: deviceId";
         auto resp        = HttpResponse::newHttpJsonResponse(error);
         resp->setStatusCode(k400BadRequest);
         callback(resp);
@@ -119,20 +119,18 @@ void FT::backup(const HttpRequestPtr &req, std::function<void(const HttpResponse
         FileTransferService service;
         auto                result = service.backupFromRemote(deviceId);
 
+        Json::Value response;
+        response["success"] = result.success;
+
         if (!result.success) {
-            Json::Value error;
-            error["success"] = false;
-            error["error"]   = result.errorMessage;
-            auto resp        = HttpResponse::newHttpJsonResponse(error);
+            response["message"] = result.errorMessage;
+            auto resp = HttpResponse::newHttpJsonResponse(response);
             resp->setStatusCode(k500InternalServerError);
             callback(resp);
             return;
         }
 
-        Json::Value response;
-        response["success"] = true;
-        response["data"]    = result.data;
-
+        response["data"] = result.data;
         auto resp = HttpResponse::newHttpJsonResponse(response);
         resp->setStatusCode(k200OK);
         callback(resp);
@@ -148,7 +146,7 @@ void FT::changePassword(const HttpRequestPtr                          &req,
     if (!jsonBody) {
         Json::Value error;
         error["success"] = false;
-        error["error"]   = "Invalid JSON";
+        error["message"] = "Invalid JSON";
         auto resp        = HttpResponse::newHttpJsonResponse(error);
         resp->setStatusCode(k400BadRequest);
         callback(resp);
@@ -159,7 +157,7 @@ void FT::changePassword(const HttpRequestPtr                          &req,
     if (!jsonBody->isMember("oldPassword") || (*jsonBody)["oldPassword"].asString().empty()) {
         Json::Value error;
         error["success"] = false;
-        error["error"]   = "Missing required field: oldPassword";
+        error["message"] = "Missing required field: oldPassword";
         auto resp        = HttpResponse::newHttpJsonResponse(error);
         resp->setStatusCode(k400BadRequest);
         callback(resp);
@@ -169,7 +167,7 @@ void FT::changePassword(const HttpRequestPtr                          &req,
     if (!jsonBody->isMember("newPassword") || (*jsonBody)["newPassword"].asString().empty()) {
         Json::Value error;
         error["success"] = false;
-        error["error"]   = "Missing required field: newPassword";
+        error["message"] = "Missing required field: newPassword";
         auto resp        = HttpResponse::newHttpJsonResponse(error);
         resp->setStatusCode(k400BadRequest);
         callback(resp);
@@ -184,12 +182,7 @@ void FT::changePassword(const HttpRequestPtr                          &req,
 
     Json::Value response;
     response["success"] = result.success;
-    if (result.success) {
-        response["message"] =
-                result.errorMessage;  // createSuccess에서는 errorMessage에 성공 메시지 저장
-    } else {
-        response["error"] = result.errorMessage;
-    }
+    response["message"] = result.errorMessage;  // 성공/실패 모두 message 사용
 
     auto resp = HttpResponse::newHttpJsonResponse(response);
     resp->setStatusCode(result.success ? k200OK : k401Unauthorized);

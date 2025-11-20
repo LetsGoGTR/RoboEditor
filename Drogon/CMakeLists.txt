@@ -103,6 +103,8 @@ aux_source_directory(src/utils/diff UTILS_DIFF_SRC)
 aux_source_directory(src/utils/logging UTILS_LOGGING_SRC)
 aux_source_directory(src/utils/robot UTILS_ROBOT_SRC)
 aux_source_directory(src/utils/sftp UTILS_SFTP_SRC)
+aux_source_directory(src/utils/device UTILS_DEVICE_SRC)
+aux_source_directory(src/utils/connection UTILS_CONNECTION_SRC)
 
 drogon_create_views(${PROJECT_NAME} ${CMAKE_CURRENT_SOURCE_DIR}/views
                     ${CMAKE_CURRENT_BINARY_DIR})
@@ -136,6 +138,8 @@ target_sources(${PROJECT_NAME}
                ${UTILS_LOGGING_SRC}
                ${UTILS_ROBOT_SRC}
                ${UTILS_SFTP_SRC}
+               ${UTILS_DEVICE_SRC}
+               ${UTILS_CONNECTION_SRC}
 )
 
 
