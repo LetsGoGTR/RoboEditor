@@ -16,8 +16,7 @@ export async function handleCreateFile(payload: { name: string; folder: FolderNo
 	const { name, folder } = payload;
 
 	const newPath = `${folder.path}/${name}`;
-
-	const resp = await _createFile(newPath, ''); // 초기 content는 빈 문자열
+	const resp = await _createFile(newPath, ' '); // 초기 content는 빈 문자열
 	if (!resp?.success) {
 		return alert('파일 생성 중 오류가 발생했습니다.');
 	}
@@ -29,7 +28,7 @@ export async function handleCreateFile(payload: { name: string; folder: FolderNo
 		type: 'file',
 		path: newPath,
 		size: 0,
-		lastModified: Date.now()
+		lastModified: Date.now().toString()
 	};
 
 	// 3) fileTree 트리에 삽입
