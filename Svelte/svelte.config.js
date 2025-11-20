@@ -7,7 +7,7 @@ const config = {
 
 	kit: {
 		adapter: adapter({
-			pages: 'build', // 빌드 결과 폴더
+			pages: 'build',     // 빌드 결과 폴더
 			assets: 'build',
 			fallback: 'index.html' // SPA 라우팅용 (모든 경로에서 index.html 서빙)
 		}),
