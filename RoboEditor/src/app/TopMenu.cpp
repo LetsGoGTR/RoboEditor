@@ -29,14 +29,17 @@ void TopMenu::build()
     help_    = mb->addMenu("Help");
 
     // add file actions
-    actNewFile_    = file_->addAction("New File");
-    actOpenFile_   = file_->addAction("Open File");
+    actNewFile_  = file_->addAction("New File");
+    actOpenFile_ = file_->addAction("Open File");
+    file_->addSeparator();
     actSaveFile_   = file_->addAction("Save File");
     actSaveAsFile_ = file_->addAction("Save as File");
     actSaveAll_    = file_->addAction("Save All");
-    actCloseFile_  = file_->addAction("Close File");
-    actCloseAll_   = file_->addAction("Close All");
-    actExit_       = file_->addAction("Exit");
+    file_->addSeparator();
+    actCloseFile_ = file_->addAction("Close File");
+    actCloseAll_  = file_->addAction("Close All");
+    file_->addSeparator();
+    actExit_ = file_->addAction("Exit");
 
     connect(actNewFile_, &QAction::triggered, mw_, &MainWindow::createNewDocument);
     connect(actOpenFile_, &QAction::triggered, mw_, &MainWindow::openFileFromMenu);
@@ -49,11 +52,13 @@ void TopMenu::build()
 
     // add edit actions
 
-    actUndo_      = edit_->addAction("Undo");
-    actRedo_      = edit_->addAction("Redo");
-    actCut_       = edit_->addAction("Cut");
-    actCopy_      = edit_->addAction("Copy");
-    actPaste_     = edit_->addAction("Paste");
+    actUndo_ = edit_->addAction("Undo");
+    actRedo_ = edit_->addAction("Redo");
+    edit_->addSeparator();
+    actCut_   = edit_->addAction("Cut");
+    actCopy_  = edit_->addAction("Copy");
+    actPaste_ = edit_->addAction("Paste");
+    edit_->addSeparator();
     actSelectAll_ = edit_->addAction("Select All");
 
     connect(actUndo_, &QAction::triggered, mw_, &MainWindow::undoFromMenu);
@@ -69,6 +74,7 @@ void TopMenu::build()
     modifyMenu_       = ctrl_->addMenu("Modify Controller Setting");
     removeMenu_       = ctrl_->addMenu("Remove Controller");
     actRefreshList_   = ctrl_->addAction("Refresh List");
+    ctrl_->addSeparator();
     actCompareFile_   = ctrl_->addAction("Compare Files");
     actCompareFolder_ = ctrl_->addAction("Compare Folders");
     actBackup_        = ctrl_->addAction("Backup from Controller");

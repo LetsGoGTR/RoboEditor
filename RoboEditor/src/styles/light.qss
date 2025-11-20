@@ -198,4 +198,27 @@ QSpinBox::up-arrow, QSpinBox::down-arrow {
 #ComparePageRoot QPushButton:pressed {
     background-color: #d0d0d0;
 }
+/* LIGHT MODE */
+QSplitter::handle {
+    background: #d7ddeb;
+}
 
+QSplitter::handle:hover {
+    background: #c5cbdb;
+}
+
+QSplitter::handle:pressed {
+    background: #b2b9c9;
+}
+QSplitter::handle:pressed {
+    background: #b2b9c9;
+}
+QSplitter::handle:vertical {
+    border-left: 1px solid #ffffff;
+    border-right: 1px solid #b3b7c5;
+}
+
+QSplitter::handle:horizontal {
+    border-top: 1px solid #ffffff;
+    border-bottom: 1px solid #b3b7c5;
+}
