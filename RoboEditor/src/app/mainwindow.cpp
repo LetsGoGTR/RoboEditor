@@ -28,7 +28,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
     ensureCenter();  // 중앙 위젯 (파일 트리 + 에디터)
     ensureMenu();    // 상단 메뉴
     ensureLog();     // 로그 관리자
-    ensureNav();     // 좌측 네비게이션
+    //ensureNav();     // 좌측 네비게이션
 
     wire();
 
@@ -75,14 +75,17 @@ void MainWindow::ensureLog()
 }
 void MainWindow::wire()
 {
-    if (!nav_ || !center_) {
+    if (!center_) {
         qDebug() << "[wire] Some component is null!"
                  << "nav=" << nav_.get() << "center=" << center_.get();
         return;
     }
 
     // 상단 Nav UI 전환 연결
-    connect(nav_.get(), &NavDock::clickCompare, center_.get(), &CenterStack::showModifyWithCompare);
+    connect(nav_.get(),
+            &NavDock::clickCompare,
+            center_.get(),
+            &CenterStack::showModifyWithCompareFile);
 
     // Nav 기능 -> Pop-up
     connect(nav_.get(), &NavDock::clickApply, this, [this]() {
@@ -418,11 +421,11 @@ void MainWindow::setMaximize(bool enable)
 
 void MainWindow::compareFileFromMenu()
 {
-    center_->showModifyWithCompare();
+    center_->showModifyWithCompareFile();
 }
 void MainWindow::compareFolderFromMenu()
 {
-    center_->showModifyWithCompare();
+    center_->showModifyWithCompareFolders();
 }
 void MainWindow::backupFromMenu()
 {

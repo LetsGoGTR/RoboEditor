@@ -188,7 +188,8 @@ void ModifyPage::buildUi()
     auto outer = new QVBoxLayout(this);
     outer->setContentsMargins(0, 0, 0, 0);
 
-    mainSplit_  = new QSplitter(Qt::Horizontal, this);
+    mainSplit_ = new QSplitter(Qt::Horizontal, this);
+    mainSplit_->setHandleWidth(2);
     editorHost_ = new QWidget(mainSplit_);
     auto ev     = new QVBoxLayout(editorHost_);
     ev->setContentsMargins(0, 0, 0, 0);
@@ -202,7 +203,7 @@ void ModifyPage::buildUi()
     outer->addWidget(mainSplit_);
 }
 
-void ModifyPage::showCompare()
+void ModifyPage::showCompareFile()
 {
     // 케이스 1: 이미 ComparePage가 열려있으면 -> 즉시 재비교
     ComparePage *pane = comparePane_;
@@ -263,7 +264,7 @@ void ModifyPage::ensureCompare(const QString &targetPath)
 
     if (comparePane_) {
         // 이미 존재하면 경로만 업데이트하고 좌측 편집기도 갱신
-        comparePane_->setTargetPath(targetPath);
+        comparePane_->setRightFile(targetPath);
         comparePane_->setLeftEditor(leftEditor);
         comparePane_->show();
         return;
@@ -271,7 +272,7 @@ void ModifyPage::ensureCompare(const QString &targetPath)
 
     // 새로 생성
     comparePane_ = new ComparePage(this);
-    comparePane_->setTargetPath(targetPath);
+    comparePane_->setRightFile(targetPath);
     comparePane_->setLeftEditor(leftEditor);  // 좌측 편집기 설정
     mainSplit_->addWidget(comparePane_);
     mainSplit_->setStretchFactor(0, 1);
@@ -279,7 +280,7 @@ void ModifyPage::ensureCompare(const QString &targetPath)
 
     // ComparePage 시그널 연결
     connect(comparePane_, &ComparePage::closed, this, &ModifyPage::closeCompare);
-    connect(comparePane_, &ComparePage::targetPathChanged, this, [this](const QString &path) {
+    connect(comparePane_, &ComparePage::rightFileChanged, this, [this](const QString &path) {
         lastComparedPath_ = path;
     });
 
@@ -341,7 +342,7 @@ void ModifyPage::closeCompare()
 
         // ComparePage 시그널 연결 해제 (크래시 방지)
         disconnect(paneToDelete, &ComparePage::closed, this, &ModifyPage::closeCompare);
-        disconnect(paneToDelete, &ComparePage::targetPathChanged, this, nullptr);
+        disconnect(paneToDelete, &ComparePage::rightFileChanged, this, nullptr);
 
         // 경로는 보존 (lastComparedPath_에 이미 저장되어 있음)
         paneToDelete->hide();
@@ -450,7 +451,7 @@ void ModifyPage::showCompareFolders()
         comparePane_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
         mainSplit_->addWidget(comparePane_);
         mainSplit_->setStretchFactor(0, 1);
-        mainSplit_->setStretchFactor(1, 0);
+        mainSplit_->setStretchFactor(1, 1);
 
         connect(comparePane_, &ComparePage::closed, this, &ModifyPage::closeCompare);
     }
