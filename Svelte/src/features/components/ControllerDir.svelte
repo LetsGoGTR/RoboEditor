@@ -1,10 +1,8 @@
 <script lang="ts">
   import type { Controller, ControllerMeta, Workspace, WorkspaceMeta, FolderNode } from '@/types';
   import { _listDevices, _getDevice } from '@/apis/controller';
-  import { _getWorkspace } from '@/apis/workspace';
   import { fileTree } from '@/stores/fileTree';
   import { onMount } from 'svelte';
-  import { toWorkspaceFromApi } from '@/utils/workspaceApiTransport';
 
   let devices = $state<Controller[]>([]);               //디바이스 목록.
   let loadingDevices = $state(false);                   //디바이스 목록 로딩 중 여부
@@ -13,8 +11,6 @@
   let selectedDevice = $state<Controller | null>(null); //현재 선택된 디바이스.
   let loadingWorkspace = $state(false);                 //워크스페이스 로딩 중 여부.
   let workspaceError = $state<string | null>(null);     //워크스페이스 목록 조회 에러 메시지.
-  let workspaceList = $state<WorkspaceMeta[]>([]);      //워크스페이스 리스트
-  let selectedWorkspace = $state<WorkspaceMeta | null>(null);
 
   function wrapDeviceAsController(raw: any): Controller {
     const meta: ControllerMeta = {
@@ -66,10 +62,7 @@
   // 🔥 컨트롤러 클릭 → device-id로 workspace 가져와서 FolderNode로 만들기
   async function handleDeviceSelect(dev: Controller) {
     selectedDevice = dev;
-    selectedWorkspace = null;
-    workspaceList = [];
     workspaceError = null;
-    fileTree.set(null);
     loadingWorkspace = true;
 
     try {
@@ -81,57 +74,34 @@
         return;
       }
 
-      workspaceList = res.workspaces?.workspaces ?? [];
+      const wsList: WorkspaceMeta[] = res.workspaces?.workspaces ?? [];
+
+      dev.workspaces = wsList.map((ws) => ({
+        id: ws.uuid,
+        name: ws.name,
+        type: 'directory',
+        path: null,
+        children: [],
+        workspaceMeta: ws
+      }));
       
-      if (workspaceList.length === 0) {
-        workspaceError = '등록된 워크스페이스가 없습니다.';
-      }
+      const deviceNode: FolderNode = {
+        id: `device:${deviceId}`,
+        name: dev.controllerMeta.name ?? deviceId,
+        type: 'directory',
+        path: `${deviceId}`,
+        children: dev.workspaces
+      };
+
+      fileTree.set(deviceNode);    
     } catch (err) {
       console.error(err);
       workspaceError = '워크스페이스 조회 중 오류가 발생했습니다.';
-      workspaceList = [];
+      fileTree.set(null);
     } finally {
       loadingWorkspace = false;
     }
   }
-
-  async function handleWorkspaceSelect(wsMeta: WorkspaceMeta) {
-    if (!selectedDevice) {
-      workspaceError = '디바이스가 선택되어 있지 않습니다.';
-      return;
-    }
-
-    workspaceError = null;
-    loadingWorkspace = true;
-    selectedWorkspace = wsMeta;
-
-    try {
-      const deviceId = selectedDevice.controllerMeta.serialNumber;
-
-      // GET /api/v1/workspace/{deviceId}/{workspaceId}
-      const res: any = await _getWorkspace(deviceId, wsMeta.id);
-
-      if (!res.success) {
-        workspaceError = '워크스페이스 조회 실패';
-        return;
-      }
-
-      // toWorkspaceFromApi: res.data.metadata + res.data.tree → Workspace
-      const workspace: Workspace = toWorkspaceFromApi(res);
-
-      // 선택된 디바이스에 현재 워크스페이스(트리 포함) 저장
-      selectedDevice.workspaces = [workspace];
-
-      // 전역 트리 상태 갱신 → Workspace 탭 / 파일 트리에서 이걸 사용
-      fileTree.set(workspace);
-    } catch (err) {
-      console.error(err);
-      workspaceError = '워크스페이스 트리 조회 중 오류가 발생했습니다.';
-    } finally {
-      loadingWorkspace = false;
-    }
-  }
-
 </script>
 
 <div class="backup-browser">
@@ -147,40 +117,30 @@
     <ul class="controller-list" role="list">
       {#each devices as ctrl (ctrl.controllerMeta.serialNumber)}
         <li>
-          <details open={selectedDevice && selectedDevice.controllerMeta.serialNumber === ctrl.controllerMeta.serialNumber}>
+          <details
+            open={selectedDevice &&
+              selectedDevice.controllerMeta.serialNumber === ctrl.controllerMeta.serialNumber}
+          >
             <summary
               class="controller-btn"
-              on:click|preventDefault={() => handleDeviceSelect(ctrl)}
+              onclick={(event) => {
+                event.preventDefault();
+                handleDeviceSelect(ctrl);
+              }}
             >
               <span class="icon">⚙️</span>
-              {ctrl.controllerMeta.name ?? ctrl.controllerMeta.serialNumber}
+              {ctrl.controllerMeta.name ?? ''}
+              {` (${ctrl.controllerMeta.serialNumber})`}
             </summary>
 
-            {#if selectedDevice && selectedDevice.controllerMeta.serialNumber === ctrl.controllerMeta.serialNumber}
-              {#if loadingWorkspace}
-                <p class="notice">워크스페이스 불러오는 중...</p>
-              {:else}
-                {#if workspaceError}
-                  <p class="notice">{workspaceError}</p>
-                {/if}
-
-                {#if workspaceList.length > 0}
-                  <ul class="workspace-list">
-                    {#each workspaceList as ws}
-                      <li>
-                        <button
-                          class="workspace-btn"
-                          class:selected={selectedWorkspace && selectedWorkspace.id === ws.id}
-                          on:click={() => handleWorkspaceSelect(ws)}
-                        >
-                          <span class="icon">📁</span>
-                          {ws.name}
-                        </button>
-                      </li>
-                    {/each}
-                  </ul>
-                {/if}
-              {/if}
+            {#if loadingWorkspace &&
+              selectedDevice &&
+              selectedDevice.controllerMeta.serialNumber === ctrl.controllerMeta.serialNumber}
+              <p class="notice">워크스페이스 정보 불러오는 중...</p>
+            {:else if workspaceError &&
+              selectedDevice &&
+              selectedDevice.controllerMeta.serialNumber === ctrl.controllerMeta.serialNumber}
+              <p class="notice">{workspaceError}</p>
             {/if}
           </details>
         </li>
@@ -219,8 +179,7 @@
     content: "";
   }
 
-  .controller-btn,
-  .workspace-btn {
+  .controller-btn {
     display: flex;
     align-items: center;
     gap: 0.4rem;
@@ -234,8 +193,7 @@
     font-size: 1rem;
   }
 
-  .controller-btn:hover,
-  .workspace-btn:hover {
+  .controller-btn:hover {
     background: #eef4ff;
   }
 

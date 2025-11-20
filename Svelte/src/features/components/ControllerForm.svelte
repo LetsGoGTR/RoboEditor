@@ -145,7 +145,7 @@
       type="text"
       class="path-input"
       readonly
-      value={selectedFolder ? selectedFolder.path : ""}
+      value={selectedFolder ? selectedFolder.path : '/'}
     />
   </div>
 

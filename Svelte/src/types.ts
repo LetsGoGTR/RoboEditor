@@ -65,7 +65,7 @@ export type TreeNode = FolderNode | FileNode;
  * ============================================================ */
 
 export interface WorkspaceMeta {
-	id: string;
+	uuid: string;
 	name: string;
 	target?: string | null;
 	description?: string | null;

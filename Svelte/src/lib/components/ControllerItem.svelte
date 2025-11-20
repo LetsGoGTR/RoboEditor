@@ -9,7 +9,7 @@
 
 <div class="controller-item {selected ? 'selected' : ''}">
   <div class="header">
-    <span class="serial">{controller.controllerMeta.serialNumber}</span>
+    <span class="serial">{controller.controllerMeta.name} ({controller.controllerMeta.serialNumber})</span>
     <span class="state {controller.controllerMeta.state.toLowerCase()}">{controller.controllerMeta.state}</span>
   </div>
   <div class="info">
