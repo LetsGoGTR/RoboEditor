@@ -54,7 +54,7 @@ void selectcontroller::setupUI()
     header->setSectionResizeMode(0, QHeaderView::Stretch);
     header->setSectionResizeMode(1, QHeaderView::Stretch);
     header->setSectionResizeMode(2, QHeaderView::Fixed);
-    header->resizeSection(2, 40);
+    header->resizeSection(2, 50);
 
     QVBoxLayout *lay = new QVBoxLayout();
     lay->addWidget(table);

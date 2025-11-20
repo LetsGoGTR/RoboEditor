@@ -39,6 +39,7 @@ class ControllerManager : public QObject
         void registerController();
         void removeController(int index);
         void removeController(const ControllerInfo *curCon);
+        void removeControllerBySN(const QString &SN);
         void updateInfo(const ControllerInfo &newInfo);
 
         // 상태 업데이트
@@ -99,6 +100,10 @@ class ControllerManager : public QObject
         // 상태 업데이트 (thread-safe)
         void updateRunningState(const QString &serialNumber, bool running);
         void updateConnectionState(const QString &serialNumber, bool connected);
+
+        bool validateConnection(const ControllerInfo &info);
+        bool validateApiConnection(const ControllerInfo &info);
+        bool validateSftpConnection(const ControllerInfo &info);
 
         static QPair<QString, quint16> parseHostPort(const QString &hostString,
                                                      quint16        defaultPort);
