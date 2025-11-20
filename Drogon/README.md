@@ -41,7 +41,7 @@ cd ../..
 # 프로젝트 클론 후 Drogon 서버 루트로 이동
 
 # Drogon submodule 초기화
-git submodule update --init Drogon/external/bcrypt Drogon/external/tree-sitter Drogon/external/tree-sitter-python
+git submodule update --init Drogon/
 
 # 빌드
 mkdir build
