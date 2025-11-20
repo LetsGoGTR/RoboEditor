@@ -35,13 +35,19 @@ WantedBy=multi-user.target
     systemd가 자동으로 /var/log/workspace-controller 폴더를 생성하고 User에게 권한을 부여합니다.\
     로그 파일 위치: /var/log/workspace-controller/server.log
 
-### 3. 서비스 파일 이동
-서비스 파일을 systemd 폴더 내부로 이동시킵니다.
+### 3. 실행
 
-/etc/systemd/system/workspace-controller.service
+바이너리 파일에 실행 권한 부여 :
+```bash
+chmod +x workspace-controller
+```
 
-### 4. 서비스 파일 리로드 및 데몬 실행
+서비스 파일 이동 :
+```bash
+sudo cp workspace-controller.service /etc/systemd/system/
+```
 
+데몬 실행 :
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl enable workspace-controller.service
