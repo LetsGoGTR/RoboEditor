@@ -90,19 +90,26 @@ void CenterStack::showCompare()
     stack_->setCurrentIndex(idxC_);
 }
 
-void CenterStack::showModifyWithCompare()
+void CenterStack::showModifyWithCompareFile()
 {
     // ModifyPage의 Compare 기능 활성화
     if (modifyPage_) {
-        modifyPage_->showCompare();
+        modifyPage_->showCompareFile();
     }
 }
-
+void CenterStack::showModifyWithCompareFolders()
+{
+    // ModifyPage의 Compare 기능 활성화
+    if (modifyPage_) {
+        modifyPage_->showCompareFolders();
+    }
+}
 void CenterStack::setupUI()
 {
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
     splitter_               = new QSplitter(Qt::Horizontal, this);
-    treeTabWidget_          = new QTabWidget(splitter_);
+    splitter_->setHandleWidth(2);
+    treeTabWidget_ = new QTabWidget(splitter_);
 
     // ===== Controller Model (QStandardItemModel) =====
     controllerModel_ = new QStandardItemModel(this);

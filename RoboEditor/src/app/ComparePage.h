@@ -18,28 +18,35 @@ class ComparePage : public QWidget
         explicit ComparePage(QWidget *parent = nullptr);
         ~ComparePage();
 
-        void setTargetPath(const QString &path);
+        //Right 관련 함수
+        void        setRightFile(const QString &path);
+        QString     loadFileContent(const QString &path);
+        CodeEditor *createCompareTab(const QString &path, const QString &content);
+
         void setLeftEditor(CodeEditor * leftEditor);
         void clearHighlights();
 
-        void       performDiff(const QString &leftPath, const QString &rightPath);
-        void       performFolderDiff(const QString &leftPath, const QString &rightPath);
-        void       applyTheme(bool dark);
+        void performDiff(const QString &leftPath, const QString &rightPath);
+        void performFolderDiff(const QString &leftPath, const QString &rightPath);
+        void applyTheme(bool dark);
+        void showCompareEditor(bool show);
+        void setLeftFile();
 
       signals:
         void closed();
-        void targetPathChanged(const QString &newPath);
+        void rightFileChanged(const QString &newPath);
         void requestOpenFile(const QString &filePath);
         void uiCompareClicked(const QString &leftPath, const QString &rightPath);
         void themeChangeRequested(bool dark);
 
       public slots:
         void recalcDiff(const QString &leftText, const QString &leftPath = QString());
+        void triggerFileCompare();
+        void triggerFolderCompare();
 
       private slots:
         void onFolderFileClicked(const QString &path);
         void onDiffRowClicked(const DiffRow &row);  // 스크롤 동기화용 슬롯
-
       private:
         QWidget    *dock_{nullptr};
         QSplitter  *rightSplit_{nullptr};
@@ -48,13 +55,13 @@ class ComparePage : public QWidget
         // 로직 처리를 위해 포인터는 유지하되, UI 구성시에는 컨테이너 안에 넣습니다.
         DiffTablePanel *diffPanel_{nullptr};
 
+        QString     rightPath_;
         CodeEditor *rightText_{nullptr};
         CodeEditor *leftText_{nullptr};
 
         core::DiffHighlighter *leftDiffHighlighter_{nullptr};
         core::DiffHighlighter *rightDiffHighlighter_{nullptr};
 
-        QString     targetPath_;
         QString     cachedLeftPath_;
         QString     cachedLeftText_;
         QStringList tempFolders_;
@@ -62,9 +69,9 @@ class ComparePage : public QWidget
         QString lastLeftFolderPath_;
         QString lastRightFolderPath_;
 
-        bool isDarkMode_ = false;
-
-        QWidget *buildDock();
+        bool       isDarkMode_ = false;
+        QList<int> savedSizes_;
+        QWidget   *buildDock();
 
         // 버튼 + 패널을 포함한 우측 영역 전체를 생성하는 함수
         QWidget *buildRightPanel();
