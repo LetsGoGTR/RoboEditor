@@ -219,3 +219,24 @@ QSpinBox::up-arrow, QSpinBox::down-arrow {
 #ComparePageRoot QPushButton:hover {
     background-color: #505050;
 }
+QSplitter::handle {
+    background: #3c414d;   /* 기본 배경만 */
+}
+
+QSplitter::handle:hover {
+    background: #4a4f5c;
+}
+
+QSplitter::handle:pressed {
+    background: #565c6b;
+}
+
+QSplitter::handle:vertical {
+    border-left: 1px solid #51586a;
+    border-right: 1px solid #2c2f38;
+}
+
+QSplitter::handle:horizontal {
+    border-top: 1px solid #51586a;
+    border-bottom: 1px solid #2c2f38;
+}

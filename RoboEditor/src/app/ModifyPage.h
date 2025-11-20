@@ -151,7 +151,7 @@ class ModifyPage : public QWidget
         void onTextChanged();
 
       public slots:
-        void showCompare();  // Compare 버튼 진입: "닫힘→파일선택", "열림→재비교"
+        void showCompareFile();  // Compare 버튼 진입: "닫힘→파일선택", "열림→재비교"
         void showCompareFolders();  // 폴더 비교 버튼: 파일 유무에 따라 동작 분기
         void closeCompare();        // ComparePane의 [X] 클릭 시 호출
 
