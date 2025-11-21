@@ -66,7 +66,23 @@ void LogManager::buildDock()
 void LogManager::wire()
 {
     // 위치 액션 연결
+
     auto a = posGroup_->actions();
+
+    if (a.size() < 5) {
+        qCritical() << "[LogManager::wire] posGroup has insufficient actions:" << a.size()
+                    << "expected at least 5";
+        return;
+    }
+
+    // null 체크
+    for (int i = 0; i < 5; ++i) {
+        if (!a[i]) {
+            qCritical() << "[LogManager::wire] Action" << i << "is null!";
+            return;
+        }
+    }
+
     connect(a[0], &QAction::triggered, this, &LogManager::placeBottom);
     connect(a[1], &QAction::triggered, this, &LogManager::placeRight);
     connect(a[2], &QAction::triggered, this, &LogManager::placeLeft);

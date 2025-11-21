@@ -41,6 +41,14 @@ void TopMenu::build()
     file_->addSeparator();
     actExit_ = file_->addAction("Exit");
 
+    actNewFile_->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_N));
+    actOpenFile_->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_O));
+    actSaveFile_->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_S));
+    actSaveAll_->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_S));
+    actCloseFile_->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_W));
+    actCloseAll_->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_W));
+    actExit_->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_Q));
+
     connect(actNewFile_, &QAction::triggered, mw_, &MainWindow::createNewDocument);
     connect(actOpenFile_, &QAction::triggered, mw_, &MainWindow::openFileFromMenu);
     connect(actSaveFile_, &QAction::triggered, mw_, &MainWindow::saveFileFromMenu);
@@ -60,6 +68,13 @@ void TopMenu::build()
     actPaste_ = edit_->addAction("Paste");
     edit_->addSeparator();
     actSelectAll_ = edit_->addAction("Select All");
+
+    actUndo_->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_Z));
+    actRedo_->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_Y));
+    actCut_->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_X));
+    actCopy_->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_C));
+    actPaste_->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_V));
+    actSelectAll_->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_A));
 
     connect(actUndo_, &QAction::triggered, mw_, &MainWindow::undoFromMenu);
     connect(actRedo_, &QAction::triggered, mw_, &MainWindow::redoFromMenu);
@@ -165,6 +180,7 @@ void TopMenu::build()
     //sett_->addAction(themeToggle_);
 
     // add help actions
+    qDebug() << "insert done";
 }
 
 void TopMenu::onChangePasswordTriggered()
