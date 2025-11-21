@@ -74,19 +74,21 @@ void MainWindow::wire()
 
     modifyPage  = center_->getModifyPage();
     comparePage = center_->getComparePage();
-    shortcutMgr = new ShortcutManager(this);
-    shortcutMgr->registerTo(this);
 
-    connect(shortcutMgr, &ShortcutManager::openRequested, modifyPage, &ModifyPage::openFile);
-    connect(shortcutMgr, &ShortcutManager::saveRequested, modifyPage, &ModifyPage::saveFile);
-    connect(shortcutMgr, &ShortcutManager::saveAsRequested, this, [this]() {
-        modifyPage->saveAsFile();
-    });
-    connect(shortcutMgr,
-            &ShortcutManager::closeRequested,
-            modifyPage,
-            &ModifyPage::closeCurrentTab);
-    connect(shortcutMgr, &ShortcutManager::quitRequested, this, []() { QApplication::quit(); });
+    //ShortCutManager -> Qt의 setShortcut 사용
+    //shortcutMgr = new ShortcutManager(this);
+    //shortcutMgr->registerTo(this);
+
+    // connect(shortcutMgr, &ShortcutManager::openRequested, modifyPage, &ModifyPage::openFile);
+    // connect(shortcutMgr, &ShortcutManager::saveRequested, modifyPage, &ModifyPage::saveFile);
+    // connect(shortcutMgr, &ShortcutManager::saveAsRequested, this, [this]() {
+    //     modifyPage->saveAsFile();
+    // });
+    // connect(shortcutMgr,
+    //         &ShortcutManager::closeRequested,
+    //         modifyPage,
+    //         &ModifyPage::closeCurrentTab);
+    // connect(shortcutMgr, &ShortcutManager::quitRequested, this, []() { QApplication::quit(); });
 
     connect(center_.get(),
             &CenterStack::compareRequested,

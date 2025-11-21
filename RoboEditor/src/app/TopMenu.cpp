@@ -110,6 +110,12 @@ void TopMenu::build()
     connect(actBackup_, &QAction::triggered, mw_, &MainWindow::backupFromMenu);
     connect(actApply_, &QAction::triggered, mw_, &MainWindow::applyFromMenu);
 
+    actRefreshList_->setShortcut(QKeySequence(Qt::Key_F5));
+    actBackup_->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_B));
+    actAddController_->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_N));
+    actCompareFile_->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_D));
+    actCompareFolder_->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_D));
+
     // add view actions
     showLogMenu_ = view_->addMenu("Show Log");
 
