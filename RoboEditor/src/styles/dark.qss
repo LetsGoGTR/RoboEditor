@@ -19,6 +19,11 @@ QMenuBar::item {
     background: transparent;
     padding: 4px 12px;
 }
+QMenu::separator {
+    height: 1px;             
+    margin: 4px 12px;        
+    background-color: #cccccc; 
+}
 QMenuBar::item:selected {
     background-color: #3c3c3c;
     border-radius: 4px;

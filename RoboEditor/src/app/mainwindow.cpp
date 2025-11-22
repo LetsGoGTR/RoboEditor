@@ -60,9 +60,20 @@ void MainWindow::ensureLog()
 {
     if (!menu_)
         return;
+
     // 싱글톤 방식으로 초기화
     LogManager::initialize(
             this, menu_->logVisibleAction(), menu_->logPosGroup(), menu_->showLogParentAction());
+
+    // LogManager의 Dock을 숨기기 (CenterStack에서 표시하므로)
+    if (LogManager::instance() && LogManager::instance()->dock()) {
+        LogManager::instance()->dock()->hide();
+    }
+
+    // CenterStack과 연결
+    if (center_) {
+        center_->connectLogManager();
+    }
 }
 void MainWindow::wire()
 {

@@ -192,10 +192,11 @@ void LogManager::openLogFile()
     if (!dir.exists())
         dir.mkpath(".");
 
-    QString date     = QDate::currentDate().toString("yyyy-MM-dd");
-    QString fileName = QString("RoboEditor_%1_Log.txt").arg(date);
+    QString date = QDate::currentDate().toString("yyyy-MM-dd");
+    logFileName_ = QString("RoboEditor_%1_Log.txt").arg(date);
 
-    QString path = dir.filePath(fileName);
+    QString path = dir.filePath(logFileName_);
+    logFilePath_ = path;
 
     file_ = new QFile(path, this);
 
@@ -252,6 +253,7 @@ void LogManager::append(const QString &line)
         instance_->stream_->flush();
     }
 }
+
 void LogManager::destroy()
 {
     if (instance_) {
