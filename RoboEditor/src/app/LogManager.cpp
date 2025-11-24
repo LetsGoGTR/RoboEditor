@@ -66,7 +66,23 @@ void LogManager::buildDock()
 void LogManager::wire()
 {
     // 위치 액션 연결
+
     auto a = posGroup_->actions();
+
+    if (a.size() < 5) {
+        qCritical() << "[LogManager::wire] posGroup has insufficient actions:" << a.size()
+                    << "expected at least 5";
+        return;
+    }
+
+    // null 체크
+    for (int i = 0; i < 5; ++i) {
+        if (!a[i]) {
+            qCritical() << "[LogManager::wire] Action" << i << "is null!";
+            return;
+        }
+    }
+
     connect(a[0], &QAction::triggered, this, &LogManager::placeBottom);
     connect(a[1], &QAction::triggered, this, &LogManager::placeRight);
     connect(a[2], &QAction::triggered, this, &LogManager::placeLeft);
@@ -176,10 +192,11 @@ void LogManager::openLogFile()
     if (!dir.exists())
         dir.mkpath(".");
 
-    QString date     = QDate::currentDate().toString("yyyy-MM-dd");
-    QString fileName = QString("RoboEditor_%1_Log.txt").arg(date);
+    QString date = QDate::currentDate().toString("yyyy-MM-dd");
+    logFileName_ = QString("RoboEditor_%1_Log.txt").arg(date);
 
-    QString path = dir.filePath(fileName);
+    QString path = dir.filePath(logFileName_);
+    logFilePath_ = path;
 
     file_ = new QFile(path, this);
 
@@ -236,6 +253,7 @@ void LogManager::append(const QString &line)
         instance_->stream_->flush();
     }
 }
+
 void LogManager::destroy()
 {
     if (instance_) {
