@@ -39,13 +39,21 @@ class LogManager : public QObject
         }
 
         // public API
-        void placeBottom();
-        void placeRight();
-        void placeLeft();
-        void placeTop();
-        void placeFloat();
-        void setVisible(bool on);
-        void placeLogAsDock(Qt::DockWidgetArea area, bool floating = false);
+        void    placeBottom();
+        void    placeRight();
+        void    placeLeft();
+        void    placeTop();
+        void    placeFloat();
+        void    setVisible(bool on);
+        void    placeLogAsDock(Qt::DockWidgetArea area, bool floating = false);
+        QString getLogFileName() const
+        {
+            return logFileName_;
+        }
+        QString getLogFilePath() const
+        {
+            return logFilePath_;
+        }
 
       private:
         QMainWindow    *mw_;
@@ -54,10 +62,11 @@ class LogManager : public QObject
         QAction        *actVisible_   = nullptr;
         QActionGroup   *posGroup_     = nullptr;
         QAction        *parentAction_ = nullptr;
-
-        void buildDock();
-        void wire();
-        void syncChecks();  // 부모/자식 Visible 체크 동기화
+        QString         logFileName_;
+        QString         logFilePath_;
+        void            buildDock();
+        void            wire();
+        void            syncChecks();  // 부모/자식 Visible 체크 동기화
 
         QFile       *file_   = nullptr;
         QTextStream *stream_ = nullptr;

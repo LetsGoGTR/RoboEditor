@@ -6,7 +6,9 @@
 #include <QTreeView>
 
 #include <QFileSystemModel>
+#include <QLabel>
 #include <QListView>
+#include <QPlainTextEdit>
 #include <QSplitter>
 #include <QStackedWidget>
 #include <QStandardItemModel>
@@ -35,6 +37,7 @@ class CenterStack : public QWidget
         void openCompareResult(const QString &left, const QString &right);
         void startPolling(int intervalMs = 5000);
         void stopPolling();
+        void connectLogManager();
         // 페이지 접근자
         ModifyPage *modifyPage() const
         {
@@ -88,11 +91,14 @@ class CenterStack : public QWidget
         // 두 번째 구조 (Controller/Workspace 트리용)
         QStackedWidget *internalStack_;
         QSplitter      *splitter_;
+        QSplitter      *rightSplitter_;
         QTabWidget     *treeTabWidget_;
         QTreeView      *backupTree_;
         QListView      *controllerList_;
         QTreeView      *workspaceTree_;
         QWidget        *controllerWidget_;
+        QPlainTextEdit *logView_;
+        QLabel         *logTitle_;
 
         // 모델
         QStandardItemModel *controllerModel_;

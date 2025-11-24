@@ -50,6 +50,8 @@ CenterStack::CenterStack(QWidget *parent) :
     workspaceModel_(nullptr),
     modifyPage_(nullptr)
 {
+    this->setObjectName("CenterStackRoot");
+
     stack_ = new QStackedWidget;
     cmp_   = new ComparePage;
 
@@ -124,18 +126,30 @@ void CenterStack::setupUI()
     QHBoxLayout *topButtonLayout = new QHBoxLayout;
 
     QToolButton *backButton = new QToolButton;
-    backButton->setText("← Back");
+    backButton->setIcon(QIcon::fromTheme("go-previous"));
+    backButton->setText("←");
     backButton->setToolTip("Return to controller list");
     backButton->setVisible(false);
+    backButton->setAutoRaise(true);
 
     QToolButton *refreshButton = new QToolButton;
-    refreshButton->setText("⟳ Refresh");
+    refreshButton->setText("⟳");
+    refreshButton->setIcon(QIcon::fromTheme("view-refresh"));
     refreshButton->setToolTip("Reload controller list");
     refreshButton->setVisible(true);
+    refreshButton->setAutoRaise(true);
+
+    QToolButton *addButton = new QToolButton;
+    addButton->setText("+");
+    addButton->setIcon(QIcon::fromTheme("list-add"));
+    addButton->setToolTip("Add controller");
+    addButton->setVisible(true);
+    addButton->setAutoRaise(true);
 
     topButtonLayout->addWidget(backButton);
-    topButtonLayout->addWidget(refreshButton);
     topButtonLayout->addStretch();
+    topButtonLayout->addWidget(refreshButton);
+    topButtonLayout->addWidget(addButton);
 
     // (1) Controller List
     controllerList_ = new QListView;
@@ -204,14 +218,53 @@ void CenterStack::setupUI()
     treeTabWidget_->addTab(tab1, "Controller");
     treeTabWidget_->addTab(tab2, "Workspace");
 
+    rightSplitter_ = new QSplitter(Qt::Vertical, this);
+    rightSplitter_->setHandleWidth(0);
+
     // ===== ModifyPage =====
-    modifyPage_ = new ModifyPage(splitter_);
+
+    modifyPage_ = new ModifyPage(rightSplitter_);
+
+    QWidget     *logPanel       = new QWidget(rightSplitter_);
+    QVBoxLayout *logPanelLayout = new QVBoxLayout(logPanel);
+    logPanelLayout->setContentsMargins(0, 0, 0, 0);
+    logPanelLayout->setSpacing(0);
+
+    // ----- 상단 제목바 -----
+    QFrame *header = new QFrame;
+    header->setObjectName("LogHeader");
+    header->setFrameShape(QFrame::NoFrame);
+    QHBoxLayout *headerLayout = new QHBoxLayout(header);
+    headerLayout->setContentsMargins(8, 6, 8, 6);
+
+    logTitle_ = new QLabel("Log File");  // <-- 파일명 표시
+    logTitle_->setObjectName("LogTitle");
+
+    headerLayout->addWidget(logTitle_);
+    headerLayout->addStretch();
+
+    logView_ = new QPlainTextEdit();
+    logView_->setReadOnly(true);
+    logView_->setMaximumBlockCount(1000);
+    logView_->setObjectName("LogView");
+
+    logPanelLayout->addWidget(header);
+    logPanelLayout->addWidget(logView_);
+
+    rightSplitter_->addWidget(modifyPage_);
+    rightSplitter_->addWidget(logPanel);
+    rightSplitter_->setSizes({750, 250});
+    rightSplitter_->setStretchFactor(0, 75);
+    rightSplitter_->setStretchFactor(1, 25);
+
     splitter_->addWidget(treeTabWidget_);
-    splitter_->addWidget(modifyPage_);
-    splitter_->setStretchFactor(0, 2);
+    splitter_->addWidget(rightSplitter_);
+    splitter_->setStretchFactor(0, 3);
     splitter_->setStretchFactor(1, 15);
     mainLayout->addWidget(splitter_);
     setLayout(mainLayout);
+
+    connectLogManager();
 
     // ---------------------- 시그널 연결 ----------------------
 
@@ -245,6 +298,7 @@ void CenterStack::setupUI()
 
         backButton->setVisible(true);
         refreshButton->setVisible(false);
+        addButton->setVisible(false);
 
         qDebug() << "Switched to BackupTree for:" << controllerPath;
     });
@@ -254,6 +308,7 @@ void CenterStack::setupUI()
         internalStack_->setCurrentIndex(0);
         backButton->setVisible(false);
         refreshButton->setVisible(true);
+        addButton->setVisible(true);
         qDebug() << "Returned to controller list view";
     });
 
@@ -304,6 +359,13 @@ void CenterStack::setupUI()
         ControllerManager::instance()->updateControllersStates();
         this->updateControllerList();
         qDebug() << "[CenterStack] Controller list refreshed.";
+    });
+
+    // [7] Add버튼 클릭 -> 제어기 추가
+    connect(addButton, &QToolButton::clicked, this, [=]() {
+        ControllerManager::instance()->registerController();
+        this->updateControllerList();
+        qDebug() << "[CenterStack] Controller list Added.";
     });
 
     updateControllerList();
@@ -408,6 +470,39 @@ void CenterStack::onEditController(const QString &serialNumber)
             break;
         }
     }
+}
+
+void CenterStack::connectLogManager()
+{
+    qDebug() << "[connectLogManager] called";
+
+    auto mgr = LogManager::instance();
+    if (!mgr)
+        return;
+
+    // 텍스트 복사
+    if (mgr->view() && logView_) {
+        auto mainLog = mgr->view();
+
+        connect(mainLog, &QPlainTextEdit::textChanged, this, [this, mainLog]() {
+            if (logView_) {
+                logView_->setPlainText(mainLog->toPlainText());
+
+                QTextCursor cursor = logView_->textCursor();
+                cursor.movePosition(QTextCursor::End);
+                logView_->setTextCursor(cursor);
+            }
+        });
+    }
+
+    // 제목 설정
+    if (logTitle_) {
+        logTitle_->setText(mgr->getLogFileName());
+    }
+
+    QString path = mgr->getLogFilePath();
+    QString msg  = QString("Load Log File from %1").arg(path);
+    LogManager::append(msg);
 }
 
 // 제어기 삭제
