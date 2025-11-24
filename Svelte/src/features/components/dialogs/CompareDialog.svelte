@@ -1,18 +1,18 @@
 <script lang="ts">
   import DirTree from "@components/DirectoryTree.svelte";
-  import type { FolderNode, FileNode, TreeNode } from "@/types";
+  import type { FolderNode, FileNode, TreeNode, NodeType } from "@/types";
 
   // Props 정의
   let {
     open = $bindable(false),
     root,
-    mode = "file", // "file" | "folder"
+    mode = "file", // "file" | "directory"
     onConfirm,
     onCancel
   } = $props<{
     open: boolean;
     root: FolderNode | null;
-    mode: "file" | "folder";
+    mode: NodeType;
     onConfirm: (payload: {
       left: FileNode | FolderNode;
       right: FileNode | FolderNode;

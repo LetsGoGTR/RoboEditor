@@ -126,7 +126,26 @@ function createCurrentFileStore() {
 		},
 
 		/* --------------------------------------------------------
-		 * 4) 탭 닫기
+		 * 4) 수정 내용 임시(store) 저장 (실제 저장 X)
+		 * ------------------------------------------------------ */
+		setContentManual(content: string) {
+			update((s) => {
+				if (s.activeIndex === null || !s.active) return s;
+
+				const updated = s.group.map((v, i) =>
+					i === s.activeIndex ? { ...v, content, dirty: true } : v
+				);
+
+				return {
+					...s,
+					group: updated,
+					active: updated[s.activeIndex]
+				};
+			});
+		},
+
+		/* --------------------------------------------------------
+		 * 5) 탭 닫기
 		 * ------------------------------------------------------ */
 		closeTab(index: number) {
 			update((s) => {
@@ -148,7 +167,7 @@ function createCurrentFileStore() {
 		},
 
 		/* --------------------------------------------------------
-		 * 5) 파일 삭제에 의한 파일 닫기
+		 * 6) 파일 삭제에 의한 파일 닫기
 		 * ------------------------------------------------------ */
 		closeByFilePath(targetPath: string) {
 			update((s) => {
@@ -158,8 +177,7 @@ function createCurrentFileStore() {
 				if (idx === -1) return s;
 
 				const newGroup = s.group.filter((_, i) => i !== idx);
-				const newActiveIndex =
-					newGroup.length === 0 ? null : Math.min(idx, newGroup.length - 1);
+				const newActiveIndex = newGroup.length === 0 ? null : Math.min(idx, newGroup.length - 1);
 
 				return {
 					...s,
@@ -171,16 +189,14 @@ function createCurrentFileStore() {
 		},
 
 		/* --------------------------------------------------------
-		 * 6) 폴더 삭제에 의한 파일 닫기
+		 * 7) 폴더 삭제에 의한 파일 닫기
 		 * ------------------------------------------------------ */
 		closeByFolderPath(folderPath: string) {
 			update((s) => {
 				if (s.isDiffMode) return s;
 
 				// folderPath로 시작하는 모든 파일 제거
-				const newGroup = s.group.filter(
-					(view) => !view.file.path?.startsWith(folderPath)
-				);
+				const newGroup = s.group.filter((view) => !view.file.path?.startsWith(folderPath));
 
 				const newActiveIndex =
 					newGroup.length === 0 ? null : Math.min(s.activeIndex ?? 0, newGroup.length - 1);
@@ -195,7 +211,7 @@ function createCurrentFileStore() {
 		},
 
 		/* --------------------------------------------------------
-		 * 7) Diff 비교 모드 진입
+		 * 8) Diff 비교 모드 진입
 		 * ------------------------------------------------------ */
 		openDiff(left: FileNode, right: FileNode) {
 			const leftView: FileView = { file: left, content: null };
@@ -211,14 +227,14 @@ function createCurrentFileStore() {
 		},
 
 		/* --------------------------------------------------------
-		 * 8) Diff 모드 종료 → normal 모드로 복귀
+		 * 9) Diff 모드 종료 → normal 모드로 복귀
 		 * ------------------------------------------------------ */
 		exitDiff() {
 			set(initialState);
 		},
 
 		/* --------------------------------------------------------
-		 * 9) 전체 초기화
+		 * 10) 전체 초기화
 		 * ------------------------------------------------------ */
 		reset() {
 			set(initialState);

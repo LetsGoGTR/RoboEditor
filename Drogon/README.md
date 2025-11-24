@@ -85,6 +85,34 @@ make
 }
 ```
 
+#### 로그 설정 (환경별)
+
+서버는 Drogon 내장 로깅을 사용합니다. `config.json`의 `log` 섹션에서 환경에 맞게 설정하세요:
+
+**개발 환경 (stdout 출력)**
+```json
+"log": {
+    "log_path": "",
+    "log_level": "DEBUG"
+}
+```
+
+**프로덕션 환경 (파일 저장 + 로테이션)**
+```json
+"log": {
+    "log_path": "./logs/",
+    "logfile_base_name": "drogon",
+    "log_size_limit": 100000000,
+    "max_files": 10,
+    "log_level": "INFO"
+}
+```
+
+- `log_path`: 빈 문자열("") = stdout, 경로 지정 = 파일 저장
+- `log_level`: TRACE, DEBUG, INFO, WARN, ERROR, FATAL
+- `log_size_limit`: 로그 파일 최대 크기 (바이트)
+- `max_files`: 보관할 구 로그 파일 개수
+
 ## 5. 실행
 
 ```bash

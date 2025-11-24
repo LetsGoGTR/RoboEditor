@@ -4,6 +4,15 @@ import path from 'path';
 
 export default defineConfig({
 	plugins: [sveltekit()],
+	server: {
+		proxy: {
+			'/proxy': {
+				target: 'http://localhost:8889',
+				changeOrigin: true,
+				rewrite: (path) => path.replace(/^\/proxy/, '')
+			}
+		}
+	},
 	ssr: {
 		noExternal: ['monaco-editor'] // SSR 번들에서 monaco 제외
 	},

@@ -11,6 +11,7 @@ export const _diffFiles = async (filePathA: string, filePathB: string) => {
 };
 
 export const _diffWorkspaces = async (dirPathA: string, dirPathB: string) => {
+	console.log({ dirPathA, dirPathB });
 	const res = await fetch(`${DIFF_API_PATH}/workspaces`, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },

@@ -1,70 +1,65 @@
 <script lang="ts">
-	import {  fileTree, insertFolderNode } from '@/stores/fileTree';
+	import { fileTree } from '@/stores/fileTree';
 	import { gotoPage } from '@/stores/currentPage';
 	import { _createFolder } from '@apis/folder';
-	import { selectedDirectory } from '@/stores/selectedDirectory';
-	import { get } from 'svelte/store';
 	import { _createFile } from '@apis/file';
-	import { handleCreateFile, handleDeleteFile, handleDeleteFolder } from '@handlers/nodeActions';
+	import {
+		handleCreateFile,
+		handleCreateFolder,
+		handleDeleteFile,
+		handleDeleteFolder
+	} from '@handlers/nodeActions';
 	import type { TreeNode } from '@/types';
 	import NewFileDialog from './dialogs/NewFileDialog.svelte';
 	import DeleteDialog from './dialogs/DeleteDialog.svelte';
-	import { handleDiffFiles } from '@handlers/diff';
-	import CompareDialog from './dialogs/CompareDialog.svelte';
+	import { handleDiffFiles, handleDiffWorkspaces } from '@handlers/diff';
+	import CompareDialog from '@features/dialogs/CompareDialog.svelte';
+	import NewFolderDialog from './dialogs/NewFolderDialog.svelte';
 
 	let warningDialog: HTMLDialogElement;
 	let showNewFile = $state(false);
+	let showNewFolder = $state(false);
 	let showDelete = $state(false);
 	let showCompareFile = $state(false);
+	let showCompareFolder = $state(false);
 	let root = $derived(fileTree);
 
-	function handleApply() { gotoPage('apply'); }
-	function handleBackup() { gotoPage('backup'); }
-	function handleRegister() { gotoPage('register'); }
-	function handleNewFile() {
-    if (!root) return alert("워크스페이스가 없습니다.");
-    showNewFile = true;
-  }
+	function clickApply() {
+		gotoPage('apply');
+	}
+	function clickBackup() {
+		gotoPage('backup');
+	}
+	function clickRegister() {
+		gotoPage('register');
+	}
+	function clickNewFile() {
+		if (!root) return alert('워크스페이스가 없습니다.');
+		showNewFile = true;
+	}
 
-	function handleDelete() {
-    showDelete = true;
-  }
+	function clickNewFolder() {
+		if (!root) return alert('워크스페이스가 없습니다.');
+		showNewFolder = true;
+	}
+
+	function clickDelete() {
+		showDelete = true;
+	}
 
 	function confirmDelete(node: TreeNode) {
-    if (node.type === "file") handleDeleteFile(node);
-    else if (node.type === "directory") handleDeleteFolder(node);
-  }
+		if (node.type === 'file') handleDeleteFile(node);
+		else if (node.type === 'directory') handleDeleteFolder(node);
+	}
 
-	function handleCompareFiles() {
+	function clickCompareFiles() {
 		if (!root) return warningDialog.showModal();
 		showCompareFile = true;
 	}
 
-	// create a new folder
-	export async function handleNewFolder() {
-		const parent = get(selectedDirectory);
-		if (!parent) return alert('상위 폴더를 선택하세요.');
-
-		const name = prompt('새 폴더 이름:');
-		if (!name?.trim()) return;
-
-		const clean = name.trim();
-
-		// 경로 구성 시 trailing slash는 시스템 규칙에 맞게 유지
-		const newPath = `${parent.path}/${clean}/`;
-
-		// 1) 서버 폴더 생성
-		await _createFolder(newPath);
-
-		// 2) store 내부 트리 부분 갱신
-		if (!parent.path) return console.error('상위 폴더 경로 관련 오류가 발생하였습니다.');
-		insertFolderNode(parent.path, {
-			id: crypto.randomUUID(),
-			name: clean,
-			type: 'directory',
-			path: newPath,
-			children: []
-		});
+	function clickCompareFolders() {
+		if (!root) return warningDialog.showModal();
+		showCompareFolder = true;
 	}
 </script>
 
@@ -74,13 +69,10 @@
 		<li>
 			<span>파일</span>
 			<ul class="dropdown">
-				<li><button onclick={handleNewFile}>새 텍스트 파일</button></li>
-				<li><button onclick={handleNewFolder}>새 폴더</button></li>
+				<li><button onclick={clickNewFile}>새 텍스트 파일</button></li>
+				<li><button onclick={clickNewFolder}>새 폴더</button></li>
 				<li><hr /></li>
-				<li><button onclick={handleNewFolder}>파일 열기</button></li>
-				<li><button >백업 폴더 열기</button></li>
-				<li><hr /></li>
-				<li><button onclick={handleDelete}>파일 또는 폴더 삭제</button></li>
+				<li><button onclick={clickDelete}>파일 또는 폴더 삭제</button></li>
 				<li><hr /></li>
 				<li><button>저장</button></li>
 				<li><button>다른 이름으로 저장</button></li>
@@ -90,17 +82,17 @@
 		<li>
 			<span>도구</span>
 			<ul class="dropdown">
-				<li><button onclick={handleCompareFiles}>파일 비교</button></li>
-				<li><button>폴더 비교</button></li>
+				<li><button onclick={clickCompareFiles}>파일 비교</button></li>
+				<li><button onclick={clickCompareFolders}>폴더 비교</button></li>
 			</ul>
 		</li>
 		<!-- 제어기 탭 -->
 		<li>
 			<span>제어기</span>
 			<ul class="dropdown">
-				<li><button onclick={handleRegister}>제어기 등록</button></li>
-				<li><button onclick={handleBackup}>제어기로부터 백업</button></li>
-				<li><button onclick={handleApply}>제어기에 적용</button></li>
+				<li><button onclick={clickRegister}>제어기 등록</button></li>
+				<li><button onclick={clickBackup}>제어기로부터 백업</button></li>
+				<li><button onclick={clickApply}>제어기에 적용</button></li>
 			</ul>
 		</li>
 		<li><span>설정</span></li>
@@ -115,28 +107,46 @@
 </dialog>
 
 <NewFileDialog
-  bind:open={showNewFile}
-  root={$fileTree}
-  onConfirm={handleCreateFile}
-  onCancel={() => (showNewFile = false)}
+	bind:open={showNewFile}
+	root={$fileTree}
+	onConfirm={handleCreateFile}
+	onCancel={() => (showNewFile = false)}
+/>
+
+<NewFolderDialog
+	bind:open={showNewFolder}
+	root={$fileTree}
+	onConfirm={handleCreateFolder}
+	onCancel={() => (showNewFolder = false)}
 />
 
 <DeleteDialog
-  bind:open={showDelete}
-  root={$fileTree}
-  onConfirm={confirmDelete}
-  onCancel={() => (showDelete = false)}
+	bind:open={showDelete}
+	root={$fileTree}
+	onConfirm={confirmDelete}
+	onCancel={() => (showDelete = false)}
 />
 
 <CompareDialog
-  bind:open={showCompareFile}
-  root={$fileTree}
-  mode="file"
-  onConfirm={async ({ left, right }) => {
-    await handleDiffFiles(left, right);
-    gotoPage("compare");
-  }}
-  onCancel={() => (showCompareFile = false)}
+	bind:open={showCompareFile}
+	root={$fileTree}
+	mode="file"
+	onConfirm={async ({ left, right }) => {
+		await handleDiffFiles(left, right);
+		gotoPage('compare');
+	}}
+	onCancel={() => (showCompareFile = false)}
+/>
+
+<CompareDialog
+	bind:open={showCompareFolder}
+	root={$fileTree}
+	mode="directory"
+	onConfirm={async ({ left, right }) => {
+		await handleDiffWorkspaces(left, right);
+		gotoPage('compare');
+	}}
+	onCancel={() => (showCompareFolder = false)}
 />
 
 <style>

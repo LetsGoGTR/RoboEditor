@@ -3,8 +3,6 @@
 #include <drogon/HttpClient.h>
 #include <future>
 
-#include "../logging/Logger.h"
-
 namespace utils
 {
 
