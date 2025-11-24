@@ -16,36 +16,13 @@ class QActionGroup;
 class LogManager : public QObject
 {
     Q_OBJECT
+
       public:
-        explicit LogManager(QMainWindow * mw,
-                            QAction * actVisible,
-                            QActionGroup * posGroup,
-                            QAction * showLogParent);
-        ~LogManager();
-        static LogManager *instance_;
+        static void        initialize();  // 파라미터 제거
         static LogManager *instance();
-        static void        initialize(
-                QMainWindow * mw, QAction * vis, QActionGroup * grp, QAction * parent);
-        static void append(const QString &line);
-        static void destroy();
+        static void        destroy();
+        static void        append(const QString &line);
 
-        QPlainTextEdit *view() const
-        {
-            return log_;
-        }
-        QDockWidget *dock() const
-        {
-            return dock_;
-        }
-
-        // public API
-        void    placeBottom();
-        void    placeRight();
-        void    placeLeft();
-        void    placeTop();
-        void    placeFloat();
-        void    setVisible(bool on);
-        void    placeLogAsDock(Qt::DockWidgetArea area, bool floating = false);
         QString getLogFileName() const
         {
             return logFileName_;
@@ -55,24 +32,22 @@ class LogManager : public QObject
             return logFilePath_;
         }
 
-      private:
-        QMainWindow    *mw_;
-        QPlainTextEdit *log_          = nullptr;
-        QDockWidget    *dock_         = nullptr;
-        QAction        *actVisible_   = nullptr;
-        QActionGroup   *posGroup_     = nullptr;
-        QAction        *parentAction_ = nullptr;
-        QString         logFileName_;
-        QString         logFilePath_;
-        void            buildDock();
-        void            wire();
-        void            syncChecks();  // 부모/자식 Visible 체크 동기화
+      signals:
+        void logAppended(const QString &line);
 
+      private:
+        explicit LogManager(QObject *parent = nullptr);  // 변경
+        ~LogManager();
+
+        void openLogFile();
+        void closeLogFile();
+
+        static LogManager *instance_;
+        // 파일 관련만 유지
         QFile       *file_   = nullptr;
         QTextStream *stream_ = nullptr;
-        void         openLogFile();
-        void         closeLogFile();
-        void         connectSignals();
+        QString      logFileName_;
+        QString      logFilePath_;
 };
 
 #endif  // LOGMANAGER_H

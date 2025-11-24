@@ -25,12 +25,13 @@ MainWindow::~MainWindow()
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 {
     // 컴포넌트 초기화
-    ensureCenter();  // 중앙 위젯 (파일 트리 + 에디터)
+
     ensureMenu();    // 상단 메뉴
     ensureLog();     // 로그 관리자
-
+    ensureCenter();  // 중앙 위젯 (파일 트리 + 에디터)
     wire();
 
+    qDebug() << "mainwindow good";
     qApp->installEventFilter(this);
 
     applyStyleSheet();
@@ -50,10 +51,19 @@ void MainWindow::ensureMenu()
 
 void MainWindow::ensureCenter()
 {
+    qDebug() << "[ensureCenter] START";
+
     if (!center_) {
+        qDebug() << "[ensureCenter] Creating CenterStack...";
         center_ = std::make_unique<CenterStack>(this);
+        qDebug() << "[ensureCenter] CenterStack created!";
+
+        qDebug() << "[ensureCenter] Setting central widget...";
         setCentralWidget(center_.get());
+        qDebug() << "[ensureCenter] Central widget set!";
     }
+
+    qDebug() << "[ensureCenter] END";
 }
 
 void MainWindow::ensureLog()
@@ -61,19 +71,14 @@ void MainWindow::ensureLog()
     if (!menu_)
         return;
 
-    // 싱글톤 방식으로 초기화
-    LogManager::initialize(
-            this, menu_->logVisibleAction(), menu_->logPosGroup(), menu_->showLogParentAction());
+    LogManager::initialize();
 
-    // LogManager의 Dock을 숨기기 (CenterStack에서 표시하므로)
-    if (LogManager::instance() && LogManager::instance()->dock()) {
-        LogManager::instance()->dock()->hide();
-    }
+    // TopMenu 시그널 연결
+    connect(menu_.get(), &TopMenu::logToggled, this, &MainWindow::onLogToggled);
+    connect(menu_.get(), &TopMenu::logPositionChanged, this, &MainWindow::onLogPositionChanged);
 
-    // CenterStack과 연결
-    if (center_) {
-        center_->connectLogManager();
-    }
+    m_logVisible = true;
+    m_logIsPanel = true;
 }
 void MainWindow::wire()
 {
@@ -100,7 +105,7 @@ void MainWindow::wire()
     //         modifyPage,
     //         &ModifyPage::closeCurrentTab);
     // connect(shortcutMgr, &ShortcutManager::quitRequested, this, []() { QApplication::quit(); });
-
+    updateLogView();
     connect(center_.get(),
             &CenterStack::compareRequested,
             this,
@@ -418,6 +423,118 @@ void MainWindow::applyFromMenu()
 
     applyPopup_->show();
 }
+void MainWindow::updateLogView()
+{
+    // 1. 숨김
+    if (!m_logVisible) {
+        center_->hideLogPanel();  // ✅ CenterStack에 요청
+        if (m_logDock)
+            m_logDock->hide();
+        return;
+    }
+
+    // 2. Panel 모드
+    if (m_logIsPanel) {
+        // Dock 정리 (MainWindow가 직접 관리)
+        if (m_logDock) {
+            removeDockWidget(m_logDock);
+            m_logDock->deleteLater();
+            m_logDock = nullptr;
+        }
+
+        // Panel 표시 (CenterStack에 위임)
+        center_->showLogPanel();  // ✅ CenterStack에 요청
+        return;
+    }
+
+    // 3. Dock 모드
+    center_->hideLogPanel();  // ✅ CenterStack에 요청
+
+    if (!m_logDock) {
+        m_logDock = new QDockWidget(this);  // ✅ 타이틀 제거
+        m_logDock->setObjectName("LogDock");
+        m_logDock->setAllowedAreas(Qt::AllDockWidgetAreas);
+        m_logDock->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable |
+                               QDockWidget::DockWidgetClosable);
+
+        // ✅ 커스텀 헤더 생성
+        QFrame *header = new QFrame;
+        header->setObjectName("LogHeader");
+        header->setFrameShape(QFrame::NoFrame);
+        QHBoxLayout *headerLayout = new QHBoxLayout(header);
+        headerLayout->setContentsMargins(8, 6, 8, 6);
+
+        QLabel *titleLabel = new QLabel;
+        titleLabel->setObjectName("LogTitle");
+        titleLabel->setText(LogManager::instance()->getLogFileName());
+        headerLayout->addWidget(titleLabel);
+        headerLayout->addStretch();
+
+        // ✅ 헤더를 타이틀바로 설정
+        m_logDock->setTitleBarWidget(header);
+
+        // ✅ 로그 뷰만 content로
+        QPlainTextEdit *logView = new QPlainTextEdit;
+        logView->setReadOnly(true);
+        logView->setMaximumBlockCount(1000);
+        logView->setObjectName("LogView");
+
+        connect(LogManager::instance(),
+                &LogManager::logAppended,
+                logView,
+                [logView](const QString &text) {
+                    logView->appendPlainText(text);
+                    QTextCursor cursor = logView->textCursor();
+                    cursor.movePosition(QTextCursor::End);
+                    logView->setTextCursor(cursor);
+                });
+
+        m_logDock->setWidget(logView);  // ✅ logView만 설정
+    }
+
+    addDockWidget(m_logArea, m_logDock);
+    m_logDock->show();
+}
+void MainWindow::onLogToggled(bool visible)
+{
+    m_logVisible = visible;
+    updateLogView();
+
+    QString msg = visible ? "Log shown" : "Log hidden";
+    LogManager::append(msg);
+}
+
+void MainWindow::onLogPositionChanged(Qt::DockWidgetArea area, bool isPanel)
+{
+    m_logArea    = area;
+    m_logIsPanel = isPanel;
+    updateLogView();
+
+    QString pos;
+    if (isPanel) {
+        pos = "In Editor";
+    } else {
+        switch (area) {
+        case Qt::BottomDockWidgetArea:
+            pos = "Bottom Dock";
+            break;
+        case Qt::TopDockWidgetArea:
+            pos = "Top Dock";
+            break;
+        case Qt::LeftDockWidgetArea:
+            pos = "Left Dock";
+            break;
+        case Qt::RightDockWidgetArea:
+            pos = "Right Dock";
+            break;
+        default:
+            pos = "Floating Dock";
+            break;
+        }
+    }
+    LogManager::append(QString("Log position: %1").arg(pos));
+}
+
 void MainWindow::closeEvent(QCloseEvent *event)
 {
     QMainWindow::closeEvent(event);
