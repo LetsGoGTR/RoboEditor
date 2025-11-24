@@ -84,8 +84,10 @@ class TopMenu : public QObject
         QAction *actChangePswd_ = nullptr;
 
         // Help Actions
-        QAction *actDocumentation_ = nullptr;
-        QAction *actAbout_         = nullptr;
+        QAction *actUserGuide_  = nullptr;
+        QAction *actShortcuts_  = nullptr;
+        QAction *actSystemInfo_ = nullptr;
+        QAction *actAbout_      = nullptr;
 
         QAction      *themeToggle_ = nullptr;
         QActionGroup *posGroup_    = nullptr;

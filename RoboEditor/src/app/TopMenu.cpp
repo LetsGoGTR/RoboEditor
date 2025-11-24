@@ -167,7 +167,9 @@ void TopMenu::build()
     setScreenSize_ = view_->addMenu("Screen Size");
 
     actFullScreen_ = sS("Full Screen");
-    actMaximize_   = sS("MaxiMize");
+    actFullScreen_->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_F11));
+    actMaximize_ = sS("MaxiMize");
+    actMaximize_->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_F11));
 
     setScreenSize_->addAction(actFullScreen_);
     setScreenSize_->addAction(actMaximize_);
@@ -185,6 +187,21 @@ void TopMenu::build()
 
     connect(actChangePswd_, &QAction::triggered, this, &TopMenu::onChangePasswordTriggered);
     tools_->addAction(actChangePswd_);
+
+    // add help actions
+
+    actUserGuide_ = help_->addAction("User Guide");
+    actUserGuide_->setShortcut(QKeySequence(Qt::Key_F1));
+    actShortcuts_ = help_->addAction("Keyboard Shortcuts");
+    help_->addSeparator();
+    actSystemInfo_ = help_->addAction("System Information");
+    help_->addSeparator();
+    actAbout_ = help_->addAction("About RoboEditor");
+
+    connect(actUserGuide_, &QAction::triggered, mw_, &MainWindow::showUserGuideFromMenu);
+    connect(actShortcuts_, &QAction::triggered, mw_, &MainWindow::showShortcutsFromMenu);
+    connect(actSystemInfo_, &QAction::triggered, mw_, &MainWindow::showSystemInfoFromMenu);
+    connect(actAbout_, &QAction::triggered, mw_, &MainWindow::showAboutFromMenu);
 
     //themeToggle_ = new QAction("Toggle Dark/Light", this);
     //sett_->addAction(themeToggle_);

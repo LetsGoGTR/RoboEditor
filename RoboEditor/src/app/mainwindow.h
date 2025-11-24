@@ -64,6 +64,11 @@ class MainWindow : public QMainWindow
         void compareFileFromMenu();
         void compareFolderFromMenu();
 
+        void showUserGuideFromMenu();
+        void showShortcutsFromMenu();
+        void showSystemInfoFromMenu();
+        void showAboutFromMenu();
+
         void onLogToggled(bool visible);
         void onLogPositionChanged(Qt::DockWidgetArea area, bool isPanel);
 

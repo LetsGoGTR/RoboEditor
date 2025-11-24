@@ -2,12 +2,15 @@
 
 #include <QApplication>
 #include <QCloseEvent>
+#include <QDesktopServices>
 #include <QDir>
 #include <QFile>
 #include <QMessageBox>
 #include <QSettings>
 #include <QStatusBar>
 #include <QStyleHints>
+#include <QSysInfo>
+#include <QUrl>
 
 #include "ApplyPage.h"
 #include "CenterStack.h"
@@ -532,6 +535,101 @@ void MainWindow::onLogPositionChanged(Qt::DockWidgetArea area, bool isPanel)
     LogManager::append(QString("Log position: %1").arg(pos));
 }
 
+void MainWindow::showShortcutsFromMenu()
+{
+    QString shortcuts = "<h3>File Operations</h3>"
+                        "Ctrl+N - New File<br>"
+                        "Ctrl+O - Open File<br>"
+                        "Ctrl+S - Save File<br>"
+                        "Ctrl+Shift+S - Save All<br>"
+                        "Ctrl+W - Close File<br>"
+                        "Ctrl+Shift+W - Close All<br>"
+                        "Ctrl+Q - Exit<br>"
+                        "<br>"
+                        "<h3>Edit Operations</h3>"
+                        "Ctrl+Z - Undo<br>"
+                        "Ctrl+Y - Redo<br>"
+                        "Ctrl+X - Cut<br>"
+                        "Ctrl+C - Copy<br>"
+                        "Ctrl+V - Paste<br>"
+                        "Ctrl+A - Select All<br>"
+                        "<br>"
+                        "<h3>Controller Operations</h3>"
+                        "Ctrl+Shift+N - Add Controller<br>"
+                        "F5 - Refresh List<br>"
+                        "Ctrl+D - Compare Files<br>"
+                        "Ctrl+Shift+D - Compare Folders<br>"
+                        "Ctrl+B - Backup from Controller<br>"
+                        "<br>"
+                        "<h3>Help</h3>"
+                        "F1 - User Guide<br>";
+
+    QMessageBox msgBox(this);
+    msgBox.setWindowTitle("Keyboard Shortcuts");
+    msgBox.setTextFormat(Qt::RichText);
+    msgBox.setText(shortcuts);
+    msgBox.setIcon(QMessageBox::Information);
+    msgBox.exec();
+}
+
+void MainWindow::showSystemInfoFromMenu()
+{
+    QString info = QString("<b>RoboEditor System Information</b><br><br>"
+                           "<b>Version:</b> 1.0.0<br>"
+                           "<b>Qt Version:</b> %1<br>"
+                           "<b>Build Date:</b> %2<br>"
+                           "<b>Operating System:</b> %3<br>"
+                           "<b>Architecture:</b> %4")
+                           .arg(qVersion())
+                           .arg(__DATE__)
+                           .arg(QSysInfo::prettyProductName())
+                           .arg(QSysInfo::currentCpuArchitecture());
+
+    QMessageBox msgBox(this);
+    msgBox.setWindowTitle("System Information");
+    msgBox.setTextFormat(Qt::RichText);
+    msgBox.setText(info);
+    msgBox.setIcon(QMessageBox::Information);
+    msgBox.exec();
+}
+void MainWindow::showUserGuideFromMenu()
+{
+    QString info = QString("<b>RoboEditor System Information</b><br><br>"
+                           "<b>Version:</b> 1.0.0<br>"
+                           "<b>Qt Version:</b> %1<br>"
+                           "<b>Build Date:</b> %2<br>"
+                           "<b>Operating System:</b> %3<br>"
+                           "<b>Architecture:</b> %4")
+                           .arg(qVersion())
+                           .arg(__DATE__)
+                           .arg(QSysInfo::prettyProductName())
+                           .arg(QSysInfo::currentCpuArchitecture());
+
+    QMessageBox msgBox(this);
+    msgBox.setWindowTitle("System Information");
+    msgBox.setTextFormat(Qt::RichText);
+    msgBox.setText(info);
+    msgBox.setIcon(QMessageBox::Information);
+    msgBox.exec();
+}
+
+void MainWindow::showAboutFromMenu()
+{
+    QString aboutText = "<h2>RoboEditor</h2>"
+                        "<p><b>Version 1.0.0</b></p>"
+                        "<p>Robot Controller Management Tool</p>"
+                        "<p>Developed in collaboration with<br>"
+                        "Samsung Electronics Production Technology Research Institute</p>"
+                        "<br>"
+                        "<p>© 2025 환성</p>";
+
+    QMessageBox msgBox(this);
+    msgBox.setWindowTitle("About RoboEditor");
+    msgBox.setTextFormat(Qt::RichText);
+    msgBox.setText(aboutText);
+    msgBox.setIconPixmap(QPixmap(":/icons/app_icon.png").scaled(64, 64, Qt::KeepAspectRatio));
+    msgBox.exec();
+}
 void MainWindow::closeEvent(QCloseEvent *event)
 {
     QMainWindow::closeEvent(event);
