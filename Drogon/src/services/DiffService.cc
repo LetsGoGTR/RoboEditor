@@ -1,26 +1,31 @@
 #include "DiffService.h"
 
+#include "../utils/diff/DiffPython.h"
+#include "../utils/diff/DiffText.h"
+#include "../utils/diff/DiffYaml.h"
+#include "../utils/diff/DiffTree.h"
+#include <drogon/drogon.h>
+
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
 
-#include "../utils/diff/DiffPython.h"
-#include "../utils/diff/DiffText.h"
-#include "../utils/diff/DiffTree.h"
-#include "../utils/diff/DiffYaml.h"
-#include "../utils/logging/Logger.h"
 
 namespace fs = std::filesystem;
 
+
 const std::vector<std::string> services::DiffService::supportedFormats_ = {
         ".yaml", ".yml", ".srl", ".py", ".txt", ".log", ".cfg", ".conf", ".ini", ".md", ".json"};
+
 
 std::string services::DiffService::detectFileType(const std::string &fileName)
 {
     std::string ext = fs::path(fileName).extension().string();
 
+
     // Convert to lowercase for case-insensitive comparison
     std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+
 
     if (ext == ".yaml" || ext == ".yml") {
         return "yaml";
@@ -32,19 +37,22 @@ std::string services::DiffService::detectFileType(const std::string &fileName)
     }
 }
 
+
 bool services::DiffService::isSupportedFormat(const std::string &fileName)
 {
     std::string ext = fs::path(fileName).extension().string();
     std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
 
+
     return std::find(supportedFormats_.begin(), supportedFormats_.end(), ext) !=
            supportedFormats_.end();
 }
 
+
 services::ServiceResult services::DiffService::diffYaml(const std::string &contentA,
-                                                        const std::string &contentB,
-                                                        const std::string &nameA,
-                                                        const std::string &nameB)
+                                                     const std::string &contentB,
+                                                     const std::string &nameA,
+                                                     const std::string &nameB)
 {
     services::ServiceResult result;
     try {
@@ -54,15 +62,16 @@ services::ServiceResult services::DiffService::diffYaml(const std::string &conte
     } catch (const std::exception &e) {
         result.success      = false;
         result.errorMessage = "YAML diff error: " + std::string(e.what());
-        utils::logging::error("YAML diff failed: " + std::string(e.what()));
+        LOG_ERROR << "YAML diff failed: " << e.what();
     }
     return result;
 }
 
+
 services::ServiceResult services::DiffService::diffPython(const std::string &contentA,
-                                                          const std::string &contentB,
-                                                          const std::string &nameA,
-                                                          const std::string &nameB)
+                                                       const std::string &contentB,
+                                                       const std::string &nameA,
+                                                       const std::string &nameB)
 {
     services::ServiceResult result;
     try {
@@ -72,15 +81,16 @@ services::ServiceResult services::DiffService::diffPython(const std::string &con
     } catch (const std::exception &e) {
         result.success      = false;
         result.errorMessage = "Python diff error: " + std::string(e.what());
-        utils::logging::error("Python diff failed: " + std::string(e.what()));
+        LOG_ERROR << "Python diff failed: " << e.what();
     }
     return result;
 }
 
+
 services::ServiceResult services::DiffService::diffText(const std::string &contentA,
-                                                        const std::string &contentB,
-                                                        const std::string &nameA,
-                                                        const std::string &nameB)
+                                                     const std::string &contentB,
+                                                     const std::string &nameA,
+                                                     const std::string &nameB)
 {
     services::ServiceResult result;
     try {
@@ -90,18 +100,21 @@ services::ServiceResult services::DiffService::diffText(const std::string &conte
     } catch (const std::exception &e) {
         result.success      = false;
         result.errorMessage = "Text diff error: " + std::string(e.what());
-        utils::logging::error("Text diff failed: " + std::string(e.what()));
+        LOG_ERROR << "Text diff failed: " << e.what();
     }
     return result;
 }
 
-services::ServiceResult services::DiffService::diffTree(const std::string &dirA,
-                                                        const std::string &dirB)
+
+services::ServiceResult services::DiffService::diffTree(const std::string& dirA,
+                                                              const std::string& dirB)
 {
     services::ServiceResult result;
     result.success = false;
 
+
     fs::path rootA(dirA), rootB(dirB);
+
 
     try {
         if (!fs::exists(rootA) || !fs::is_directory(rootA)) {
@@ -112,44 +125,50 @@ services::ServiceResult services::DiffService::diffTree(const std::string &dirA,
             result.errorMessage = "dirB is not a directory: " + dirB;
             return result;
         }
-    } catch (const std::exception &e) {
+    } catch (const std::exception& e) {
         result.errorMessage = std::string("filesystem error: ") + e.what();
         return result;
     }
 
+
     Json::Value j;
     try {
         j = DiffTree::Run(rootA, rootB);
-    } catch (const std::exception &e) {
+    } catch (const std::exception& e) {
         result.errorMessage = std::string("treediff failed: ") + e.what();
         return result;
     }
+
 
     result.success = true;
     result.data    = std::move(j);
     return result;
 }
 
+
 services::ServiceResult services::DiffService::diff(const std::string &contentA,
-                                                    const std::string &contentB,
-                                                    const std::string &nameA,
-                                                    const std::string &nameB)
+                                                 const std::string &contentB,
+                                                 const std::string &nameA,
+                                                 const std::string &nameB)
 {
     services::ServiceResult result;
     result.success = false;
 
+
     // Validate content is not empty
     if (contentA.empty()) {
         result.errorMessage = "Content A is empty";
-        utils::logging::error(result.errorMessage);
+        LOG_ERROR << result.errorMessage;
         return result;
     }
 
+
     if (contentB.empty()) {
         result.errorMessage = "Content B is empty";
-        utils::logging::error(result.errorMessage);
+        LOG_ERROR << result.errorMessage;
         return result;
     }
+
 
     // Validate both files have same extension
     std::string extA = fs::path(nameA).extension().string();
@@ -157,25 +176,30 @@ services::ServiceResult services::DiffService::diff(const std::string &contentA,
     std::transform(extA.begin(), extA.end(), extA.begin(), ::tolower);
     std::transform(extB.begin(), extB.end(), extB.begin(), ::tolower);
 
+
     if (extA != extB) {
         result.errorMessage = "File extensions do not match: " + extA + " vs " + extB;
-        utils::logging::warn(result.errorMessage);
+        LOG_WARN << result.errorMessage;
         // Continue anyway, but warn the user
     }
+
 
     // Check if format is supported
     if (!isSupportedFormat(nameA)) {
         result.errorMessage = "Unsupported file format: " + extA;
-        utils::logging::error(result.errorMessage);
+        LOG_ERROR << result.errorMessage;
         return result;
     }
+
 
     // Detect file type and route to appropriate handler
     std::string fileType = detectFileType(nameA);
 
-    utils::logging::info("Diffing files with type: " + fileType);
-    utils::logging::info("File A: " + nameA);
-    utils::logging::info("File B: " + nameB);
+
+    LOG_INFO << "Diffing files with type: " << fileType;
+    LOG_INFO << "File A: " << nameA;
+    LOG_INFO << "File B: " << nameB;
+
 
     if (fileType == "yaml") {
         return diffYaml(contentA, contentB, nameA, nameB);
@@ -185,7 +209,7 @@ services::ServiceResult services::DiffService::diff(const std::string &contentA,
         return diffText(contentA, contentB, nameA, nameB);
     } else {
         result.errorMessage = "Unknown file type: " + fileType;
-        utils::logging::error(result.errorMessage);
+        LOG_ERROR << result.errorMessage;
         return result;
     }
 }
