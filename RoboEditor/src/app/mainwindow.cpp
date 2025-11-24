@@ -427,7 +427,7 @@ void MainWindow::updateLogView()
 {
     // 1. 숨김
     if (!m_logVisible) {
-        center_->hideLogPanel();  // ✅ CenterStack에 요청
+        center_->hideLogPanel();
         if (m_logDock)
             m_logDock->hide();
         return;
@@ -443,21 +443,20 @@ void MainWindow::updateLogView()
         }
 
         // Panel 표시 (CenterStack에 위임)
-        center_->showLogPanel();  // ✅ CenterStack에 요청
+        center_->showLogPanel();
         return;
     }
 
     // 3. Dock 모드
-    center_->hideLogPanel();  // ✅ CenterStack에 요청
+    center_->hideLogPanel();
 
     if (!m_logDock) {
-        m_logDock = new QDockWidget(this);  // ✅ 타이틀 제거
+        m_logDock = new QDockWidget(this);
         m_logDock->setObjectName("LogDock");
         m_logDock->setAllowedAreas(Qt::AllDockWidgetAreas);
         m_logDock->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable |
                                QDockWidget::DockWidgetClosable);
 
-        // ✅ 커스텀 헤더 생성
         QFrame *header = new QFrame;
         header->setObjectName("LogHeader");
         header->setFrameShape(QFrame::NoFrame);
@@ -470,10 +469,8 @@ void MainWindow::updateLogView()
         headerLayout->addWidget(titleLabel);
         headerLayout->addStretch();
 
-        // ✅ 헤더를 타이틀바로 설정
         m_logDock->setTitleBarWidget(header);
 
-        // ✅ 로그 뷰만 content로
         QPlainTextEdit *logView = new QPlainTextEdit;
         logView->setReadOnly(true);
         logView->setMaximumBlockCount(1000);
@@ -489,7 +486,7 @@ void MainWindow::updateLogView()
                     logView->setTextCursor(cursor);
                 });
 
-        m_logDock->setWidget(logView);  // ✅ logView만 설정
+        m_logDock->setWidget(logView);
     }
 
     addDockWidget(m_logArea, m_logDock);

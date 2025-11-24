@@ -176,18 +176,30 @@ void ControllerManager::updateInfo(const ControllerInfo &newInfo)
 {
     ControllerSetting dialog;
     dialog.setControllerInfo(newInfo);
-
     if (dialog.exec() == QDialog::Accepted) {
         ControllerInfo updated = dialog.getControllerInfo();
 
-        QString serialNumber;
+        // 먼저 연결 검증
+        if (!validateConnection(updated)) {
+            QString msg = QString("[%1] update failed: connection validation failed")
+                                  .arg(updated.serialNumber);
+            LogManager::append(msg);
 
+            QMessageBox::warning(&dialog,
+                                 "수정 실패",
+                                 "제어기와의 연결을 확인할 수 없습니다.\n"
+                                 "API 또는 SFTP 연결이 실패했습니다.\n"
+                                 "IP 주소, 포트, 계정 정보를 확인해주세요.");
+            return;  // 검증 실패
+        }
+
+        QString serialNumber;
         {
             QMutexLocker locker(&mutex_);
             for (auto &c : controllers_) {
                 if (c.serialNumber == newInfo.serialNumber) {
                     serialNumber = c.serialNumber;
-
+                    // 검증 성공
                     c.ip       = updated.ip;
                     c.username = updated.username;
                     c.sftpPort = updated.sftpPort;
@@ -196,17 +208,14 @@ void ControllerManager::updateInfo(const ControllerInfo &newInfo)
 
                     QString msg = QString("[%1] state has been updated").arg(c.serialNumber);
                     LogManager::append(msg);
-
                     break;
                 }
             }
         }
 
         saveToFile();
-
         cleanupApiClient(serialNumber);
         setupApiClient(serialNumber);
-
         emit controllerListChanged();
     }
 }
