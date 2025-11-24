@@ -22,7 +22,7 @@ export async function handleCreateFile(payload: { name: string; folder: FolderNo
 	const { name, folder } = payload;
 
 	const newPath = `${folder.path}/${name}`;
-	const resp = await _createFile(newPath, ' '); // 초기 content는 빈 문자열
+	const resp = await _createFile(newPath, ''); // 초기 content는 빈 문자열
 	if (!resp?.success) {
 		return alert('파일 생성 중 오류가 발생했습니다.');
 	}
@@ -130,16 +130,17 @@ export async function loadFile(
 	monacoInstance: typeof monaco,
 	editor: monaco.editor.IStandaloneCodeEditor | null,
 	file: FileNode
-) {
+): Promise<monaco.editor.IStandaloneCodeEditor | null> {
 	if (!monacoInstance || !file) return editor;
 
-	// ------------------------------------------------------------
-	// 1) store에 있는 content 우선 사용
-	// ------------------------------------------------------------
-	const state = currentFile.get(); // manual getter (store 내부에서 만들면 됨)
+	const uri = monacoInstance.Uri.file(file.path);
+	let model = monacoInstance.editor.getModel(uri);
+
+	const state = get(currentFile);
 	const view = state.group.find((v) => v.file.id === file.id);
 
-	let text = '';
+	let text: string;
+
 	if (view?.content !== null) {
 		text = view.content;
 	} else {
@@ -148,36 +149,22 @@ export async function loadFile(
 		currentFile.setContent(text);
 	}
 
-	// ------------------------------------------------------------
-	// 2) 동일 모델인지 검사 → 동일하면 아무 것도 하지 않음
-	// ------------------------------------------------------------
-	if (editor) {
-		const currentValue = editor.getValue();
-		const currentUri = editor.getModel()?.uri.path;
-
-		if (currentUri === file.path && currentValue === text) {
-			return editor; // 그대로 사용 → 루프 없음
+	if (!model) {
+		model = monacoInstance.editor.createModel(text, detectLanguage(file.name), uri);
+	} else {
+		if (model.getValue() !== text) {
+			model.setValue(text);
 		}
 	}
 
-	// ------------------------------------------------------------
-	// 3) 새 모델 생성
-	// ------------------------------------------------------------
-	const model = monacoInstance.editor.createModel(
-		text,
-		detectLanguage(file.name),
-		monacoInstance.Uri.parse(`file:///${file.path}`)
-	);
-
-	// ------------------------------------------------------------
-	// 4) Editor에 모델 설정
-	// ------------------------------------------------------------
 	if (editor) {
-		editor.setModel(model);
+		const current = editor.getModel();
+		if (!current || current.uri.toString() !== uri.toString()) {
+			editor.setModel(model);
+		}
 		return editor;
 	}
 
-	// Editor가 아직 없으면 EditorTab에서 initEditor()가 생성해야 함
 	return null;
 }
 
