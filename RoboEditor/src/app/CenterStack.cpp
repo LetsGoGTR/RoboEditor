@@ -126,18 +126,30 @@ void CenterStack::setupUI()
     QHBoxLayout *topButtonLayout = new QHBoxLayout;
 
     QToolButton *backButton = new QToolButton;
+    backButton->setIcon(QIcon::fromTheme("go-previous"));
     backButton->setText("←");
     backButton->setToolTip("Return to controller list");
     backButton->setVisible(false);
+    backButton->setAutoRaise(true);
 
     QToolButton *refreshButton = new QToolButton;
     refreshButton->setText("⟳");
+    refreshButton->setIcon(QIcon::fromTheme("view-refresh"));
     refreshButton->setToolTip("Reload controller list");
     refreshButton->setVisible(true);
+    refreshButton->setAutoRaise(true);
+
+    QToolButton *addButton = new QToolButton;
+    addButton->setText("+");
+    addButton->setIcon(QIcon::fromTheme("list-add"));
+    addButton->setToolTip("Add controller");
+    addButton->setVisible(true);
+    addButton->setAutoRaise(true);
 
     topButtonLayout->addWidget(backButton);
-    topButtonLayout->addWidget(refreshButton);
     topButtonLayout->addStretch();
+    topButtonLayout->addWidget(refreshButton);
+    topButtonLayout->addWidget(addButton);
 
     // (1) Controller List
     controllerList_ = new QListView;
@@ -286,6 +298,7 @@ void CenterStack::setupUI()
 
         backButton->setVisible(true);
         refreshButton->setVisible(false);
+        addButton->setVisible(false);
 
         qDebug() << "Switched to BackupTree for:" << controllerPath;
     });
@@ -295,6 +308,7 @@ void CenterStack::setupUI()
         internalStack_->setCurrentIndex(0);
         backButton->setVisible(false);
         refreshButton->setVisible(true);
+        addButton->setVisible(true);
         qDebug() << "Returned to controller list view";
     });
 
@@ -345,6 +359,13 @@ void CenterStack::setupUI()
         ControllerManager::instance()->updateControllersStates();
         this->updateControllerList();
         qDebug() << "[CenterStack] Controller list refreshed.";
+    });
+
+    // [7] Add버튼 클릭 -> 제어기 추가
+    connect(addButton, &QToolButton::clicked, this, [=]() {
+        ControllerManager::instance()->registerController();
+        this->updateControllerList();
+        qDebug() << "[CenterStack] Controller list Added.";
     });
 
     updateControllerList();
