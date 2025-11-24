@@ -16,7 +16,6 @@ namespace fs = std::filesystem;
 
 namespace services {
 
-// Directory traversal - 재귀적으로 archive에 추가
 static void addDirToArchive(archive* a, const std::string& path,
                             const std::string& prefix, int depth = 0) {
   // Recursion depth 제한
@@ -156,31 +155,51 @@ std::string WorkspaceService::extract(const std::string& user) {
 
   chmod(input.c_str(), S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
 
-  // Backup path 생성
-  auto now = std::chrono::system_clock::now();
-  auto timestamp = std::chrono::duration_cast<std::chrono::seconds>(
-                       now.time_since_epoch())
-                       .count();
-  std::string backup_path =
-      std::string(Config::PATH_BACKUP_BASE) + "_" + user + "_" +
-      std::to_string(timestamp);
-
-  // Workspace backup
+  // Workspace 존재 여부 확인 및 백업 처리
   bool backup_created = false;
+  std::string backup_path;
+
   if (fs::exists(workspace)) {
-    fs::rename(workspace, backup_path);
+    // Backup path 생성
+    auto now = std::chrono::system_clock::now();
+    auto timestamp =
+        std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch())
+            .count();
+    backup_path = std::string(Config::PATH_BACKUP_BASE) + "_" + user + "_" +
+                  std::to_string(timestamp);
+
+    // Workspace backup
+    std::error_code ec;
+    fs::rename(workspace, backup_path, ec);
+
+    if (ec) {
+      throw std::runtime_error("Failed to create backup: " + ec.message());
+    }
+
     backup_created = true;
+
+    // rename 성공 후에도 workspace가 남아있는 경우 제거
     if (fs::exists(workspace)) {
-      fs::remove_all(workspace);
+      fs::remove_all(workspace, ec);
+      if (ec) {
+        throw std::runtime_error("Failed to remove workspace after backup: " +
+                                 ec.message());
+      }
+    }
+
+    // 백업 검증
+    if (!fs::exists(backup_path)) {
+      throw std::runtime_error("Backup verification failed: backup not found");
     }
   }
 
   archive* a = archive_read_new();
   if (!a) {
     if (backup_created) {
-      fs::rename(backup_path, workspace);
+      std::error_code ec;
+      fs::rename(backup_path, workspace, ec);
     }
-    throw std::runtime_error("Failed to create reader");
+    throw std::runtime_error("Failed to create archive reader");
   }
 
   try {
@@ -189,53 +208,127 @@ std::string WorkspaceService::extract(const std::string& user) {
 
     if (archive_read_open_filename(a, input.c_str(),
                                    Config::ARCHIVE_BLOCK_SIZE) != ARCHIVE_OK) {
-      throw std::runtime_error(
-          "Failed to open archive: Check file permissions or file integrity");
+      throw std::runtime_error("Failed to open archive: " +
+                               std::string(archive_error_string(a)));
     }
 
     archive_entry* entry;
     size_t total_extracted = 0;
 
     // Entry 순회
-    while (archive_read_next_header(a, &entry) == ARCHIVE_OK) {
+    while (true) {
+      int r = archive_read_next_header(a, &entry);
+
+      if (r == ARCHIVE_EOF) {
+        break;
+      }
+
+      if (r == ARCHIVE_WARN) {
+        continue;
+      }
+
+      if (r != ARCHIVE_OK) {
+        throw std::runtime_error("Failed to read archive header: " +
+                                 std::string(archive_error_string(a)));
+      }
+
       const char* pathname = archive_entry_pathname(entry);
       if (!pathname) {
         continue;
       }
-      std::string path = base + "/" + pathname;
-      archive_entry_set_pathname(entry, path.c_str());
+
+      std::string pathname_str(pathname);
+
+      // Path Traversal 수동 검증
+      if (pathname_str[0] == '/' ||
+          pathname_str.find("../") != std::string::npos ||
+          pathname_str.find("..\\") != std::string::npos) {
+        throw std::runtime_error("Invalid path detected: " + pathname_str);
+      }
+
+      // 경로 길이 검증
+      std::string full_path = base + "/" + pathname;
+      if (full_path.length() > 4000) {
+        throw std::runtime_error("Path too long: " + pathname_str);
+      }
+
+      archive_entry_set_pathname(entry, full_path.c_str());
 
       archive* ext = archive_write_disk_new();
       if (!ext) {
         throw std::runtime_error("Failed to create disk writer");
       }
 
-      // Path Traversal 방어
       archive_write_disk_set_options(
-          ext, ARCHIVE_EXTRACT_TIME | ARCHIVE_EXTRACT_PERM |
-               ARCHIVE_EXTRACT_SECURE_NODOTDOT |
-               ARCHIVE_EXTRACT_SECURE_NOABSOLUTEPATHS);
+          ext,
+          // ARCHIVE_EXTRACT_TIME | // 원본 timestamp 복원
+          ARCHIVE_EXTRACT_PERM |               // 원본 권한 복원
+              ARCHIVE_EXTRACT_SECURE_NODOTDOT  // ../ 방지
 
-      if (archive_write_header(ext, entry) == ARCHIVE_OK) {
-        const void* buf;
-        size_t size;
-        int64_t offset;
+      );
 
-        while (archive_read_data_block(a, &buf, &size, &offset) == ARCHIVE_OK) {
-          // Zip Bomb 방어: extract size 제한
-          total_extracted += size;
-          if (total_extracted > Config::MAX_EXTRACT_SIZE) {
-            archive_write_close(ext);
-            archive_write_free(ext);
-            throw std::runtime_error("Extracted size exceeds limit");
-          }
+      // Header 쓰기
+      r = archive_write_header(ext, entry);
+      if (r != ARCHIVE_OK) {
+        std::string error_msg = "Failed to write header for " + pathname_str +
+                                ": " + std::string(archive_error_string(ext));
+        archive_write_close(ext);
+        archive_write_free(ext);
+        throw std::runtime_error(error_msg);
+      }
 
-          if (archive_write_data_block(ext, buf, size, offset) != ARCHIVE_OK) {
-            archive_write_close(ext);
-            archive_write_free(ext);
-            throw std::runtime_error("Failed to write data block");
-          }
+      // Data 쓰기
+      const void* buf;
+      size_t size;
+      int64_t offset;
+
+      while (true) {
+        r = archive_read_data_block(a, &buf, &size, &offset);
+
+        if (r == ARCHIVE_EOF) {
+          break;
         }
+
+        if (r == ARCHIVE_WARN) {
+          continue;
+        }
+
+        if (r != ARCHIVE_OK) {
+          std::string error_msg = "Failed to read data block for " +
+                                  pathname_str + ": " +
+                                  std::string(archive_error_string(a));
+          archive_write_close(ext);
+          archive_write_free(ext);
+          throw std::runtime_error(error_msg);
+        }
+
+        // Zip Bomb 방어: extract size 제한
+        total_extracted += size;
+        if (total_extracted > Config::MAX_EXTRACT_SIZE) {
+          archive_write_close(ext);
+          archive_write_free(ext);
+          throw std::runtime_error("Extracted size exceeds limit");
+        }
+
+        r = archive_write_data_block(ext, buf, size, offset);
+        if (r != ARCHIVE_OK) {
+          std::string error_msg = "Failed to write data block for " +
+                                  pathname_str + ": " +
+                                  std::string(archive_error_string(ext));
+          archive_write_close(ext);
+          archive_write_free(ext);
+          throw std::runtime_error(error_msg);
+        }
+      }
+
+      // Entry 완료 처리
+      r = archive_write_finish_entry(ext);
+      if (r != ARCHIVE_OK) {
+        std::string error_msg = "Failed to finish entry for " + pathname_str +
+                                ": " + std::string(archive_error_string(ext));
+        archive_write_close(ext);
+        archive_write_free(ext);
+        throw std::runtime_error(error_msg);
       }
 
       archive_write_close(ext);
@@ -250,31 +343,46 @@ std::string WorkspaceService::extract(const std::string& user) {
 
     // Workspace 검증
     if (!fs::exists(workspace) || !fs::is_directory(workspace)) {
-      if (backup_created) {
-        fs::rename(backup_path, workspace);
-        backup_created = false;
-      }
-      throw std::runtime_error("Workspace folder not created");
+      throw std::runtime_error("Workspace folder not created after extraction");
     }
 
-    // Backup 삭제
+    // 백업 삭제 (백업이 있을 경우)
     if (backup_created) {
-      fs::remove_all(backup_path);
+      std::error_code ec;
+      fs::remove_all(backup_path, ec);
+      if (ec) {
+        throw std::runtime_error(
+            "Extraction successful but failed to remove backup: " +
+            ec.message());
+      }
     }
 
     return "Extracted successfully";
-  } catch (...) {
+
+  } catch (const std::exception& e) {
     if (a) {
       archive_read_free(a);
     }
 
-    // Backup 복원
+    // 백업 복원 (백업이 있을 경우)
     if (backup_created) {
+      std::error_code ec;
+
+      // 불완전한 workspace 제거
       if (fs::exists(workspace)) {
-        fs::remove_all(workspace);
+        fs::remove_all(workspace, ec);
       }
-      fs::rename(backup_path, workspace);
-      throw std::runtime_error("Extraction failed. Restored from backup");
+
+      // 백업 복원
+      fs::rename(backup_path, workspace, ec);
+      if (ec) {
+        throw std::runtime_error(
+            std::string("Extraction failed: ") + e.what() +
+            ". Backup restore also failed: " + ec.message());
+      }
+
+      throw std::runtime_error(std::string("Extraction failed: ") + e.what() +
+                               ". Restored from backup");
     }
 
     throw;

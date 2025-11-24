@@ -39,6 +39,8 @@ int main(int argc, char* argv[]) {
   static plog::RollingFileAppender<plog::TxtFormatter> fileAppender(
       log_path.c_str(), 1024 * 1024, 3);
   plog::init(plog::info, &fileAppender);
+  // static plog::ColorConsoleAppender<plog::TxtFormatter> consoleAppender;
+  // plog::init(plog::info, &fileAppender).addAppender(&consoleAppender);
 
   try {
     // Port 설정
