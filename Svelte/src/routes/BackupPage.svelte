@@ -1,9 +1,10 @@
 <script lang="ts">
-  import ControllerList from '@features/ApplyControllerList.svelte';
-  import type { Controller, ControllerMeta } from '@/types';
+  import type { Controller } from '@/types';
   import { _listDevices } from '@/apis/controller';
   import { _ftBackup } from '@/apis/sftp';
   import { onMount } from 'svelte';
+  import { wrapDeviceAsController } from '@handlers/controller';
+  import  ControllerList  from '@features/ApplyControllerList.svelte';
 
   let selected = $state<string[]>([]);
   let showBackupOnly = $state(false);
@@ -14,27 +15,6 @@
 
   function handleSelectChange(ids: string[]) {
     selected = ids;
-  }
-
-  function wrapDeviceAsController(raw: any): Controller {
-    const meta: ControllerMeta = {
-      serialNumber: raw.serialNumber,
-      name: raw.name,
-      description: raw.description ?? null,
-      api: raw.api,
-      sftpHost: raw.sftpHost,
-      sftpPort: raw.sftpPort,
-      sftpUser: raw.sftpUser,
-      sftpPassword: raw.sftpPassword,
-      createdAt: raw.createdAt,
-      updatedAt: raw.updatedAt,
-      state: raw.state ?? 'idle'
-    };
-
-    return {
-      controllerMeta: meta,
-      workspaces: []
-    };
   }
 
   async function loadControllers() {
@@ -49,12 +29,7 @@
         return;
       }
 
-      const rawList = res.data?.devices ?? res.devices ?? [];
-      controllers = rawList.map(wrapDeviceAsController);
-    } catch (e) {
-      console.error(e);
-      error = '제어기 목록 조회 중 오류가 발생했습니다.';
-      controllers = [];
+      controllers = (res.data?.devices ?? []).map((raw: any) => wrapDeviceAsController(raw));
     } finally {
       loading = false;
     }
