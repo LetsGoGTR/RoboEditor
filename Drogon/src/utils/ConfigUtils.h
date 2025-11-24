@@ -4,8 +4,6 @@
 #include <json/json.h>
 #include <string>
 
-#include "logging/Logger.h"
-
 namespace utils
 {
     namespace config

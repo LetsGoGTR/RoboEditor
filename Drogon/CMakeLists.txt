@@ -100,7 +100,6 @@ aux_source_directory(src/models MODEL_SRC)
 aux_source_directory(src/services SERVICE_SRC)
 aux_source_directory(src/utils UTILS_SRC)
 aux_source_directory(src/utils/diff UTILS_DIFF_SRC)
-aux_source_directory(src/utils/logging UTILS_LOGGING_SRC)
 aux_source_directory(src/utils/robot UTILS_ROBOT_SRC)
 aux_source_directory(src/utils/sftp UTILS_SFTP_SRC)
 aux_source_directory(src/utils/device UTILS_DEVICE_SRC)
@@ -135,7 +134,6 @@ target_sources(${PROJECT_NAME}
                ${SERVICE_SRC}
                ${UTILS_SRC}
                ${UTILS_DIFF_SRC}
-               ${UTILS_LOGGING_SRC}
                ${UTILS_ROBOT_SRC}
                ${UTILS_SFTP_SRC}
                ${UTILS_DEVICE_SRC}

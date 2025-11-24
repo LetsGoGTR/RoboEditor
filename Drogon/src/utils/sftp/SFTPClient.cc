@@ -8,7 +8,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-#include "../logging/Logger.h"
+#include <drogon/drogon.h>
 
 SFTPClient::SFTPClient(const SFTPConfig &cfg) :
     config(cfg),
@@ -46,8 +46,8 @@ bool SFTPClient::createSocket()
     if (gai_err != 0) {
         lastError = "호스트명 해석 실패: " + config.host + " (" +
                     std::string(gai_strerror(gai_err)) + ")";
-        utils::logging::error("DNS 해석 실패: " + config.host + " - " +
-                              std::string(gai_strerror(gai_err)));
+        LOG_ERROR << "DNS 해석 실패: " << config.host << " - "
+                  << gai_strerror(gai_err);
         return false;
     }
 
@@ -71,13 +71,13 @@ bool SFTPClient::createSocket()
     if (rp == nullptr) {
         lastError = "SSH 서버 연결 실패 (호스트: " + config.host +
                     ", 포트: " + std::to_string(config.port) + ")";
-        utils::logging::error("SFTP 서버 연결 실패: " + config.host + ":" +
-                              std::to_string(config.port));
+        LOG_ERROR << "SFTP 서버 연결 실패: " << config.host << ":"
+                  << config.port;
         socket = -1;
         return false;
     }
 
-    utils::logging::info("소켓 연결 성공: " + config.host + ":" + std::to_string(config.port));
+    LOG_INFO << "소켓 연결 성공: " << config.host << ":" << config.port;
     return true;
 }
 
@@ -86,7 +86,7 @@ bool SFTPClient::authenticatePassword()
     clearError();
     if (libssh2_userauth_password(session, config.user.c_str(), config.password.c_str()) != 0) {
         lastError = "인증 실패 (사용자명: " + config.user + ")";
-        utils::logging::error("SFTP 인증 실패: " + config.user);
+        LOG_ERROR << "SFTP 인증 실패: " << config.user;
         return false;
     }
     return true;
@@ -98,7 +98,7 @@ bool SFTPClient::initSFTP()
     sftpSession = libssh2_sftp_init(session);
     if (!sftpSession) {
         lastError = "SFTP 세션 초기화 실패";
-        utils::logging::error("SFTP 세션 초기화 실패");
+        LOG_ERROR << "SFTP 세션 초기화 실패";
         return false;
     }
     return true;
@@ -117,7 +117,7 @@ bool SFTPClient::connectSSHOnly()
     session = libssh2_session_init();
     if (!session) {
         lastError = "SSH 세션 초기화 실패";
-        utils::logging::error("SSH 세션 초기화 실패");
+        LOG_ERROR << "SSH 세션 초기화 실패";
         ::close(socket);
         socket = -1;
         return false;
@@ -126,7 +126,7 @@ bool SFTPClient::connectSSHOnly()
     // 3. SSH 핸드셰이크
     if (libssh2_session_handshake(session, socket) != 0) {
         lastError = "SSH 핸드셰이크 실패";
-        utils::logging::error("SSH 핸드셰이크 실패");
+        LOG_ERROR << "SSH 핸드셰이크 실패";
         libssh2_session_free(session);
         ::close(socket);
         session = nullptr;
@@ -143,7 +143,7 @@ bool SFTPClient::connectSSHOnly()
         return false;
     }
 
-    utils::logging::info("SSH 연결 성공: " + config.host + ":" + std::to_string(config.port));
+    LOG_INFO << "SSH 연결 성공: " << config.host << ":" << config.port;
     return true;
 }
 
@@ -163,7 +163,7 @@ bool SFTPClient::connect()
         return false;
     }
 
-    utils::logging::info("SFTP 연결 성공: " + config.host + ":" + std::to_string(config.port));
+    LOG_INFO << "SFTP 연결 성공: " << config.host << ":" << config.port;
     return true;
 }
 
@@ -194,14 +194,14 @@ bool SFTPClient::uploadFile(const std::string &localPath, const std::string &rem
     clearError();
     if (!isConnected()) {
         lastError = "SSH 연결 상태가 아닙니다";
-        utils::logging::error("SFTP 업로드 실패: 연결 상태 아님");
+        LOG_ERROR << "SFTP 업로드 실패: 연결 상태 아님";
         return false;
     }
 
     std::ifstream localFile(localPath, std::ios::binary);
     if (!localFile) {
         lastError = "로컬 파일 열기 실패: " + localPath;
-        utils::logging::error("로컬 파일 열기 실패: " + localPath);
+        LOG_ERROR << "로컬 파일 열기 실패: " << localPath;
         return false;
     }
 
@@ -213,7 +213,7 @@ bool SFTPClient::uploadFile(const std::string &localPath, const std::string &rem
 
     if (!remoteFile) {
         lastError = "원격 파일 생성 실패: " + remotePath;
-        utils::logging::error("원격 파일 생성 실패: " + remotePath);
+        LOG_ERROR << "원격 파일 생성 실패: " << remotePath;
         return false;
     }
 
@@ -224,7 +224,7 @@ bool SFTPClient::uploadFile(const std::string &localPath, const std::string &rem
         ssize_t nwritten = libssh2_sftp_write(remoteFile, buffer, localFile.gcount());
         if (nwritten < 0 || nwritten != localFile.gcount()) {
             lastError = "파일 쓰기 오류: " + remotePath;
-            utils::logging::error("파일 쓰기 오류: " + remotePath);
+            LOG_ERROR << "파일 쓰기 오류: " << remotePath;
             success = false;
             break;
         }
@@ -232,7 +232,7 @@ bool SFTPClient::uploadFile(const std::string &localPath, const std::string &rem
 
     libssh2_sftp_close_handle(remoteFile);
     if (success) {
-        utils::logging::info("파일 업로드 성공: " + localPath + " -> " + remotePath);
+        LOG_INFO << "파일 업로드 성공: " << localPath << " -> " << remotePath;
     }
     return success;
 }
@@ -242,7 +242,7 @@ bool SFTPClient::downloadFile(const std::string &remotePath, const std::string &
     clearError();
     if (!isConnected()) {
         lastError = "SSH 연결 상태가 아닙니다";
-        utils::logging::error("SFTP 다운로드 실패: 연결 상태 아님");
+        LOG_ERROR << "SFTP 다운로드 실패: 연결 상태 아님";
         return false;
     }
 
@@ -251,14 +251,14 @@ bool SFTPClient::downloadFile(const std::string &remotePath, const std::string &
 
     if (!remoteFile) {
         lastError = "원격 파일 열기 실패: " + remotePath;
-        utils::logging::error("원격 파일 열기 실패: " + remotePath);
+        LOG_ERROR << "원격 파일 열기 실패: " << remotePath;
         return false;
     }
 
     std::ofstream localFile(localPath, std::ios::binary);
     if (!localFile) {
         lastError = "로컬 파일 생성 실패: " + localPath;
-        utils::logging::error("로컬 파일 생성 실패: " + localPath);
+        LOG_ERROR << "로컬 파일 생성 실패: " << localPath;
         libssh2_sftp_close_handle(remoteFile);
         return false;
     }
@@ -273,13 +273,13 @@ bool SFTPClient::downloadFile(const std::string &remotePath, const std::string &
 
     if (nbytes < 0) {
         lastError = "파일 읽기 오류: " + remotePath;
-        utils::logging::error("파일 읽기 오류: " + remotePath);
+        LOG_ERROR << "파일 읽기 오류: " << remotePath;
         success = false;
     }
 
     libssh2_sftp_close_handle(remoteFile);
     if (success) {
-        utils::logging::info("파일 다운로드 성공: " + remotePath + " -> " + localPath);
+        LOG_INFO << "파일 다운로드 성공: " << remotePath << " -> " << localPath;
     }
     return success;
 }
@@ -294,11 +294,11 @@ bool SFTPClient::deleteFile(const std::string &remotePath)
 
     if (libssh2_sftp_unlink(sftpSession, remotePath.c_str()) != 0) {
         lastError = "파일 삭제 실패: " + remotePath;
-        utils::logging::error("파일 삭제 실패: " + remotePath);
+        LOG_ERROR << "파일 삭제 실패: " << remotePath;
         return false;
     }
 
-    utils::logging::info("파일 삭제 성공: " + remotePath);
+    LOG_INFO << "파일 삭제 성공: " << remotePath;
     return true;
 }
 
@@ -312,11 +312,11 @@ bool SFTPClient::createDirectory(const std::string &remotePath)
 
     if (libssh2_sftp_mkdir(sftpSession, remotePath.c_str(), 0755) != 0) {
         lastError = "디렉토리 생성 실패: " + remotePath;
-        utils::logging::error("디렉토리 생성 실패: " + remotePath);
+        LOG_ERROR << "디렉토리 생성 실패: " << remotePath;
         return false;
     }
 
-    utils::logging::info("디렉토리 생성 성공: " + remotePath);
+    LOG_INFO << "디렉토리 생성 성공: " << remotePath;
     return true;
 }
 
@@ -335,7 +335,7 @@ std::vector<std::string> SFTPClient::listDirectory(const std::string &remotePath
 
     if (!handle) {
         lastError = "디렉토리 열기 실패: " + remotePath;
-        utils::logging::error("디렉토리 열기 실패: " + remotePath);
+        LOG_ERROR << "디렉토리 열기 실패: " << remotePath;
         return files;
     }
 
@@ -400,14 +400,14 @@ bool SFTPClient::executeCommand(const std::string &command, std::string &output)
     LIBSSH2_CHANNEL *channel = libssh2_channel_open_session(session);
     if (!channel) {
         lastError = "채널 오픈 실패";
-        utils::logging::error("SSH 채널 오픈 실패");
+        LOG_ERROR << "SSH 채널 오픈 실패";
         return false;
     }
 
     // 명령 실행
     if (libssh2_channel_exec(channel, command.c_str()) != 0) {
         lastError = "명령 실행 실패: " + command;
-        utils::logging::error("SSH 명령 실행 실패: " + command);
+        LOG_ERROR << "SSH 명령 실행 실패: " << command;
         libssh2_channel_free(channel);
         return false;
     }
@@ -438,12 +438,12 @@ bool SFTPClient::executeCommand(const std::string &command, std::string &output)
         if (!errorOutput.empty()) {
             lastError += ": " + errorOutput;
         }
-        utils::logging::error("SSH 명령 실행 실패: " + command +
-                              " (exit: " + std::to_string(exitStatus) + ")" +
-                              (errorOutput.empty() ? "" : " stderr: " + errorOutput));
+        LOG_ERROR << "SSH 명령 실행 실패: " << command
+                  << " (exit: " << exitStatus << ")"
+                  << (errorOutput.empty() ? "" : " stderr: " + errorOutput);
         return false;
     }
 
-    utils::logging::info("SSH 명령 실행 성공: " + command);
+    LOG_INFO << "SSH 명령 실행 성공: " << command;
     return true;
 }

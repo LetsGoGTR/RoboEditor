@@ -4,7 +4,7 @@
 #include "../utils/JsonFileUtils.h"
 #include "../utils/PathValidator.h"
 #include "../utils/TimeUtils.h"
-#include "../utils/logging/Logger.h"
+#include <drogon/drogon.h>
 
 #include <chrono>
 #include <filesystem>
@@ -83,7 +83,7 @@ services::DeviceService::createDevice(const DeviceMetadata &metadata)
 
     // Validate path for security
     if (!utils::validatePath(metadata.serialNumber)) {
-        utils::logging::warn("Invalid device serialNumber: " + metadata.serialNumber);
+        LOG_WARN << "Invalid device serialNumber: " << metadata.serialNumber;
         return ServiceResult::createError("Invalid device serialNumber: " + metadata.serialNumber);
     }
 
@@ -91,7 +91,7 @@ services::DeviceService::createDevice(const DeviceMetadata &metadata)
 
     // Check if device already exists
     if (fs::exists(devicePath) && fs::is_directory(devicePath)) {
-        utils::logging::warn("Device already exists: " + metadata.serialNumber);
+        LOG_WARN << "Device already exists: " << metadata.serialNumber;
         return ServiceResult::createError("Device already exists: " + metadata.serialNumber);
     }
 
@@ -109,7 +109,7 @@ services::DeviceService::createDevice(const DeviceMetadata &metadata)
         std::string metadataPath = devicePath + "/" + metadataFilename_;
         if (!utils::saveJsonToFile(metadataPath, newMetadata)) {
             fs::remove_all(devicePath);
-            utils::logging::error("Failed to save device metadata: " + metadata.serialNumber);
+            LOG_ERROR << "Failed to save device metadata: " << metadata.serialNumber;
             return ServiceResult::createError("Failed to save metadata");
         }
 
@@ -117,7 +117,7 @@ services::DeviceService::createDevice(const DeviceMetadata &metadata)
         result.success = true;
         result.data    = newMetadata.toJson();
 
-        utils::logging::info("Created device: " + metadata.name + " (serialNumber: " + metadata.serialNumber + ")");
+        LOG_INFO << "Created device: " << metadata.name << " (serialNumber: " << metadata.serialNumber << ")";
         return result;
 
     } catch (const std::exception &e) {
@@ -131,7 +131,7 @@ services::ServiceResult services::DeviceService::readDevice(const std::string &d
 {
     // Validate path for security
     if (!utils::validatePath(deviceId)) {
-        utils::logging::warn("Invalid device ID: " + deviceId);
+        LOG_WARN << "Invalid device ID: " << deviceId;
         return ServiceResult::createError("Invalid device ID: " + deviceId);
     }
 
@@ -139,7 +139,7 @@ services::ServiceResult services::DeviceService::readDevice(const std::string &d
 
     // Check if device exists
     if (!fs::exists(devicePath) || !fs::is_directory(devicePath)) {
-        utils::logging::warn("Device not found: " + deviceId);
+        LOG_WARN << "Device not found: " << deviceId;
         return ServiceResult::createError("Device not found: " + deviceId);
     }
 
@@ -152,7 +152,7 @@ services::ServiceResult services::DeviceService::readDevice(const std::string &d
     result.success = true;
     result.data    = metadata.toJson();
 
-    utils::logging::info("Retrieved device info: " + deviceId);
+    LOG_INFO << "Retrieved device info: " << deviceId;
     return result;
 }
 
@@ -161,7 +161,7 @@ services::ServiceResult services::DeviceService::updateDevice(
 {
     // Validate path for security
     if (!utils::validatePath(deviceId)) {
-        utils::logging::warn("Invalid device ID: " + deviceId);
+        LOG_WARN << "Invalid device ID: " << deviceId;
         return ServiceResult::createError("Invalid device ID: " + deviceId);
     }
 
@@ -169,7 +169,7 @@ services::ServiceResult services::DeviceService::updateDevice(
 
     // Check if device exists
     if (!fs::exists(devicePath) || !fs::is_directory(devicePath)) {
-        utils::logging::warn("Device not found: " + deviceId);
+        LOG_WARN << "Device not found: " << deviceId;
         return ServiceResult::createError("Device not found: " + deviceId);
     }
 
@@ -189,7 +189,7 @@ services::ServiceResult services::DeviceService::updateDevice(
         // Save metadata
         std::string metadataPath = devicePath + "/" + metadataFilename_;
         if (!utils::saveJsonToFile(metadataPath, updatedMetadata)) {
-            utils::logging::error("Failed to save device metadata: " + deviceId);
+            LOG_ERROR << "Failed to save device metadata: " << deviceId;
             return ServiceResult::createError("Failed to save metadata");
         }
 
@@ -197,7 +197,7 @@ services::ServiceResult services::DeviceService::updateDevice(
         result.success = true;
         result.data    = updatedMetadata.toJson();
 
-        utils::logging::info("Updated device: " + deviceId);
+        LOG_INFO << "Updated device: " << deviceId;
         return result;
 
     } catch (const std::exception &e) {
@@ -209,7 +209,7 @@ services::ServiceResult services::DeviceService::deleteDevice(const std::string 
 {
     // Validate path for security
     if (!utils::validatePath(deviceId)) {
-        utils::logging::warn("Invalid device ID: " + deviceId);
+        LOG_WARN << "Invalid device ID: " << deviceId;
         return ServiceResult::createError("Invalid device ID: " + deviceId);
     }
 
@@ -217,7 +217,7 @@ services::ServiceResult services::DeviceService::deleteDevice(const std::string 
 
     // Check if device exists
     if (!fs::exists(devicePath) || !fs::is_directory(devicePath)) {
-        utils::logging::warn("Device not found: " + deviceId);
+        LOG_WARN << "Device not found: " << deviceId;
         return ServiceResult::createError("Device not found: " + deviceId);
     }
 
@@ -232,7 +232,7 @@ services::ServiceResult services::DeviceService::deleteDevice(const std::string 
         result.success = true;
         result.data    = metadata.toJson();
 
-        utils::logging::info("Deleted device: " + deviceId);
+        LOG_INFO << "Deleted device: " << deviceId;
         return result;
 
     } catch (const std::exception &e) {
@@ -271,7 +271,7 @@ services::ServiceResult services::DeviceService::listDevices()
         result.data["devices"] = devices;
         result.data["count"]   = (int)devices.size();
 
-        utils::logging::info("Listed " + std::to_string(devices.size()) + " devices");
+        LOG_INFO << "Listed " << devices.size() << " devices";
         return result;
 
     } catch (const std::exception &e) {
