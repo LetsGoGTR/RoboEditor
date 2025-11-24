@@ -165,12 +165,12 @@ QSpinBox {
 }
 QSpinBox::up-button, QSpinBox::down-button {
     width: 16px;
-    height: 10px;
+    height: 16px;
 }
 
 QSpinBox::up-arrow, QSpinBox::down-arrow {
     width: 16px;
-    height: 10px;
+    height: 16px;
 }
 #ComparePageRoot QLabel#pathLabel {
     padding: 4px 8px;
@@ -255,4 +255,114 @@ QSplitter::handle:horizontal {
     color: #24292e;
     selection-background-color: #c8e1ff;
     selection-color: #000;
+}
+#ControllerSetting {
+    background-color: #ffffff;
+    border: 1px solid #d0d4df;
+    border-radius: 6px;
+}
+
+/* === Title Label === */
+#ControllerSetting QLabel#dialogTitle {
+    font-size: 11pt;
+    font-weight: 600;
+    color: #3a405a;
+    padding-bottom: 4px;
+}
+
+/* === 그룹박스 === */
+#ControllerSetting QGroupBox {
+    background-color: #f6f8fc;
+    border: 1px solid #cfd4e3;
+    border-radius: 4px;
+    margin-top: 12px;
+    padding: 6px 10px;
+    font-weight: 500;
+    color: #333;
+}
+
+/* fix 그룹박스 텍스트 위치 */
+#ControllerSetting QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 8px;
+    padding: 0 2px;
+    color: #4a67d6;
+}
+
+/* === 입력 박스 === */
+#ControllerSetting QLineEdit,
+#ControllerSetting QSpinBox,
+#ControllerSetting QComboBox {
+    background: #ffffff;
+    border: 1px solid #b6bccd;
+    border-radius: 3px;
+    min-height: 22px;
+    padding: 3px 6px;
+    font-size: 12px;
+    color: #222;
+}
+
+#ControllerSetting QLineEdit:focus,
+#ControllerSetting QSpinBox:focus,
+#ControllerSetting QComboBox:focus {
+    border: 1px solid #4a67d6;
+    background: #f8faff;
+}
+
+/* === 콤보박스 화살표 === */
+#ControllerSetting QComboBox::drop-down {
+    border-left: 1px solid #b6bccd;
+    width: 16px;
+}
+
+#ControllerSetting QComboBox::down-arrow {
+    width: 10px;
+    height: 10px;
+    image: url(:/icons/down_arrow.svg); /* 아이콘 없으면 제거 가능 */
+}
+
+/* === 레이블 === */
+#ControllerSetting QLabel {
+    color: #444;
+    font-size: 11px;
+    padding-right: 4px;
+}
+
+/* === 버튼 === */
+#ControllerSetting QPushButton {
+    background-color: #4a67d6;
+    color: #ffffff;
+    border-radius: 4px;
+    padding: 5px 12px;
+    font-size: 11px;
+}
+
+#ControllerSetting QPushButton:hover {
+    background-color: #5e7aed;
+}
+
+#ControllerSetting QPushButton:pressed {
+    background-color: #3a54b0;
+}
+
+/* === 취소 버튼 (확인 옆) === */
+#ControllerSetting QPushButton#cancelBtn {
+    background-color: #f0f0f0;
+    color: #333;
+    border: 1px solid #cccccc;
+}
+
+#ControllerSetting QPushButton#cancelBtn:hover {
+    background-color: #e0e0e0;
+}
+
+#ControllerSetting QPushButton#cancelBtn:pressed {
+    background-color: #d0d0d0;
+}
+
+/* === 확인/취소 버튼 바 === */
+#ControllerSetting QWidget#bottomBar {
+    background-color: #f6f8fa;
+    border-top: 1px solid #d0d4e3;
+    padding: 6px 8px;
 }

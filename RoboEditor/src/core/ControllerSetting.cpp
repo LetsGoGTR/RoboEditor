@@ -8,6 +8,7 @@ ControllerSetting::ControllerSetting(QWidget *parent) :
     QDialog(parent),
     ui(new Ui::ControllerSettings)
 {
+    setObjectName("ControllerSetting");
     ui->setupUi(this);
 
     ui->ProtocolGroup->setId(ui->HTTPBtn, 0);   // HTTP = 0

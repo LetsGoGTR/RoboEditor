@@ -70,8 +70,17 @@ QString ApiClient::normalizeBaseUrlAPI(const ControllerInfo &info)
 
     // protocol: 0=HTTP, 1=HTTPS (버튼그룹 ID에 따라)
     QString protocol = (info.protocol == 0) ? "http://" : "https://";
-    QString result   = QString("%1%2:%3").arg(protocol).arg(host).arg(info.apiPort);
-    qDebug() << "[normalizeBaseUrlAPI]" << info.host << "->" << result;
+    QString result;
+    if (info.protocol == 0 && info.apiPort == 80) {
+        result = QString("%1%2").arg(protocol).arg(host);
+        return result;
+    }
+    if (info.protocol == 1 && info.apiPort == 443) {
+        result = QString("%1%2").arg(protocol).arg(host);
+        return result;
+    }
+
+    result = QString("%1%2:%3").arg(protocol).arg(host).arg(info.apiPort);
     return result;
 }
 //요청 만들기, 도메인 + 엔드포인트 url 반환
