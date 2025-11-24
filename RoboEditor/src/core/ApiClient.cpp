@@ -13,13 +13,14 @@
 #include <QJsonDocument>
 #include <QJsonParseError>
 
+#include "ControllerManager.h"
 #include "FileCompressor.h"
 #include "LogManager.h"
 
-ApiClient::ApiClient(const QString &baseUrl, QObject *parent) :
+ApiClient::ApiClient(const ControllerInfo &info, QObject *parent) :
     QObject(parent),
     m_manager(new QNetworkAccessManager(this)),
-    m_baseUrl(normalizeBaseUrl(baseUrl)),
+    m_baseUrl(normalizeBaseUrlAPI(info)),
     m_robotRunning(false)
 {
     // QNetworkAccessManager finished 시그널 연결
@@ -30,41 +31,49 @@ ApiClient::ApiClient(const QString &baseUrl, QObject *parent) :
 
 ApiClient::~ApiClient() {}
 // url 정규화
-QString ApiClient::normalizeBaseUrl(const QString &baseUrl)
+QString ApiClient::normalizeBaseUrlSFTP(const ControllerInfo &info)
 {
-    QString input = baseUrl.trimmed();
+    QString host = info.host.trimmed();
 
-    // 1) 프로토콜 제거
-    input.remove(QRegularExpression("^https?://", QRegularExpression::CaseInsensitiveOption));
-
-    // 2) 경로 제거 (example.com/api -> example.com)
-    int slashIndex = input.indexOf('/');
+    // 경로 제거 (example.com/api -> example.com)
+    int slashIndex = host.indexOf('/');
     if (slashIndex != -1) {
-        input = input.left(slashIndex);
+        host = host.left(slashIndex);
     }
 
-    if (input.isEmpty()) {
-        qWarning() << "[normalizeBaseUrl] Empty URL:" << baseUrl;
-        return baseUrl;
+    if (host.isEmpty()) {
+        qWarning() << "[normalizeBaseUrl] Empty host";
+        return QString();
     }
 
-    // 3) IP인지 도메인인지 판별
-    //  - 숫자/점/콜론만 존재하면 IP로 판단
-    bool isIp = input.contains(QRegularExpression("^[0-9\\.]+(:[0-9]+)?$"));
+    // protocol: 0=HTTP, 1=HTTPS (버튼그룹 ID에 따라)
+    QString protocol = (info.protocol == 0) ? "http://" : "https://";
 
-    QString protocol;
-    if (isIp) {
-        protocol = "http://";  // IP는 HTTP
-    } else {
-        protocol = "https://";  // 도메인은 HTTPS
-    }
-
-    QString result = protocol + input;
-
-    qDebug() << "[normalizeBaseUrl]" << baseUrl << "->" << result;
+    QString result = QString("%1%2:%3").arg(protocol).arg(host).arg(info.sftpPort);
+    qDebug() << "[normalizeBaseUrlSFTP]" << info.host << "->" << result;
     return result;
 }
+QString ApiClient::normalizeBaseUrlAPI(const ControllerInfo &info)
+{
+    QString host = info.host.trimmed();
 
+    // 경로 제거 (example.com/api -> example.com)
+    int slashIndex = host.indexOf('/');
+    if (slashIndex != -1) {
+        host = host.left(slashIndex);
+    }
+
+    if (host.isEmpty()) {
+        qWarning() << "[normalizeBaseUrl] Empty host";
+        return QString();
+    }
+
+    // protocol: 0=HTTP, 1=HTTPS (버튼그룹 ID에 따라)
+    QString protocol = (info.protocol == 0) ? "http://" : "https://";
+    QString result   = QString("%1%2:%3").arg(protocol).arg(host).arg(info.apiPort);
+    qDebug() << "[normalizeBaseUrlAPI]" << info.host << "->" << result;
+    return result;
+}
 //요청 만들기, 도메인 + 엔드포인트 url 반환
 QNetworkRequest ApiClient::createRequest(const QString &endpoint)
 {

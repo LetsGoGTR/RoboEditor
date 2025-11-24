@@ -89,7 +89,7 @@ void ControllerManager::registerController()
                                  "등록 실패",
                                  "제어기와의 연결을 확인할 수 없습니다.\n"
                                  "API 또는 SFTP 연결이 실패했습니다.\n"
-                                 "IP 주소, 포트, 계정 정보를 확인해주세요.");
+                                 "host 주소, 포트, 계정 정보를 확인해주세요.");
             if (folderCreated) {
                 if (dir.rmpath(folderPath)) {
                     qDebug() << "등록 실패로 인한 폴더 삭제:" << folderPath;
@@ -106,12 +106,6 @@ void ControllerManager::registerController()
         newConInfo.isRunning   = false;
         newConInfo.birth       = QDateTime::currentDateTime().toString(Qt::ISODate);
         controllers_.append(newConInfo);
-
-        qDebug() << "SN:" << newConInfo.serialNumber;
-        qDebug() << "IP:" << newConInfo.ip;
-        qDebug() << "SFTP:" << newConInfo.sftpPort;
-        qDebug() << "Username:" << newConInfo.username;
-
         saveToFile(newConInfo.serialNumber);
         QString msg = QString("[%1] registred").arg(newConInfo.serialNumber);
         LogManager::append(msg);
@@ -189,7 +183,7 @@ void ControllerManager::updateInfo(const ControllerInfo &newInfo)
                                  "수정 실패",
                                  "제어기와의 연결을 확인할 수 없습니다.\n"
                                  "API 또는 SFTP 연결이 실패했습니다.\n"
-                                 "IP 주소, 포트, 계정 정보를 확인해주세요.");
+                                 "host 주소, 포트, 계정 정보를 확인해주세요.");
             return;  // 검증 실패
         }
 
@@ -200,7 +194,9 @@ void ControllerManager::updateInfo(const ControllerInfo &newInfo)
                 if (c.serialNumber == newInfo.serialNumber) {
                     serialNumber = c.serialNumber;
                     // 검증 성공
-                    c.ip       = updated.ip;
+                    c.protocol = updated.protocol;
+                    c.host     = updated.host;
+                    c.apiPort  = updated.apiPort;
                     c.username = updated.username;
                     c.sftpPort = updated.sftpPort;
                     c.pswd     = updated.pswd;
@@ -238,8 +234,7 @@ void ControllerManager::setupApiClient(const QString &serialNumber)
         return;
     }
 
-    QString    baseUrl = QString("%1").arg(info.ip);
-    ApiClient *client  = new ApiClient(baseUrl, this);
+    ApiClient *client = new ApiClient(info, this);
 
     // serialNumber를 값으로 캡처
     //running 값이 바뀌었을 때
@@ -319,8 +314,7 @@ void ControllerManager::updateControllersStates()
             continue;
         }
 
-        QString inputUrl    = QString("%1").arg(c.ip);
-        QString expectedUrl = ApiClient::normalizeBaseUrl(inputUrl);
+        QString expectedUrl = ApiClient::normalizeBaseUrlAPI(c);
         QString currentUrl  = client->getBaseUrl();
 
         if (currentUrl != expectedUrl) {
@@ -702,10 +696,8 @@ bool ControllerManager::send(const QString     &serialNumber,
         return false;
     }
 
-    // 호스트와 포트 분리
-    QPair<QString, quint16> hostPort = parseHostPort(controller.ip, controller.sftpPort);
-    QString                 host     = hostPort.first;
-    quint16                 port     = hostPort.second;
+    QString host = controller.host;
+    quint16 port = controller.sftpPort;
 
     qDebug() << "[send] Parsed host:" << host << "port:" << port;
 
@@ -767,9 +759,9 @@ bool ControllerManager::receive(const QString &serialNumber,
     }
 
     // 호스트와 포트 분리
-    QPair<QString, quint16> hostPort = parseHostPort(controller.ip, controller.sftpPort);
-    QString                 host     = hostPort.first;
-    quint16                 port     = hostPort.second;
+
+    QString host = controller.host;
+    quint16 port = controller.sftpPort;
 
     qDebug() << "[receive] Parsed host:" << host << "port:" << port;
 
@@ -876,7 +868,7 @@ bool ControllerManager::saveController(const ControllerInfo &controller)
     // 3. JSON 객체 생성
     QJsonObject obj;
     obj["serialNumber"] = controller.serialNumber;
-    obj["ip"]           = controller.ip;
+    obj["host"]         = controller.host;
     obj["sftpPort"]     = controller.sftpPort;
     obj["username"]     = controller.username;
     obj["pswd"]         = pm_->encrypt(controller.pswd);
@@ -933,7 +925,7 @@ bool ControllerManager::loadController(const QString &serialNumber)
     // 6. ControllerInfo 생성
     ControllerInfo c;
     c.serialNumber = obj["serialNumber"].toString();
-    c.ip           = obj["ip"].toString();
+    c.host         = obj["host"].toString();
     c.sftpPort     = obj["sftpPort"].toInt();
     c.username     = obj["username"].toString();
     c.pswd         = pm_->decrypt(obj["pswd"].toString());
@@ -980,7 +972,7 @@ void ControllerManager::saveControllerList()
     for (const auto &c : controllersCopy) {
         QJsonObject obj;
         obj["serialNumber"] = c.serialNumber;
-        obj["ip"]           = c.ip;
+        obj["host"]         = c.host;
         snArray.append(obj);
     }
 
@@ -1080,32 +1072,7 @@ void ControllerManager::resumeStateUpdates()
     // 즉시 한 번 업데이트
     QTimer::singleShot(0, this, &ControllerManager::updateControllersStates);
 }
-QPair<QString, quint16> ControllerManager::parseHostPort(const QString &hostString,
-                                                         quint16        defaultPort)
-{
-    QString host = hostString.trimmed();
 
-    // 프로토콜 제거
-    if (host.startsWith("https://"))
-        host.remove(0, 8);
-    else if (host.startsWith("http://"))
-        host.remove(0, 7);
-
-    // 경로 제거
-    int slashIndex = host.indexOf('/');
-    if (slashIndex != -1) {
-        host = host.left(slashIndex);
-    }
-
-    // SFTP는 포트 parsing 하지 않음 (API와 분리)
-    // ip:port 입력이어도 ip만 추출
-    int colonIndex = host.indexOf(':');
-    if (colonIndex != -1) {
-        host = host.left(colonIndex);
-    }
-
-    return qMakePair(host, defaultPort);
-}
 bool ControllerManager::validateConnection(const ControllerInfo &info)
 {
     qDebug() << "[validateConnection] Validating connection for" << info.serialNumber;
@@ -1118,8 +1085,7 @@ bool ControllerManager::validateConnection(const ControllerInfo &info)
 
 bool ControllerManager::validateApiConnection(const ControllerInfo &info)
 {
-    QString baseUrl       = QString("%1").arg(info.ip);
-    QString normalizedUrl = ApiClient::normalizeBaseUrl(baseUrl);
+    QString normalizedUrl = ApiClient::normalizeBaseUrlAPI(info);
 
     QNetworkAccessManager manager;
     QNetworkRequest       request;
@@ -1180,32 +1146,25 @@ bool ControllerManager::validateApiConnection(const ControllerInfo &info)
 
 bool ControllerManager::validateSftpConnection(const ControllerInfo &info)
 {
-    QPair<QString, quint16> hostPort = parseHostPort(info.ip, info.sftpPort);
-    QString                 host     = hostPort.first;
-    quint16                 port     = hostPort.second;
-
-    SFTPClient client(host, port, info.username, info.pswd);
-
-    bool success = client.connectToServer();
+    // info에서 직접 포트 사용
+    SFTPClient client(info.host, info.sftpPort, info.username, info.pswd);
+    bool       success = client.connectToServer();
 
     if (success) {
         qDebug() << "[validateSftpConnection] SFTP connection successful";
         client.disconnect();
-
         QString msg = QString("[%1] SFTP connection validated successfully (host=%2, port=%3)")
                               .arg(info.serialNumber)
-                              .arg(host)
-                              .arg(port);
+                              .arg(info.host)
+                              .arg(info.sftpPort);
         LogManager::append(msg);
     } else {
-        // lastError_에서 상세 에러 메시지 가져오기
         QString errorMsg = client.getLastError();
-
-        QString msg = QString("[%1] SFTP connection failed - %2 (host=%3, port=%4, user=%5)")
+        QString msg      = QString("[%1] SFTP connection failed - %2 (host=%3, port=%4, user=%5)")
                               .arg(info.serialNumber)
                               .arg(errorMsg)
-                              .arg(host)
-                              .arg(port)
+                              .arg(info.host)
+                              .arg(info.sftpPort)
                               .arg(info.username);
         LogManager::append(msg);
         qWarning() << msg;
