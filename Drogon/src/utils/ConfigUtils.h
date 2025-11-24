@@ -4,8 +4,6 @@
 #include <json/json.h>
 #include <string>
 
-#include "logging/Logger.h"
-
 namespace utils
 {
     namespace config
@@ -34,12 +32,6 @@ namespace utils
         inline std::string getTempBackupDir()
         {
             return drogon::app().getCustomConfig()["storage"]["temp_backup_dir"].asString();
-        }
-
-        // Auth config
-        inline std::string getPasswordHash()
-        {
-            return drogon::app().getCustomConfig()["auth"]["device_password_hash"].asString();
         }
 
     }  // namespace config

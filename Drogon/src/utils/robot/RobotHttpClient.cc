@@ -6,10 +6,13 @@
 
 namespace fs = std::filesystem;
 
-void utils::RobotHttpClient::checkRunning(const std::string                             &ip,
+void utils::RobotHttpClient::checkRunning(const std::string                             &scheme,
+                                          const std::string                             &host,
+                                          int                                            port,
                                           std::function<void(bool, const std::string &)> callback)
 {
-    auto client = drogon::HttpClient::newHttpClient("https://" + ip);
+    std::string url = scheme + "://" + host + ":" + std::to_string(port);
+    auto        client = drogon::HttpClient::newHttpClient(url);
     auto req    = drogon::HttpRequest::newHttpRequest();
     req->setPath(RUNNING_ENDPOINT);
     req->setMethod(drogon::Get);
@@ -31,7 +34,9 @@ void utils::RobotHttpClient::checkRunning(const std::string                     
 }
 
 void utils::RobotHttpClient::uploadWorkspace(
-        const std::string                             &ip,
+        const std::string                             &scheme,
+        const std::string                             &host,
+        int                                            port,
         const std::string                             &filePath,
         std::function<void(bool, const std::string &)> callback)
 {
@@ -58,7 +63,8 @@ void utils::RobotHttpClient::uploadWorkspace(
     multipartBody << "\r\n--" << boundary << "--\r\n";
 
     // Create HTTP request
-    auto client = drogon::HttpClient::newHttpClient("https://" + ip);
+    std::string url    = scheme + "://" + host + ":" + std::to_string(port);
+    auto        client = drogon::HttpClient::newHttpClient(url);
     auto req    = drogon::HttpRequest::newHttpRequest();
     req->setPath(IMPORT_ENDPOINT);
     req->setMethod(drogon::Post);
@@ -91,10 +97,13 @@ void utils::RobotHttpClient::uploadWorkspace(
 }
 
 void utils::RobotHttpClient::downloadWorkspace(
-        const std::string                                            &ip,
+        const std::string                                            &scheme,
+        const std::string                                            &host,
+        int                                                           port,
         std::function<void(const std::string &, const std::string &)> callback)
 {
-    auto client = drogon::HttpClient::newHttpClient("https://" + ip);
+    std::string url    = scheme + "://" + host + ":" + std::to_string(port);
+    auto        client = drogon::HttpClient::newHttpClient(url);
     auto req    = drogon::HttpRequest::newHttpRequest();
     req->setPath(EXPORT_ENDPOINT);
     req->setMethod(drogon::Get);

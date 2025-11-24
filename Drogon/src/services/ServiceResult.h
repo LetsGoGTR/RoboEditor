@@ -2,8 +2,7 @@
 
 #include <json/json.h>
 #include <string>
-
-#include "../utils/logging/Logger.h"
+#include <drogon/drogon.h>
 
 namespace services
 {
@@ -25,7 +24,7 @@ namespace services
             result.data    = resultData;
 
             if (!logMessage.empty()) {
-                utils::logging::info(logMessage);
+                LOG_INFO << logMessage;
             }
 
             return result;
@@ -39,7 +38,7 @@ namespace services
             result.errorMessage = message;
 
             if (autoLog) {
-                utils::logging::error(message);
+                LOG_ERROR << message;
             }
 
             return result;
