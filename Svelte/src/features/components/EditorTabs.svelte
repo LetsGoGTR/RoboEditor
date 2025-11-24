@@ -1,138 +1,118 @@
 <script lang="ts">
-  import GroupTabs from '@layouts/GroupTabs.svelte';
-  import { currentFile } from '@/stores/currentFile';
-  import { onDestroy, onMount, tick } from 'svelte';
-  import type { FileNode } from '@/types';
+	import GroupTabs from '@layouts/GroupTabs.svelte';
+	import { currentFile } from '@/stores/currentFile';
+	import { onMount, onDestroy, tick } from 'svelte';
+	import type { FileNode } from '@/types';
 
-  import { getMonaco } from '@utils/monaco';
-  import type * as monaco from 'monaco-editor';
-	import { detectLanguage } from '@utils/nodeAction';
-	import { _getFile } from '@apis/file';
+	import { getMonaco } from '@utils/monaco';
+	import type * as monaco from 'monaco-editor';
 	import { handleSaveFile } from '@handlers/nodeActions';
 
-  let container: HTMLDivElement | null = null;
-  let editor: monaco.editor.IStandaloneCodeEditor | null = null;
-  let monacoInstance: typeof monaco | null = null;
+	import { loadFile } from '@/features/handlers/nodeActions';
 
-  let state = $derived($currentFile);
+	let container: HTMLDivElement | null = null;
+	let editor: monaco.editor.IStandaloneCodeEditor | null = null;
+	let monacoInstance: typeof monaco | null = null;
 
-  /* ------------------------------------------------------------
-   * 초기화
-   * ------------------------------------------------------------ */
-  onMount(async () => {
-    monacoInstance = await getMonaco();
+	let state = $derived($currentFile);
 
-    const activeFile = state.active?.file;
-    if (activeFile) await loadFile(activeFile);
-  });
+	/* ------------------------------------------------------------
+	 * Editor 최초 초기화 (이벤트 1회 등록)
+	 * ------------------------------------------------------------ */
+	function initEditor(model) {
+		editor = monacoInstance!.editor.create(container!, {
+			model,
+			theme: 'vs-white',
+			automaticLayout: true,
+			minimap: { enabled: false }
+		});
 
-  /* ------------------------------------------------------------ */
-  async function tryInitEditor() {
-    await tick();
-    const file = state.active?.file;
-    if (!file || !container || !monacoInstance) return;
-    await loadFile(file);
-  }
+		// Ctrl+S 저장
+		editor.addCommand(monacoInstance!.KeyMod.CtrlCmd | monacoInstance!.KeyCode.KeyS, () =>
+			handleSaveFile(editor!)
+		);
+	}
 
-  /* ------------------------------------------------------------
-   * 파일 로드 (서버 기반)
-   * ------------------------------------------------------------ */
-  async function loadFile(file: FileNode) {
-    if (!monacoInstance || !container) return;
+	/* ------------------------------------------------------------
+	 * active file 변경 감지 → loadFileToEditor 실행
+	 * ------------------------------------------------------------ */
+	$effect(async () => {
+		const file = $currentFile.active?.file;
+		if (!file || !monacoInstance || !container) return;
 
-    let text = '';
+		await tick();
 
-    if (file.path) {
-      const res = await _getFile(file.path);
-      text = res?.data?.content ?? '';
-    }
+		const updated = await loadFile(monacoInstance, editor, file);
 
-    const model = monacoInstance.editor.createModel(
-      text,
-      detectLanguage(file.name)
-    );
+		// 처음 설정한 경우 updated=null → 모델은 있지만 editor가 없음
+		if (updated === null) {
+			const model = monacoInstance!.editor.getModels().find((m) => m.uri.path === file.path);
+			model && initEditor(model);
+		}
+	});
 
-    if (editor) {
-      const prev = editor.getModel();
-      prev?.dispose();
-      editor.setModel(model);
-    } else {
-      editor = monacoInstance.editor.create(container, {
-        model,
-        theme: 'vs-white',
-        automaticLayout: true,
-        minimap: { enabled: false }
-      });
+	/* ------------------------------------------------------------
+	 * mount
+	 * ------------------------------------------------------------ */
+	onMount(async () => {
+		monacoInstance = await getMonaco();
 
-      // 저장 핸들러 연결
-      editor.addCommand(
-        monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyCode.KeyS,
-        () => handleSaveFile(editor)
-      );
-    }
-  }
+		const active = state.active?.file;
+		if (active) {
+			await tick();
+			const updated = await loadFile(monacoInstance, editor, active);
 
-  /* ------------------------------------------------------------
-   * Tab 전환 / 닫기
-   * ------------------------------------------------------------ */
-  function handleSwitch(index: number) {
-    currentFile.switchTab(index);
-  }
+			if (!updated) {
+				const model = monacoInstance!.editor.getModels().find((m) => m.uri.path === active.path);
+				model && initEditor(model);
+			}
+		}
+	});
 
-  function handleClose(index: number) {
-    currentFile.closeTab(index);
-  }
+	onDestroy(() => {
+		editor?.dispose();
+	});
 
-  $effect(() => {
-    const file = $currentFile.active?.file;
+	function handleSwitch(i: number) {
+		currentFile.switchTab(i);
+	}
 
-    if (file && monacoInstance) {
-      tryInitEditor();
-    } else if (!file && editor) {
-      editor.dispose();
-      editor = null;
-    }
-  });
-
-  onDestroy(() => {
-    if (editor) {
-      editor.dispose();
-      editor = null;
-    }
-  });
+	function handleClose(i: number) {
+		currentFile.closeTab(i);
+	}
 </script>
 
 <div class="editor-tabs-root">
-  <GroupTabs
-    tabs={state.group
-      .map((g) => g.file)
-      .filter((file): file is FileNode => file !== null)
-      .map((file) => ({
-        id: file.id,
-        name: file.name,
-        path: file.path
-      }))}
-    activeIndex={state.activeIndex}
-    onSwitch={handleSwitch}
-    onClose={handleClose}
-  >
-    <div slot="content" bind:this={container} class="editor-container"></div>
-  </GroupTabs>
+	<GroupTabs
+		tabs={state.group
+			.map((g) => g.file)
+			.filter((file): file is FileNode => file !== null)
+			.map((file) => ({
+				id: file.id,
+				name: file.name,
+				path: file.path
+			}))}
+		activeIndex={state.activeIndex}
+		onSwitch={handleSwitch}
+		onClose={handleClose}
+	>
+		<div slot="content" bind:this={container} class="editor-container"></div>
+	</GroupTabs>
 </div>
 
 <style>
-.editor-tabs-root {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  height: 100%;
-  width: 100%;
-  overflow: hidden;
-}
+	.editor-tabs-root {
+		display: flex;
+		flex-direction: column;
+		flex: 1;
+		height: 100%;
+		width: 100%;
+		overflow: hidden;
+	}
 
-.editor-container {
-  flex: 1;
-  width: 100%;
-  height: 100%;
-}
+	.editor-container {
+		flex: 1;
+		width: 100%;
+		height: 100%;
+	}
 </style>

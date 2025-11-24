@@ -1,9 +1,15 @@
 import { currentFile } from '@/stores/currentFile';
 import { gotoPage } from '@/stores/currentPage';
-import { insertFileNode, removeFileNode, removeFolderNode } from '@/stores/fileTree';
+import {
+	insertFileNode,
+	insertFolderNode,
+	removeFileNode,
+	removeFolderNode
+} from '@/stores/fileTree';
 import type { FileNode, FolderNode } from '@/types';
 import { _createFile, _deleteFile, _getFile, _updateFile } from '@apis/file';
-import { _deleteFolder } from '@apis/folder';
+import { _createFolder, _deleteFolder } from '@apis/folder';
+import { detectLanguage, normalizeSlash } from '@utils/nodeAction';
 import type * as monaco from 'monaco-editor';
 import { get } from 'svelte/store';
 
@@ -26,7 +32,7 @@ export async function handleCreateFile(payload: { name: string; folder: FolderNo
 		id: crypto.randomUUID(),
 		name,
 		type: 'file',
-		path: newPath,
+		path: normalizeSlash(newPath),
 		size: 0,
 		lastModified: Date.now().toString()
 	};
@@ -115,6 +121,67 @@ export async function handleSaveFile(editor: monaco.editor.IStandaloneCodeEditor
 }
 
 /**
+ * Monaco Editor에서 특정 파일 로드 및 모델 교체 처리
+ * - 반응 루프 방지
+ * - store content 우선 적용
+ * - model 재생성 최소화
+ */
+export async function loadFile(
+	monacoInstance: typeof monaco,
+	editor: monaco.editor.IStandaloneCodeEditor | null,
+	file: FileNode
+) {
+	if (!monacoInstance || !file) return editor;
+
+	// ------------------------------------------------------------
+	// 1) store에 있는 content 우선 사용
+	// ------------------------------------------------------------
+	const state = currentFile.get(); // manual getter (store 내부에서 만들면 됨)
+	const view = state.group.find((v) => v.file.id === file.id);
+
+	let text = '';
+	if (view?.content !== null) {
+		text = view.content;
+	} else {
+		const res = await _getFile(file.path);
+		text = res?.data?.content ?? '';
+		currentFile.setContent(text);
+	}
+
+	// ------------------------------------------------------------
+	// 2) 동일 모델인지 검사 → 동일하면 아무 것도 하지 않음
+	// ------------------------------------------------------------
+	if (editor) {
+		const currentValue = editor.getValue();
+		const currentUri = editor.getModel()?.uri.path;
+
+		if (currentUri === file.path && currentValue === text) {
+			return editor; // 그대로 사용 → 루프 없음
+		}
+	}
+
+	// ------------------------------------------------------------
+	// 3) 새 모델 생성
+	// ------------------------------------------------------------
+	const model = monacoInstance.editor.createModel(
+		text,
+		detectLanguage(file.name),
+		monacoInstance.Uri.parse(`file:///${file.path}`)
+	);
+
+	// ------------------------------------------------------------
+	// 4) Editor에 모델 설정
+	// ------------------------------------------------------------
+	if (editor) {
+		editor.setModel(model);
+		return editor;
+	}
+
+	// Editor가 아직 없으면 EditorTab에서 initEditor()가 생성해야 함
+	return null;
+}
+
+/**
  * 파일 삭제 핸들러
  * @param file 삭제할 FileNode
  */
@@ -150,6 +217,46 @@ export async function handleDeleteFile(file: FileNode) {
 /** ==============================
  *   2. Folder
  *  ==============================  */
+
+/**
+ * 새 폴더 생성 핸들러
+ * NewFolderDialog.svelte 에서 내려주는
+ * { name: string, folder: FolderNode } payload 를 그대로 사용한다.
+ */
+export async function handleCreateFolder(payload: { name: string; folder: FolderNode }) {
+	const { name, folder } = payload;
+
+	if (!name.trim()) {
+		alert('폴더 이름이 비어 있습니다.');
+		return;
+	}
+	if (!folder?.path) {
+		alert('상위 폴더 경로가 유효하지 않습니다.');
+		return;
+	}
+
+	const cleanName = name.trim();
+
+	// trailing slash 유지: 서버 규칙에 맞춰 / 로 끝나게 처리
+	const newPath = `${folder.path}/${cleanName}/`;
+
+	// 1) 서버에 폴더 생성 요청
+	const apiResp = await _createFolder(newPath);
+
+	if (!apiResp?.success) {
+		alert('폴더 생성에 실패하였습니다.');
+		return;
+	}
+
+	// 2) fileTree store 업데이트 (UI 갱신)
+	insertFolderNode(folder.path, {
+		id: crypto.randomUUID(),
+		name: cleanName,
+		type: 'directory',
+		path: normalizeSlash(newPath),
+		children: []
+	});
+}
 
 // 폴더 삭제 handler
 export async function handleDeleteFolder(folder: FolderNode) {

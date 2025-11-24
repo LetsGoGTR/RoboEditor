@@ -97,3 +97,16 @@ export async function fetchFolderTreeRecursively(
 
 	return folderNode;
 }
+/**
+ * path 앞쪽의 슬래시를 정리해
+ * 항상 "슬래시 1개 + 나머지 경로" 형태로 만들어 줍니다.
+ */
+export function normalizeSlash(path: string): string {
+	if (!path) return '/';
+
+	// 앞부분의 연속된 슬래시 제거
+	const trimmed = path.replace(/^\/+/, '');
+
+	// 결과가 비면 "/"만 반환, 아니면 앞에 슬래시 하나만 붙여서 반환
+	return trimmed ? `/${trimmed}` : '/';
+}
