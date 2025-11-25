@@ -62,8 +62,9 @@ class CenterStack : public QWidget
         }
 
         // 경로 관련
-        QString getWorkspacePath() const;
-        void    setBackupPath(const QString &path);
+        static QString getIconPath();
+        QString        getWorkspacePath() const;
+        void           setBackupPath(const QString &path);
 
       signals:
         // 메인윈도우가 받을 시그널
