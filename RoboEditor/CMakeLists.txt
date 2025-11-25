@@ -230,6 +230,8 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         src/core/FileTypeHelper.cpp
         src/core/FileTypeHelper.h
         src/core/AppConfig.h
+        src/core/LogTextEdit.cpp
+        src/core/LogTextEdit.h
     )
     qt_create_translation(QM_FILES ${CMAKE_SOURCE_DIR} ${TS_FILES})
 else()

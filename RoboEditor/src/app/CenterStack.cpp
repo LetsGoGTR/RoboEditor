@@ -22,6 +22,7 @@
 #include "ComparePage.h"
 #include "ControllerManager.h"
 #include "LogManager.h"
+#include "LogTextEdit.h"
 #include "ModifyPage.h"
 #include "WorkspaceContextMenuController.h"
 
@@ -245,8 +246,8 @@ void CenterStack::setupUI()
     // ===== ModifyPage =====
 
     modifyPage_ = new ModifyPage(rightSplitter_);
+    logPanel_   = new QWidget(rightSplitter_);
 
-    logPanel_                   = new QWidget(rightSplitter_);
     QVBoxLayout *logPanelLayout = new QVBoxLayout(logPanel_);
     logPanelLayout->setContentsMargins(0, 0, 0, 0);
     logPanelLayout->setSpacing(0);
@@ -255,22 +256,31 @@ void CenterStack::setupUI()
     QFrame *header = new QFrame;
     header->setObjectName("LogHeader");
     header->setFrameShape(QFrame::NoFrame);
+
     QHBoxLayout *headerLayout = new QHBoxLayout(header);
     headerLayout->setContentsMargins(8, 6, 8, 6);
 
-    logTitle_ = new QLabel("Log File");  // <-- 파일명 표시
+    logTitle_ = new QLabel("Log File");
     logTitle_->setObjectName("LogTitle");
-
     headerLayout->addWidget(logTitle_);
     headerLayout->addStretch();
 
-    logView_ = new QPlainTextEdit();
-    logView_->setReadOnly(true);
-    logView_->setMaximumBlockCount(1000);
+    // LogTextEdit 생성 (멤버 변수로 저장)
+    logView_ = new LogTextEdit(logPanel_);  // logView -> logView_로 변경
     logView_->setObjectName("LogView");
 
+    connect(LogManager::instance(),
+            &LogManager::logAppended,
+            logView_,                      // 여기도 logView_로 변경
+            [this](const QString &text) {  // logView 대신 this 사용
+                logView_->appendPlainText(text);
+                QTextCursor cursor = logView_->textCursor();
+                cursor.movePosition(QTextCursor::End);
+                logView_->setTextCursor(cursor);
+            });
+
     logPanelLayout->addWidget(header);
-    logPanelLayout->addWidget(logView_);
+    logPanelLayout->addWidget(logView_);  // logView_로 변경
 
     rightSplitter_->addWidget(modifyPage_);
     rightSplitter_->addWidget(logPanel_);
@@ -282,42 +292,28 @@ void CenterStack::setupUI()
     splitter_->addWidget(rightSplitter_);
     splitter_->setStretchFactor(0, 3);
     splitter_->setStretchFactor(1, 15);
+
     mainLayout->addWidget(splitter_);
     setLayout(mainLayout);
 
+    // LogManager 초기화 체크
     auto *mgr = LogManager::instance();
     if (!mgr) {
         qWarning() << "[CenterStack] LogManager is null!";
-        return;  // 여기서 리턴하면 안전
+        return;
     }
-
     qDebug() << "[CenterStack] LogManager instance OK";
 
     if (!logTitle_) {
         qWarning() << "[CenterStack] logTitle_ is null!";
         return;
     }
-
     qDebug() << "[CenterStack] logTitle_ OK";
 
     // 로그 파일명 설정
     QString fileName = mgr->getLogFileName();
     qDebug() << "[CenterStack] LogFileName:" << fileName;
     logTitle_->setText(fileName);
-
-    qDebug() << "[CenterStack] Before signal connection";
-
-    connect(mgr, &LogManager::logAppended, this, [this](const QString &text) {
-        if (logView_) {
-            logView_->appendPlainText(text);
-
-            QTextCursor cursor = logView_->textCursor();
-            cursor.movePosition(QTextCursor::End);
-            logView_->setTextCursor(cursor);
-        }
-    });
-
-    qDebug() << "[CenterStack] LogManager connected successfully";
 
     // ---------------------- 시그널 연결 ----------------------
 
