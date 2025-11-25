@@ -562,7 +562,7 @@ void CenterStack::stopPolling()
 
 void CenterStack::onPollingTimeout()
 {
-    qDebug() << "timeout";
+    //qDebug() << "timeout";
     ControllerManager::instance()->updateControllersStates();
 }
 void CenterStack::showLogPanel()

@@ -14,8 +14,7 @@ static void loadTheme()
     // Build correct QSS file path
     QString fileName = dark ? "dark.qss" : "light.qss";
 
-    QString stylePath = QApplication::applicationDirPath() + "/../../src/styles/" + fileName;
-
+    QString stylePath = QCoreApplication::applicationDirPath() + "/styles/" + fileName;
     QFile styleFile(stylePath);
 
     if (styleFile.open(QFile::ReadOnly)) {
@@ -49,3 +48,4 @@ int main(int argc, char *argv[])
     w.showMaximized();
     return a.exec();
 }
+
