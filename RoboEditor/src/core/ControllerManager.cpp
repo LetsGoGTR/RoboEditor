@@ -16,6 +16,7 @@
 #include "LogManager.h"
 #include "PasswordManager.h"
 #include "SftpClient.h"
+#include "AppConfig.h"
 
 static ControllerManager *getinstance = nullptr;
 
@@ -64,7 +65,7 @@ void ControllerManager::registerController()
         }
 
         // SN 폴더 자동 생성
-        QString folderPath = "C:/backup/" + newConInfo.serialNumber;
+        QString folderPath = AppConfig::getBackupPath() + "/" + newConInfo.serialNumber;
         QDir    dir;
         bool    folderCreated = false;
 
@@ -505,22 +506,24 @@ bool ControllerManager::backupRequest(const QString &serialNumber, const QString
     QString sn = info.serialNumber;
     QString snDir;  // 항상 C:\backup\123 형태로 맞춤
     {
-        QString tail = QFileInfo(base.path()).fileName();
+        // "backup" 폴더 내인지 확인 로직
+        QString backupRoot = AppConfig::getBackupPath();
+        QString absoluteBase = QDir(baseBackupDir).absolutePath();
+        QString absoluteRoot = QDir(backupRoot).absolutePath();
 
-        // 1) base가 "C:/backup" 같은 루트일 때만 SN 하위 폴더 생성
-        if (tail.compare("backup", Qt::CaseInsensitive) == 0) {
-            // 예: base = C:/backup → C:/backup/SN1
+        // 1) base가 AppConfig::getBackupPath() 와 같으면 하위 폴더 생성
+        if (absoluteBase.compare(absoluteRoot, Qt::CaseInsensitive) == 0) {
             snDir = base.filePath(sn);
         }
-        // 2) base가 이미 해당 SN 폴더일 때는 있는 폴더 그대로 사용
-        else if (tail == sn) {
-            // 예: base = C:/backup/SN1 → C:/backup/SN1
-            snDir = base.path();
-        }
-        // 3) 그 외는 호출자가 넘긴 baseBackupDir을 그대로 최상위로 사용
+        // 2) 그 외는 호출자가 넘긴 baseBackupDir을 그대로 사용 (이미 SN 폴더일 수도 있음)
         else {
-            // 예: base = C:/backup/test → C:/backup/test
-            snDir = base.path();
+            // 만약 base의 이름이 SN과 같다면 그대로 사용
+            if (QFileInfo(absoluteBase).fileName() == sn) {
+                snDir = absoluteBase;
+            } else {
+                // 아니라면 SN 폴더를 만들어주는 것이 안전하지만, 기존 로직(3번)을 유지
+                snDir = absoluteBase;
+            }
         }
     }
     if (!QDir().mkpath(snDir)) {
@@ -852,7 +855,7 @@ bool ControllerManager::receive(const QString &serialNumber,
 bool ControllerManager::saveController(const ControllerInfo &controller)
 {
     // 1. 경로 생성
-    QString folderPath = QString("C:/backup/%1/config").arg(controller.serialNumber);
+    QString folderPath = AppConfig::getBackupPath() + QString("/%1/config").arg(controller.serialNumber);
     QString filePath   = folderPath + "/controller.json";
 
     // 2. config 디렉토리 생성
@@ -893,7 +896,7 @@ bool ControllerManager::saveController(const ControllerInfo &controller)
 bool ControllerManager::loadController(const QString &serialNumber)
 {
     // 1. 파일 경로 생성
-    QString folderPath = QString("C:/backup/%1/config").arg(serialNumber);
+    QString folderPath = AppConfig::getBackupPath() + QString("/%1/config").arg(serialNumber);
     QString filePath   = folderPath + "/controller.json";
 
     // 2. 파일 존재 확인
@@ -959,6 +962,13 @@ void ControllerManager::saveControllerList()
 {
     //전체 제어기 목록 업데이트
 
+    QString configDir = AppConfig::getBackupPath() + "/config";
+    QDir dir;
+    if (!dir.exists(configDir)) {
+        dir.mkpath(configDir);
+    }
+    QString listPath = configDir + "/controller_list.json";
+
     // 1. Mutex로 보호된 영역에서 복사
     QList<ControllerInfo> controllersCopy;
     {
@@ -984,7 +994,6 @@ void ControllerManager::saveControllerList()
     QJsonDocument doc(root);
 
     // 4. 파일 저장
-    QString listPath = QString("C:/backup/config/controller_list.json");
     QFile   file(listPath);
 
     if (!file.open(QIODevice::WriteOnly)) {
@@ -998,7 +1007,7 @@ void ControllerManager::saveControllerList()
 void ControllerManager::loadControllerList()
 {
     //전체 제어기 목록 가져오기
-    QString listPath = QString("C:/backup/config/controller_list.json");
+    QString listPath = AppConfig::getBackupPath() + "/config/controller_list.json";
 
     QFile file(listPath);
     if (!file.exists()) {

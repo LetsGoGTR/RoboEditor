@@ -229,6 +229,7 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         src/app/DiffTablePanel.h
         src/core/FileTypeHelper.cpp
         src/core/FileTypeHelper.h
+        src/core/AppConfig.h
     )
     qt_create_translation(QM_FILES ${CMAKE_SOURCE_DIR} ${TS_FILES})
 else()

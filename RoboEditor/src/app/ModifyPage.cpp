@@ -16,6 +16,7 @@
 #include "ComparePage.h"
 #include "LogManager.h"
 #include "mainwindow.h"
+#include "AppConfig.h"
 
 ModifyPage::ModifyPage(QWidget *parent) : QWidget(parent), currentDoc(nullptr)
 {
@@ -237,14 +238,14 @@ void ModifyPage::showCompareFile()
         } else if (result == QMessageBox::No) {
             // 새 파일 선택 - C:/backup에서 시작
             targetPath =
-                    QFileDialog::getOpenFileName(this, tr("Select file to compare"), "C:/backup");
+                    QFileDialog::getOpenFileName(this, tr("Select file to compare"), AppConfig::getBackupPath());
         } else {
             // 취소
             return;
         }
     } else {
         // 이전 파일이 없으면 바로 파일 선택 - C:/backup에서 시작
-        targetPath = QFileDialog::getOpenFileName(this, tr("Select file to compare"), "C:/backup");
+        targetPath = QFileDialog::getOpenFileName(this, tr("Select file to compare"), AppConfig::getBackupPath());
     }
 
     if (targetPath.isEmpty())
@@ -379,7 +380,7 @@ void ModifyPage::showCompareFolders()
         }
 
         // 비교할 폴더/압축 파일 선택
-        QFileDialog dialog(this, tr("Select folder or archive to compare"), "C:/backup");
+        QFileDialog dialog(this, tr("Select folder or archive to compare"), AppConfig::getBackupPath());
         dialog.setFileMode(QFileDialog::Directory);
         dialog.setOption(QFileDialog::ShowDirsOnly, false);
         dialog.setOption(QFileDialog::DontUseNativeDialog, true);
@@ -409,7 +410,7 @@ void ModifyPage::showCompareFolders()
         }
 
         // 첫 번째 폴더/압축 파일 선택
-        QFileDialog dialog1(this, tr("Select first folder or archive (compare)"), "C:/backup");
+        QFileDialog dialog1(this, tr("Select first folder or archive (compare)"), AppConfig::getBackupPath());
         dialog1.setFileMode(QFileDialog::Directory);
         dialog1.setOption(QFileDialog::ShowDirsOnly, false);
         dialog1.setOption(QFileDialog::DontUseNativeDialog, true);
@@ -427,7 +428,7 @@ void ModifyPage::showCompareFolders()
         }
 
         // 두 번째 폴더/압축 파일 선택
-        QFileDialog dialog2(this, tr("Select second folder or archive (base)"), "C:/backup");
+        QFileDialog dialog2(this, tr("Select second folder or archive (base)"), AppConfig::getBackupPath());
         dialog2.setFileMode(QFileDialog::Directory);
         dialog2.setOption(QFileDialog::ShowDirsOnly, false);
         dialog2.setOption(QFileDialog::DontUseNativeDialog, true);
@@ -578,7 +579,8 @@ void ModifyPage::closeFile(int index)
 }
 static QString shortenBackupPath(const QString &fullPath)
 {
-    QString base = "C:/backup/";
+    QString base = AppConfig::getBackupPath();
+    if (!base.endsWith('/')) base += '/';
 
     if (fullPath.startsWith(base, Qt::CaseInsensitive)) {
         return fullPath.mid(base.length());
@@ -900,7 +902,7 @@ void Document::setContent(const QString &newContent)
 void ModifyPage::dragEnterEvent(QDragEnterEvent *event)
 {
     if (event->mimeData()->hasUrls())
-        event->acceptProposedAction();  // ✅ 파일이면 허용
+        event->acceptProposedAction();  // 파일이면 허용
 }
 
 void ModifyPage::dropEvent(QDropEvent *event)
@@ -925,12 +927,11 @@ QString ModifyPage::formatPath(const QString &fullPath) const
     }
 
     QString displayPath = fullPath;
+    QString backupPath = AppConfig::getBackupPath();
 
     // "C:/backup" 제거
-    if (displayPath.startsWith("C:/backup", Qt::CaseInsensitive)) {
-        displayPath.remove(0, 9);
-    } else if (displayPath.startsWith("C:\\backup", Qt::CaseInsensitive)) {
-        displayPath.remove(0, 9);
+    if (displayPath.startsWith(backupPath, Qt::CaseInsensitive)) {
+        displayPath.remove(0, backupPath.length());
     }
 
     // 맨 앞 / 제거

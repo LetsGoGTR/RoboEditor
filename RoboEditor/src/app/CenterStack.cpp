@@ -23,6 +23,7 @@
 #include "LogManager.h"
 #include "ModifyPage.h"
 #include "WorkspaceContextMenuController.h"
+#include "AppConfig.h"
 
 static QIcon makeCircleIcon(const QColor &color, int size = 12)
 {
@@ -162,7 +163,7 @@ void CenterStack::setupUI()
     // (2) Backup Tree
     backupModel_ = new QFileSystemModel(this);
     backupModel_->setFilter(QDir::NoDotAndDotDot | QDir::Dirs);
-    backupModel_->setRootPath("C:/backup");
+    backupModel_->setRootPath(AppConfig::getBackupPath());
 
     backupTree_ = new QTreeView;
     backupTree_->setModel(backupModel_);
@@ -188,7 +189,7 @@ void CenterStack::setupUI()
 
     workspaceModel_ = new QFileSystemModel(this);
     workspaceModel_->setFilter(QDir::NoDotAndDotDot | QDir::AllEntries);
-    workspaceModel_->setRootPath("C:/backup");
+    workspaceModel_->setRootPath(AppConfig::getBackupPath());
 
     workspaceTree_ = new QTreeView;
     workspaceTree_->setModel(workspaceModel_);
@@ -394,7 +395,7 @@ void CenterStack::updateControllerList()
     for (const auto &c : controllers) {
         QStandardItem *item = new QStandardItem(c.serialNumber);
         item->setEditable(false);
-        item->setData(QString("C:/backup/%1").arg(c.serialNumber), Qt::UserRole + 1);
+        item->setData(AppConfig::getBackupPath() + QString("/%1").arg(c.serialNumber), Qt::UserRole + 1);
         item->setToolTip(QString("IP: %1\nSFTP: %2\nUser: %3\nWorkspace: %4")
                                  .arg(c.ip)
                                  .arg(c.sftpPort)

@@ -27,6 +27,7 @@
 // Core services
 #include "../core/services/DiffService.h"
 #include "../core/services/WorkspaceService.h"
+#include "AppConfig.h"
 
 ComparePage::ComparePage(QWidget *parent) : QWidget(parent)
 {
@@ -216,10 +217,10 @@ QString ComparePage::formatPathForCompare(const QString &fullPath) const
     if (fullPath.isEmpty())
         return "No file opened";
     QString displayPath = fullPath;
-    if (displayPath.startsWith("C:/backup", Qt::CaseInsensitive))
-        displayPath.remove(0, 9);
-    else if (displayPath.startsWith("C:\\backup", Qt::CaseInsensitive))
-        displayPath.remove(0, 9);
+    QString backupPath = AppConfig::getBackupPath();
+    if (displayPath.startsWith(backupPath, Qt::CaseInsensitive))
+        displayPath.remove(0, backupPath.length());
+
     if (displayPath.startsWith('/') || displayPath.startsWith('\\'))
         displayPath.remove(0, 1);
     displayPath.replace('/', " > ");
@@ -753,14 +754,16 @@ ComparePage::ControllerPathInfo ComparePage::extractControllerInfo(const QString
     ControllerPathInfo info;
     if (path.isEmpty())
         return info;
-    QString     normalized = QDir::fromNativeSeparators(QDir::cleanPath(path));
-    QStringList parts      = normalized.split('/', Qt::SkipEmptyParts);
+    QString normalized = QDir::cleanPath(path);
+    QString backupPath = QDir::cleanPath(AppConfig::getBackupPath());
 
-    for (int i = 0; i < parts.size(); ++i) {
-        if (parts[i].compare("backup", Qt::CaseInsensitive) == 0) {
-            if (i + 1 < parts.size())
-                info.serial = parts[i + 1];
-            break;
+    if (normalized.startsWith(backupPath, Qt::CaseInsensitive)) {
+        QString relative = normalized.mid(backupPath.length());
+        if (relative.startsWith('/') || relative.startsWith('\\')) relative.remove(0, 1);
+
+        QStringList parts = relative.split('/', Qt::SkipEmptyParts);
+        if (!parts.isEmpty()) {
+            info.serial = parts.first();
         }
     }
     return info;
@@ -824,7 +827,7 @@ void ComparePage::triggerFileCompare()
     QString path = QFileDialog::getOpenFileName(
             this,
             tr("Select file to compare"),
-            "C:/backup",
+            AppConfig::getBackupPath(),
             tr("All Files (*.*);;YAML Files (*.yaml *.yml);;Text Files (*.txt)"));
 
     if (!path.isEmpty()) {
@@ -836,7 +839,7 @@ void ComparePage::triggerFolderCompare()
 {
     showCompareEditor(false);
 
-    QFileDialog dialog(this, tr("Select folder or archive (compare)"), "C:/backup");
+    QFileDialog dialog(this, tr("Select folder or archive (compare)"), AppConfig::getBackupPath());
     dialog.setFileMode(QFileDialog::Directory);
     dialog.setOption(QFileDialog::ShowDirsOnly, false);
     dialog.setOption(QFileDialog::DontUseNativeDialog, true);
@@ -855,7 +858,7 @@ void ComparePage::triggerFolderCompare()
     if (leftPath.isEmpty())
         return;
 
-    QFileDialog dialog2(this, tr("Select folder or archive (base)"), "C:/backup");
+    QFileDialog dialog2(this, tr("Select folder or archive (base)"), AppConfig::getBackupPath());
     dialog2.setFileMode(QFileDialog::Directory);
     dialog2.setOption(QFileDialog::ShowDirsOnly, false);
     dialog2.setOption(QFileDialog::DontUseNativeDialog, true);

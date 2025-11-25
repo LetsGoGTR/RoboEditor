@@ -13,8 +13,34 @@
 #include "LogManager.h"
 #include "PasswordManager.h"
 #include "ProgressDialog.h"
+#include "AppConfig.h"
 #include "ui_ApplyPage.h"
 #include "ui_ConfirmSelection.h"
+
+
+// 경로를 'backup/...' 형태로 줄여주는 헬퍼 함수
+static QString formatDisplayPath(const QString &fullPath)
+{
+    if (fullPath.isEmpty()) return "";
+
+    QString backupRoot = QDir::cleanPath(AppConfig::getBackupPath());
+    QString targetPath = QDir::cleanPath(fullPath);
+
+    // 선택된 경로가 backup 루트 경로로 시작하는지 확인
+    if (targetPath.startsWith(backupRoot, Qt::CaseInsensitive)) {
+        // 루트 경로만큼 잘라냄 (예: "C:/.../backup" 제거)
+        QString relative = targetPath.mid(backupRoot.length());
+
+        // 맨 앞의 슬래시 제거
+        if (relative.startsWith('/')) relative.remove(0, 1);
+
+        // "backup/"을 앞에 붙여서 리턴
+        return "backup/" + relative;
+    }
+
+    // backup 폴더 밖의 경로라면 원래 경로 그대로 표시
+    return fullPath;
+}
 
 ApplyPage::ApplyPage(QWidget *parent) :
     QWidget(parent),
@@ -41,7 +67,7 @@ ApplyPage::ApplyPage(QWidget *parent) :
             this,
             [this](const QString &folder) {
                 selectedBackupDir = folder;
-                ui->selectedDir->setText(selectedBackupDir);
+                ui->selectedDir->setText(formatDisplayPath(selectedBackupDir));
                 qDebug() << "ApplyPage received:" << selectedBackupDir;
             });
 
@@ -130,7 +156,7 @@ void ApplyPage::showPasswordUI()
 QString ApplyPage::determineBackupRoot() const
 {
     if (selectedBackupDir.isEmpty()) {
-        return QStringLiteral("C:/backup");
+        return AppConfig::getBackupPath();
     }
 
     QDir dir(selectedBackupDir);
