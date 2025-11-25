@@ -23,11 +23,11 @@ class LogManager : public QObject
         static void        destroy();
         static void        append(const QString &line);
 
-        QString getLogFileName() const
+        static QString getLogFileName()
         {
             return logFileName_;
         }
-        QString getLogFilePath() const
+        static QString getLogFilePath()
         {
             return logFilePath_;
         }
@@ -44,10 +44,10 @@ class LogManager : public QObject
 
         static LogManager *instance_;
         // 파일 관련만 유지
-        QFile       *file_   = nullptr;
-        QTextStream *stream_ = nullptr;
-        QString      logFileName_;
-        QString      logFilePath_;
+        QFile         *file_   = nullptr;
+        QTextStream   *stream_ = nullptr;
+        static QString logFileName_;
+        static QString logFilePath_;
 };
 
 #endif  // LOGMANAGER_H

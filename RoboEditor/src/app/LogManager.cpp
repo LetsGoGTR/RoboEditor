@@ -12,12 +12,16 @@
 #include <QStandardPaths>
 
 LogManager *LogManager::instance_ = nullptr;
-
+QString     LogManager::logFileName_;
+QString     LogManager::logFilePath_;
 LogManager::LogManager(QObject *parent) : QObject(parent)
 {
-    openLogFile();
+    QString logDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QDir().mkpath(logDir);
 
-    qDebug() << "LogManager good";
+    logFileName_ = "RoboEditor_" + QDate::currentDate().toString("yyyy-MM-dd") + "_Log.txt";
+    logFilePath_ = logDir + "/" + logFileName_;
+    openLogFile();
 }
 
 LogManager::~LogManager()

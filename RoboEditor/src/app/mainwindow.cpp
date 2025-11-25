@@ -91,23 +91,13 @@ void MainWindow::wire()
         return;
     }
 
+    QString path = LogManager::getLogFilePath();
+    QString msg  = QString("Log File Loaded From [%1]").arg(path);
+    LogManager::append(msg);
+
     modifyPage  = center_->getModifyPage();
     comparePage = center_->getComparePage();
 
-    //ShortCutManager -> Qt의 setShortcut 사용
-    //shortcutMgr = new ShortcutManager(this);
-    //shortcutMgr->registerTo(this);
-
-    // connect(shortcutMgr, &ShortcutManager::openRequested, modifyPage, &ModifyPage::openFile);
-    // connect(shortcutMgr, &ShortcutManager::saveRequested, modifyPage, &ModifyPage::saveFile);
-    // connect(shortcutMgr, &ShortcutManager::saveAsRequested, this, [this]() {
-    //     modifyPage->saveAsFile();
-    // });
-    // connect(shortcutMgr,
-    //         &ShortcutManager::closeRequested,
-    //         modifyPage,
-    //         &ModifyPage::closeCurrentTab);
-    // connect(shortcutMgr, &ShortcutManager::quitRequested, this, []() { QApplication::quit(); });
     updateLogView();
     connect(center_.get(),
             &CenterStack::compareRequested,
@@ -594,25 +584,73 @@ void MainWindow::showSystemInfoFromMenu()
 }
 void MainWindow::showUserGuideFromMenu()
 {
-    QString info = QString("<b>RoboEditor System Information</b><br><br>"
-                           "<b>Version:</b> 1.0.0<br>"
-                           "<b>Qt Version:</b> %1<br>"
-                           "<b>Build Date:</b> %2<br>"
-                           "<b>Operating System:</b> %3<br>"
-                           "<b>Architecture:</b> %4")
-                           .arg(qVersion())
-                           .arg(__DATE__)
-                           .arg(QSysInfo::prettyProductName())
-                           .arg(QSysInfo::currentCpuArchitecture());
+    QString guide = "<h2>RoboEditor User Guide</h2>"
+                    "<h3>Getting Started</h3>"
+                    "<p><b>Adding a Controller:</b><br>"
+                    "1. Click 'Add Controller' or press Ctrl+Shift+N<br>"
+                    "2. Enter controller name, IP address, and credentials<br>"
+                    "3. Test connection and save configuration</p>"
+                    "<br>"
+                    "<h3>File Operations</h3>"
+                    "<p><b>Opening Files:</b><br>"
+                    "- Use Ctrl+O to open local files<br>"
+                    "- Double-click controller files in the tree view to open remotely</p>"
+                    "<p><b>Editing Files:</b><br>"
+                    "- Syntax highlighting is automatically applied<br>"
+                    "- Changes are saved locally until you upload to controller</p>"
+                    "<p><b>Saving Files:</b><br>"
+                    "- Ctrl+S: Save current file<br>"
+                    "- Ctrl+Shift+S: Save all open files</p>"
+                    "<br>"
+                    "<h3>Controller Management</h3>"
+                    "<p><b>Backup/Restore:</b><br>"
+                    "- Right-click controller → 'Backup from Controller'<br>"
+                    "- Backups are stored as compressed archives with timestamps<br>"
+                    "- Use 'Restore to Controller' to upload backup files</p>"
+                    "<p><b>File Comparison:</b><br>"
+                    "- Ctrl+D: Compare two files side-by-side<br>"
+                    "- Ctrl+Shift+D: Compare entire folders with diff highlighting</p>"
+                    "<p><b>SFTP Operations:</b><br>"
+                    "- Upload/Download files via right-click context menu<br>"
+                    "- Browse remote filesystem in tree view<br>"
+                    "- Monitor transfer progress in status bar</p>"
+                    "<br>"
+                    "<h3>Logs & Monitoring</h3>"
+                    "<p><b>Log Panel:</b><br>"
+                    "- View real-time system logs in bottom panel<br>"
+                    "- Filter by log level (Debug/Info/Warning/Error)<br>"
+                    "- Export logs for debugging purposes</p>"
+                    "<br>"
+                    "<h3>Tips & Tricks</h3>"
+                    "<p>• Use F5 to refresh controller file lists<br>"
+                    "• Right-click tabs for quick file operations<br>"
+                    "• Drag files between local and remote views<br>"
+                    "• Use search (Ctrl+F) to find text in open files<br>"
+                    "• Check status bar for connection status</p>"
+                    "<br>"
+                    "<h3>Troubleshooting</h3>"
+                    "<p><b>Connection Issues:</b><br>"
+                    "- Verify IP address and credentials<br>"
+                    "- Check network connectivity<br>"
+                    "- Ensure SSH/SFTP service is running on controller</p>"
+                    "<p><b>File Transfer Errors:</b><br>"
+                    "- Check file permissions on remote system<br>"
+                    "- Verify sufficient disk space<br>"
+                    "- Review logs for detailed error messages</p>"
+                    "<br>"
+                    "<p><i>For additional support, press F1 or contact technical support.</i></p>";
 
     QMessageBox msgBox(this);
-    msgBox.setWindowTitle("System Information");
+    msgBox.setWindowTitle("User Guide");
     msgBox.setTextFormat(Qt::RichText);
-    msgBox.setText(info);
+    msgBox.setText(guide);
     msgBox.setIcon(QMessageBox::Information);
+
+    // 내용이 길어서 스크롤 가능하도록 크기 조정
+    msgBox.setStyleSheet("QMessageBox { min-width: 600px; }");
+
     msgBox.exec();
 }
-
 void MainWindow::showAboutFromMenu()
 {
     QString aboutText = "<h2>RoboEditor</h2>"
@@ -620,8 +658,7 @@ void MainWindow::showAboutFromMenu()
                         "<p>Robot Controller Management Tool</p>"
                         "<p>Developed in collaboration with<br>"
                         "Samsung Electronics Production Technology Research Institute</p>"
-                        "<br>"
-                        "<p>© 2025 환성</p>";
+                        "<br>";
 
     QMessageBox msgBox(this);
     msgBox.setWindowTitle("About RoboEditor");

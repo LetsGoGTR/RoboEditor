@@ -867,8 +867,11 @@ bool ControllerManager::saveController(const ControllerInfo &controller)
 
     // 3. JSON 객체 생성
     QJsonObject obj;
+
+    obj["protocol"]     = controller.protocol;
     obj["serialNumber"] = controller.serialNumber;
     obj["host"]         = controller.host;
+    obj["apiPort"]      = controller.apiPort;
     obj["sftpPort"]     = controller.sftpPort;
     obj["username"]     = controller.username;
     obj["pswd"]         = pm_->encrypt(controller.pswd);
@@ -924,8 +927,10 @@ bool ControllerManager::loadController(const QString &serialNumber)
     QJsonObject obj = doc.object();
     // 6. ControllerInfo 생성
     ControllerInfo c;
+    c.protocol     = obj["protocol"].toInt();
     c.serialNumber = obj["serialNumber"].toString();
     c.host         = obj["host"].toString();
+    c.apiPort      = obj["apiPort"].toInt();
     c.sftpPort     = obj["sftpPort"].toInt();
     c.username     = obj["username"].toString();
     c.pswd         = pm_->decrypt(obj["pswd"].toString());
