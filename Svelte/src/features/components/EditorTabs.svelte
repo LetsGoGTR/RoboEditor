@@ -1,14 +1,13 @@
 <script lang="ts">
 	import GroupTabs from '@layouts/GroupTabs.svelte';
 	import { currentFile } from '@/stores/currentFile';
-	import { onMount, onDestroy, tick } from 'svelte';
+	import { onDestroy, onMount, tick } from 'svelte';
 	import type { FileNode } from '@/types';
 
 	import { getMonaco } from '@utils/monaco';
 	import type * as monaco from 'monaco-editor';
-	import { handleSaveFile } from '@handlers/nodeActions';
-
-	import { loadFile } from '@/features/handlers/nodeActions';
+	import { _getFile } from '@apis/file';
+	import { handleSaveFile, loadFile } from '@handlers/nodeActions';
 
 	let container: HTMLDivElement | null = null;
 	let editor: monaco.editor.IStandaloneCodeEditor | null = null;
@@ -17,69 +16,104 @@
 	let state = $derived($currentFile);
 
 	/* ------------------------------------------------------------
-	 * Editor 최초 초기화 (이벤트 1회 등록)
+	 * 초기화
 	 * ------------------------------------------------------------ */
-	function initEditor(model) {
-		editor = monacoInstance!.editor.create(container!, {
-			model,
+	onMount(async () => {
+		await tick();
+
+		monacoInstance = await getMonaco();
+		const activeFile = state.active?.file;
+
+		if (!monacoInstance || !container) return;
+
+		editor = monacoInstance.editor.create(container, {
 			theme: 'vs-white',
 			automaticLayout: true,
 			minimap: { enabled: false }
 		});
 
-		// Ctrl+S 저장
-		editor.addCommand(monacoInstance!.KeyMod.CtrlCmd | monacoInstance!.KeyCode.KeyS, () =>
-			handleSaveFile(editor!)
-		);
+		if (activeFile) {
+			editor = await loadFile(monacoInstance, editor, activeFile);
+		}
+
+		editor?.addCommand(monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyCode.KeyS, () => {
+			handleSaveFile(editor!);
+		});
+
+		editor?.onDidChangeModelContent(() => {
+			currentFile.setContentManual(editor!.getValue());
+		});
+	});
+
+	/* ------------------------------------------------------------ */
+	async function tryInitEditor() {
+		await tick();
+		if (!container || !monacoInstance) return;
+
+		if (!editor) {
+			editor = monacoInstance.editor.create(container, {
+				theme: 'vs-white',
+				automaticLayout: true,
+				minimap: { enabled: false }
+			});
+
+			editor.addCommand(monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyCode.KeyS, () => {
+				handleSaveFile(editor!);
+			});
+
+			editor.onDidChangeModelContent(() => {
+				currentFile.setContentManual(editor!.getValue());
+			});
+		}
+
+		const file = state.active?.file;
+		if (file) {
+			editor = await loadFile(monacoInstance, editor, file);
+		}
 	}
 
 	/* ------------------------------------------------------------
-	 * active file 변경 감지 → loadFileToEditor 실행
+	 * Tab 전환 / 닫기
 	 * ------------------------------------------------------------ */
-	$effect(async () => {
+	function handleSwitch(index: number) {
+		currentFile.switchTab(index);
+	}
+
+	function handleClose(index: number) {
+		currentFile.closeTab(index);
+	}
+
+	$effect(() => {
 		const file = $currentFile.active?.file;
-		if (!file || !monacoInstance || !container) return;
 
-		await tick();
+		if (!monacoInstance) return;
 
-		const updated = await loadFile(monacoInstance, editor, file);
-
-		// 처음 설정한 경우 updated=null → 모델은 있지만 editor가 없음
-		if (updated === null) {
-			const model = monacoInstance!.editor.getModels().find((m) => m.uri.path === file.path);
-			model && initEditor(model);
-		}
-	});
-
-	/* ------------------------------------------------------------
-	 * mount
-	 * ------------------------------------------------------------ */
-	onMount(async () => {
-		monacoInstance = await getMonaco();
-
-		const active = state.active?.file;
-		if (active) {
-			await tick();
-			const updated = await loadFile(monacoInstance, editor, active);
-
-			if (!updated) {
-				const model = monacoInstance!.editor.getModels().find((m) => m.uri.path === active.path);
-				model && initEditor(model);
+		// 파일이 바뀌었을 때만 모델 교체
+		if (file) {
+			if (editor) {
+				// 현재 editor의 모델이 다른 파일이면 로드
+				const currentPath = editor.getModel()?.uri.path;
+				if (currentPath !== file.path) {
+					tryInitEditor();
+				}
+			} else {
+				tryInitEditor();
+			}
+		} else {
+			// 탭이 모두 닫힌 경우만 dispose
+			if (editor) {
+				editor.dispose();
+				editor = null;
 			}
 		}
 	});
 
 	onDestroy(() => {
-		editor?.dispose();
+		if (editor) {
+			editor.dispose();
+			editor = null;
+		}
 	});
-
-	function handleSwitch(i: number) {
-		currentFile.switchTab(i);
-	}
-
-	function handleClose(i: number) {
-		currentFile.closeTab(i);
-	}
 </script>
 
 <div class="editor-tabs-root">
@@ -99,10 +133,12 @@
 		<div slot="content" bind:this={container} class="editor-container"></div>
 	</GroupTabs>
 </div>
+<button class="save-btn" onclick={() => handleSaveFile(editor!)}>저장</button>
 
 <style>
 	.editor-tabs-root {
 		display: flex;
+		position: relative;
 		flex-direction: column;
 		flex: 1;
 		height: 100%;
@@ -114,5 +150,52 @@
 		flex: 1;
 		width: 100%;
 		height: 100%;
+	}
+
+	.save-btn {
+		position: absolute;
+		bottom: 24px;
+		right: 24px;
+
+		width: 72px;
+		height: 36px;
+		line-height: 36px;
+
+		border: none;
+		outline: none;
+		border-radius: 10px;
+
+		background-color: #4e83db;
+		color: white;
+
+		font-size: 15px;
+		font-weight: 500;
+		font-family:
+			system-ui,
+			-apple-system,
+			BlinkMacSystemFont,
+			'Segoe UI',
+			Roboto,
+			Helvetica,
+			Arial,
+			sans-serif;
+		text-align: center;
+		cursor: pointer;
+
+		transition:
+			background-color 0.2s ease,
+			transform 0.15s ease;
+
+		user-select: none;
+		z-index: 999;
+	}
+
+	.save-btn:hover {
+		background-color: #3b6fc5;
+		transform: translateY(-2px);
+	}
+
+	.save-btn:active {
+		transform: translateY(0);
 	}
 </style>
