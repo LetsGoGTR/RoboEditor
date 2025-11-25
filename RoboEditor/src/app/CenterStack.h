@@ -37,7 +37,8 @@ class CenterStack : public QWidget
         void openCompareResult(const QString &left, const QString &right);
         void startPolling(int intervalMs = 5000);
         void stopPolling();
-        void connectLogManager();
+        void showLogPanel();
+        void hideLogPanel();
         // 페이지 접근자
         ModifyPage *modifyPage() const
         {
@@ -97,6 +98,7 @@ class CenterStack : public QWidget
         QListView      *controllerList_;
         QTreeView      *workspaceTree_;
         QWidget        *controllerWidget_;
+        QWidget        *logPanel_;
         QPlainTextEdit *logView_;
         QLabel         *logTitle_;
 
