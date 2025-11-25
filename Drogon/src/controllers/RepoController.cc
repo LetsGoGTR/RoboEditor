@@ -73,9 +73,9 @@ void api::v1::Repo::create(const drogon::HttpRequestPtr                         
         metadata.scheme   = json->isMember("scheme") ? (*json)["scheme"].asString() : "http";
         metadata.apiPort  = json->isMember("apiPort") ? (*json)["apiPort"].asInt() : 0;
         metadata.sftpPort = json->isMember("sftpPort") ? (*json)["sftpPort"].asInt() : 22;
+        metadata.sftpUser = json->isMember("sftpUser") ? (*json)["sftpUser"].asString() : "";
         metadata.sftpPassword =
                 json->isMember("sftpPassword") ? (*json)["sftpPassword"].asString() : "";
-        metadata.sftpUser = json->isMember("sftpUser") ? (*json)["sftpUser"].asString() : "";
 
         auto result = services::DeviceService::createDevice(metadata);
 
@@ -172,11 +172,11 @@ void api::v1::Repo::update(const drogon::HttpRequestPtr                         
                                                           : existingResult.data["apiPort"].asInt();
         metadata.sftpPort     = json->isMember("sftpPort") ? (*json)["sftpPort"].asInt()
                                                            : existingResult.data["sftpPort"].asInt();
+        metadata.sftpUser     = json->isMember("sftpUser") ? (*json)["sftpUser"].asString()
+                                                           : existingResult.data["sftpUser"].asString();
         metadata.sftpPassword = json->isMember("sftpPassword")
                                         ? (*json)["sftpPassword"].asString()
                                         : existingResult.data["sftpPassword"].asString();
-        metadata.sftpUser     = json->isMember("sftpUser") ? (*json)["sftpUser"].asString()
-                                                           : existingResult.data["sftpUser"].asString();
 
         auto result = services::DeviceService::updateDevice(deviceId, metadata);
 

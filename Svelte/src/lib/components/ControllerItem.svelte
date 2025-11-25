@@ -13,7 +13,9 @@
     <span class="state {controller.controllerMeta.state.toLowerCase()}">{controller.controllerMeta.state}</span>
   </div>
   <div class="info">
-    <div><strong>IP:</strong> {controller.controllerMeta.api}</div>
+    <div><strong>IP:</strong> {controller.controllerMeta.host}</div>
+    <div><strong>API Port:</strong> {controller.controllerMeta.apiPort}</div>
+    <div><strong>SFTP Port:</strong> {controller.controllerMeta.sftpPort}</div>
   </div>
 </div>
 

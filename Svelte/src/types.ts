@@ -88,8 +88,9 @@ export interface ControllerMeta {
 	name: string;
 	description?: string | null;
 
-	api: string;
-	sftpHost: string;
+	host: string;
+	scheme?: string | null;
+	apiPort: number;
 	sftpPort: number;
 	sftpUser?: string;
 	sftpPassword?: string;
