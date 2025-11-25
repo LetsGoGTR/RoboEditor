@@ -61,7 +61,8 @@ void ControllerManager::registerController()
             QString msg = QString("Registration failed : [%1] already exists")
                                   .arg(newConInfo.serialNumber);
             LogManager::append(msg);
-            QMessageBox::warning(nullptr, "등록 실패", "이미 동일한 제어기가 등록되어 있습니다.");
+            QMessageBox::warning(nullptr, tr("Registration Failed"), 
+                                 tr("A controller with the same Serial Number is already registered."));
             return;
         }
 
@@ -76,8 +77,8 @@ void ControllerManager::registerController()
                 folderCreated = true;
             } else {
                 QMessageBox::warning(nullptr,
-                                     "폴더 생성 실패",
-                                     "작업 경로에 폴더를 생성할 수 없습니다:\n" + folderPath);
+                                     tr("Folder Creation Failed"),
+                                     tr("Cannot create folder at the working path:\n") + folderPath);
                 return;
             }
         }
@@ -88,10 +89,10 @@ void ControllerManager::registerController()
                                   .arg(newConInfo.serialNumber);
             LogManager::append(msg);
             QMessageBox::warning(nullptr,
-                                 "등록 실패",
-                                 "제어기와의 연결을 확인할 수 없습니다.\n"
-                                 "API 또는 SFTP 연결이 실패했습니다.\n"
-                                 "host 주소, 포트, 계정 정보를 확인해주세요.");
+                                 tr("Registration Failed"),
+                                 tr("Cannot verify connection to the controller.\n"
+                                    "API or SFTP connection failed.\n"
+                                    "Please check the host address, port, and credentials."));
             if (folderCreated) {
                 if (dir.rmpath(folderPath)) {
                     qDebug() << "등록 실패로 인한 폴더 삭제:" << folderPath;
@@ -182,10 +183,10 @@ void ControllerManager::updateInfo(const ControllerInfo &newInfo)
             LogManager::append(msg);
 
             QMessageBox::warning(&dialog,
-                                 "수정 실패",
-                                 "제어기와의 연결을 확인할 수 없습니다.\n"
-                                 "API 또는 SFTP 연결이 실패했습니다.\n"
-                                 "host 주소, 포트, 계정 정보를 확인해주세요.");
+                                 tr("Update Failed"),
+                                 tr("Cannot verify connection to the controller.\n"
+                                    "API or SFTP connection failed.\n"
+                                    "Please check the host address, port, and credentials."));
             return;  // 검증 실패
         }
 
@@ -848,21 +849,26 @@ bool ControllerManager::receive(const QString &serialNumber,
             return false;
         }
     }
-// 1. 하위 파일/폴더 권한 설정
-    QDirIterator it(finalPath, QDir::AllEntries | 					QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
+    // 1. 하위 파일/폴더 권한 설정
+    QDirIterator it(finalPath, QDir::AllEntries | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
     while (it.hasNext()) {
-        QString entry = it.next();
-        QFile::setPermissions(entry,
-            QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner |
-            QFileDevice::ReadGroup | QFileDevice::WriteGroup | QFileDevice::ExeGroup |
-            QFileDevice::ReadOther | QFileDevice::WriteOther | QFileDevice::ExeOther);
-    }
+        QString entryPath = it.next();
+        QFileInfo fi(entryPath);
 
-    // 2. 최상위 폴더 자체 권한 설정
-    QFile::setPermissions(finalPath,
-        QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner |
-        QFileDevice::ReadGroup | QFileDevice::WriteGroup | QFileDevice::ExeGroup |
-        QFileDevice::ReadOther | QFileDevice::WriteOther | QFileDevice::ExeOther);
+        if (fi.isDir()) {
+            // 폴더: 775 (rwxrwxr-x) - 그룹에게도 쓰기/진입 권한 부여
+            QFile::setPermissions(entryPath,
+                                  QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner |
+                                          QFileDevice::ReadGroup | QFileDevice::WriteGroup | QFileDevice::ExeGroup | // 그룹 쓰기 추가
+                                          QFileDevice::ReadOther | QFileDevice::ExeOther);
+        } else {
+            // 파일: 664 (rw-rw-r--) - 그룹에게도 쓰기 권한 부여
+            QFile::setPermissions(entryPath,
+                                  QFileDevice::ReadOwner | QFileDevice::WriteOwner |
+                                          QFileDevice::ReadGroup | QFileDevice::WriteGroup | // 그룹 쓰기 추가
+                                          QFileDevice::ReadOther);
+        }
+    }
 
 
     qDebug() << "Receive completed successfully ->" << finalPath;

@@ -510,9 +510,9 @@ void CenterStack::onRemoveController(const QString &serialNumber)
 {
     QMessageBox::StandardButton reply;
     reply = QMessageBox::question(this,
-                                  "제어기 삭제",
-                                  QString("정말로 '%1'을(를) 삭제하시겠습니까?\n\n"
-                                          "※ 백업 폴더는 삭제되지 않습니다.")
+                                  tr("Delete Controller"),
+                                  tr("Are you sure you want to delete '%1'?\n\n"
+                                     "Note: The backup folder will not be deleted.")
                                           .arg(serialNumber),
                                   QMessageBox::Yes | QMessageBox::No);
 
@@ -531,7 +531,7 @@ void CenterStack::onRemoveController(const QString &serialNumber)
             updateControllerList();
 
             QMessageBox::information(
-                    this, "삭제 완료", QString("'%1'이(가) 삭제되었습니다.").arg(serialNumber));
+                    this, tr("Deleted"), tr("'%1' has been deleted.").arg(serialNumber));
 
             QString msg = QString("Controller removed: %1").arg(serialNumber);
             LogManager::append(msg);

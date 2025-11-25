@@ -56,7 +56,7 @@ ControllerInfo ControllerSetting::getControllerInfo()
     QString pswd = ui->pswdBox->text().trimmed();
 
     if (sn.isEmpty() || host.isEmpty() || user.isEmpty() || pswd.isEmpty()) {
-        QMessageBox::warning(this, "입력 오류", "모든 항목을 입력해야 합니다.");
+        QMessageBox::warning(this, tr("Input Error"), tr("All fields must be filled."));
         return ControllerInfo();  // 빈 구조체
     }
 
