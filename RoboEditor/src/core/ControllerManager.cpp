@@ -4,6 +4,7 @@
 
 #include <QDateTime>
 #include <QDir>
+#include <QDirIterator>
 #include <QFile>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -847,6 +848,22 @@ bool ControllerManager::receive(const QString &serialNumber,
             return false;
         }
     }
+// 1. 하위 파일/폴더 권한 설정
+    QDirIterator it(finalPath, QDir::AllEntries | 					QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
+    while (it.hasNext()) {
+        QString entry = it.next();
+        QFile::setPermissions(entry,
+            QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner |
+            QFileDevice::ReadGroup | QFileDevice::WriteGroup | QFileDevice::ExeGroup |
+            QFileDevice::ReadOther | QFileDevice::WriteOther | QFileDevice::ExeOther);
+    }
+
+    // 2. 최상위 폴더 자체 권한 설정
+    QFile::setPermissions(finalPath,
+        QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner |
+        QFileDevice::ReadGroup | QFileDevice::WriteGroup | QFileDevice::ExeGroup |
+        QFileDevice::ReadOther | QFileDevice::WriteOther | QFileDevice::ExeOther);
+
 
     qDebug() << "Receive completed successfully ->" << finalPath;
     return true;
