@@ -15,6 +15,7 @@
 #include "ApplyPage.h"
 #include "CenterStack.h"
 #include "LogManager.h"
+#include "LogTextEdit.h"
 #include "ModifyPage.h"
 #include "NavDock.h"
 #include "ShortcutManager.h"
@@ -442,7 +443,6 @@ void MainWindow::updateLogView()
 
     // 3. Dock 모드
     center_->hideLogPanel();
-
     if (!m_logDock) {
         m_logDock = new QDockWidget(this);
         m_logDock->setObjectName("LogDock");
@@ -464,9 +464,8 @@ void MainWindow::updateLogView()
 
         m_logDock->setTitleBarWidget(header);
 
-        QPlainTextEdit *logView = new QPlainTextEdit;
-        logView->setReadOnly(true);
-        logView->setMaximumBlockCount(1000);
+        // LogTextEdit 사용
+        LogTextEdit *logView = new LogTextEdit;
         logView->setObjectName("LogView");
 
         connect(LogManager::instance(),
@@ -629,7 +628,6 @@ void MainWindow::showAboutFromMenu()
     msgBox.setIconPixmap(QPixmap(":/icons/app_icon.png").scaled(64, 64, Qt::KeepAspectRatio));
     msgBox.exec();
 }
-
 void MainWindow::closeEvent(QCloseEvent *event)
 {
     QMainWindow::closeEvent(event);
