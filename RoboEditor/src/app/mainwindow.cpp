@@ -120,8 +120,10 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event)
 void MainWindow::applyStyleSheet()
 {
     dark = qApp->styleHints()->colorScheme() == Qt::ColorScheme::Dark;
+    QString fileName = dark ? "dark.qss" : "light.qss";
 
-    QString stylePath = dark ? ":/styles/dark.qss" : ":/styles/light.qss";
+    // 실행 파일 옆 styles 폴더 참조로 통일
+    QString stylePath = QCoreApplication::applicationDirPath() + "/styles/" + fileName;
 
     QFile f(stylePath);
     if (f.open(QFile::ReadOnly)) {

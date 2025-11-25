@@ -269,6 +269,19 @@ if(WIN32)
     )
 endif()
 
+# 빌드 후 src/styles 폴더를 실행 파일 옆으로 자동 복사
+add_custom_command(TARGET RoboEditor POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/styles
+    $<TARGET_FILE_DIR:RoboEditor>/styles
+    COMMENT "Copying styles directory to build directory..."
+)
+# make install 시에도 styles 폴더가 같이 설치되도록 설정
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src/styles
+    DESTINATION ${CMAKE_INSTALL_BINDIR}
+    COMPONENT resources
+)
+
 if(${QT_VERSION} VERSION_LESS 6.1.0)
     set(BUNDLE_ID_OPTION MACOSX_BUNDLE_GUI_IDENTIFIER com.example.RoboEditor)
 endif()
