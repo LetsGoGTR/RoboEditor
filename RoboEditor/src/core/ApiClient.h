@@ -13,13 +13,15 @@
 #include <QUrl>
 
 // 로봇의 상태를 주기적으로 확인하는 역할
+struct ControllerInfo;
+class ControllerManager;
 
 class ApiClient : public QObject
 {
     Q_OBJECT
 
       public:
-        explicit ApiClient(const QString &baseUrl, QObject *parent = nullptr);
+        explicit ApiClient(const ControllerInfo &info, QObject *parent = nullptr);
         ~ApiClient();
 
         //api요청
@@ -28,17 +30,18 @@ class ApiClient : public QObject
         void download(
                 const QString &endpoint, const QString &destPath, const QString &serialNumber);
 
-        static QString normalizeBaseUrl(const QString &baseUrl);
+        static QString normalizeBaseUrlAPI(const ControllerInfo &info);
+        static QString normalizeBaseUrlSFTP(const ControllerInfo &info);
         QString        getBaseUrl() const
         {
             return m_baseUrl;
         }
 
-        bool postJson(const QString& endpoint, const QJsonObject& body, int timeoutMs = 10000);
+        bool postJson(const QString &endpoint, const QJsonObject &body, int timeoutMs = 10000);
 
         // workspace(래퍼)
-        bool postWorkspaceCompress(const QString& user);
-        bool postWorkspaceExtract(const QString& user, const QString& password);
+        bool postWorkspaceCompress(const QString &user);
+        bool postWorkspaceExtract(const QString &user, const QString &password);
 
       signals:
         void robotStateChanged(bool isRunning);  //로봇의 상태가 변화했을 때 신호

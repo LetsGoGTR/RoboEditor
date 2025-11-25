@@ -18,6 +18,8 @@ class TopMenu : public QObject
     Q_OBJECT
       public:
         explicit TopMenu(MainWindow * mw);
+        enum LogPosition { Bottom, Top, Left, Righ, Editor };
+
         QMenu *viewMenu() const
         {
             return view_;
@@ -34,6 +36,7 @@ class TopMenu : public QObject
         {
             return showLogMenu_->menuAction();
         }
+        QAction *mk(const QString &text);
 
       private:
         MainWindow *mw_;
@@ -81,12 +84,20 @@ class TopMenu : public QObject
         QAction *actChangePswd_ = nullptr;
 
         // Help Actions
-        QAction *actDocumentation_ = nullptr;
-        QAction *actAbout_         = nullptr;
+        QAction *actUserGuide_  = nullptr;
+        QAction *actShortcuts_  = nullptr;
+        QAction *actSystemInfo_ = nullptr;
+        QAction *actAbout_      = nullptr;
 
         QAction      *themeToggle_ = nullptr;
         QActionGroup *posGroup_    = nullptr;
         QActionGroup *screenGroup_ = nullptr;
+
+        QAction *actLogBottom_;
+        QAction *actLogRight_;
+        QAction *actLogLeft_;
+        QAction *actLogTop_;
+        QAction *actLogPanel_;
 
         void build();
 
@@ -103,6 +114,9 @@ class TopMenu : public QObject
         void compareFolderFromMenu();
         void applyFromMenu();
         void backupFromMenu();
+
+        void logToggled(bool visible);
+        void logPositionChanged(Qt::DockWidgetArea area, bool isPanel);
 };
 
 #endif  // TOPMENU_H

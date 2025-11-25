@@ -225,8 +225,8 @@ void CenterStack::setupUI()
 
     modifyPage_ = new ModifyPage(rightSplitter_);
 
-    QWidget     *logPanel       = new QWidget(rightSplitter_);
-    QVBoxLayout *logPanelLayout = new QVBoxLayout(logPanel);
+    logPanel_                   = new QWidget(rightSplitter_);
+    QVBoxLayout *logPanelLayout = new QVBoxLayout(logPanel_);
     logPanelLayout->setContentsMargins(0, 0, 0, 0);
     logPanelLayout->setSpacing(0);
 
@@ -252,7 +252,7 @@ void CenterStack::setupUI()
     logPanelLayout->addWidget(logView_);
 
     rightSplitter_->addWidget(modifyPage_);
-    rightSplitter_->addWidget(logPanel);
+    rightSplitter_->addWidget(logPanel_);
     rightSplitter_->setSizes({750, 250});
     rightSplitter_->setStretchFactor(0, 75);
     rightSplitter_->setStretchFactor(1, 25);
@@ -264,7 +264,39 @@ void CenterStack::setupUI()
     mainLayout->addWidget(splitter_);
     setLayout(mainLayout);
 
-    connectLogManager();
+    auto *mgr = LogManager::instance();
+    if (!mgr) {
+        qWarning() << "[CenterStack] LogManager is null!";
+        return;  // 여기서 리턴하면 안전
+    }
+
+    qDebug() << "[CenterStack] LogManager instance OK";
+
+    if (!logTitle_) {
+        qWarning() << "[CenterStack] logTitle_ is null!";
+        return;
+    }
+
+    qDebug() << "[CenterStack] logTitle_ OK";
+
+    // 로그 파일명 설정
+    QString fileName = mgr->getLogFileName();
+    qDebug() << "[CenterStack] LogFileName:" << fileName;
+    logTitle_->setText(fileName);
+
+    qDebug() << "[CenterStack] Before signal connection";
+
+    connect(mgr, &LogManager::logAppended, this, [this](const QString &text) {
+        if (logView_) {
+            logView_->appendPlainText(text);
+
+            QTextCursor cursor = logView_->textCursor();
+            cursor.movePosition(QTextCursor::End);
+            logView_->setTextCursor(cursor);
+        }
+    });
+
+    qDebug() << "[CenterStack] LogManager connected successfully";
 
     // ---------------------- 시그널 연결 ----------------------
 
@@ -395,8 +427,8 @@ void CenterStack::updateControllerList()
         QStandardItem *item = new QStandardItem(c.serialNumber);
         item->setEditable(false);
         item->setData(QString("C:/backup/%1").arg(c.serialNumber), Qt::UserRole + 1);
-        item->setToolTip(QString("IP: %1\nSFTP: %2\nUser: %3\nWorkspace: %4")
-                                 .arg(c.ip)
+        item->setToolTip(QString("Protocol: %1 Host: %2\nSFTP: %3\nUser: %4\nWorkspace: %5")
+                                 .arg(c.host)
                                  .arg(c.sftpPort)
                                  .arg(c.username)
                                  .arg(c.wsPath));
@@ -472,39 +504,6 @@ void CenterStack::onEditController(const QString &serialNumber)
     }
 }
 
-void CenterStack::connectLogManager()
-{
-    qDebug() << "[connectLogManager] called";
-
-    auto mgr = LogManager::instance();
-    if (!mgr)
-        return;
-
-    // 텍스트 복사
-    if (mgr->view() && logView_) {
-        auto mainLog = mgr->view();
-
-        connect(mainLog, &QPlainTextEdit::textChanged, this, [this, mainLog]() {
-            if (logView_) {
-                logView_->setPlainText(mainLog->toPlainText());
-
-                QTextCursor cursor = logView_->textCursor();
-                cursor.movePosition(QTextCursor::End);
-                logView_->setTextCursor(cursor);
-            }
-        });
-    }
-
-    // 제목 설정
-    if (logTitle_) {
-        logTitle_->setText(mgr->getLogFileName());
-    }
-
-    QString path = mgr->getLogFilePath();
-    QString msg  = QString("Load Log File from %1").arg(path);
-    LogManager::append(msg);
-}
-
 // 제어기 삭제
 void CenterStack::onRemoveController(const QString &serialNumber)
 {
@@ -565,7 +564,21 @@ void CenterStack::onPollingTimeout()
     qDebug() << "timeout";
     ControllerManager::instance()->updateControllersStates();
 }
+void CenterStack::showLogPanel()
+{
+    if (logPanel_) {
+        logPanel_->show();
+        qDebug() << "[CenterStack] Log panel shown";
+    }
+}
 
+void CenterStack::hideLogPanel()
+{
+    if (logPanel_) {
+        logPanel_->hide();
+        qDebug() << "[CenterStack] Log panel hidden";
+    }
+}
 CenterStack::~CenterStack()
 {
     stopPolling();
