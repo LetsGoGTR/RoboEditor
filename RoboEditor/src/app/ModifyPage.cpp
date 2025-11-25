@@ -93,6 +93,9 @@ Document *ModifyPage::openDocument(const QString &path)
         delete doc;
         return nullptr;
     }
+    
+    // 리스트에 먼저 추가 (탭 생성 전에)
+    documents.append(doc);
 
     // 컨테이너 위젯 생성 (QLabel + CodeEditor)
     QWidget     *tabPage    = new QWidget(tabWidget);
@@ -155,7 +158,6 @@ Document *ModifyPage::openDocument(const QString &path)
     currentDoc = doc;
     editor_    = neweditor_;
     updateTitle();
-    documents.append(doc);
     setCurrentDocument(documents.size() - 1);
 
     if (comparePane_) {
@@ -583,9 +585,10 @@ void ModifyPage::closeFile(int index)
         else if (result == QMessageBox::Cancel)
             return;
     }
-
-    tabWidget->removeTab(index);
+    
     closeDocument(index);
+    tabWidget->removeTab(index);
+    
     delete doc;
 
     if (!documents.isEmpty()) {
