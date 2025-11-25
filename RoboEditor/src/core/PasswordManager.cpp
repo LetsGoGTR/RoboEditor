@@ -122,8 +122,8 @@ void PasswordManager::changePassword()
 {
     bool    ok;
     QString oldPwd = QInputDialog::getText(this,
-                                           tr("현재 비밀번호 확인"),
-                                           tr("현재 비밀번호를 입력하세요:"),
+                                           tr("Verify Current Password"),
+                                           tr("Enter current password:"),
                                            QLineEdit::Password,
                                            "",
                                            &ok);
@@ -132,13 +132,13 @@ void PasswordManager::changePassword()
         return;
 
     if (hashedPswd != hashPassword(oldPwd)) {
-        QMessageBox::warning(this, tr("오류"), tr("현재 비밀번호가 올바르지 않습니다."));
+        QMessageBox::warning(this, tr("Error"), tr("Incorrect current password."));
         return;
     }
 
     QString newPwd = QInputDialog::getText(this,
-                                           tr("새 비밀번호 설정"),
-                                           tr("새 비밀번호를 입력하세요:"),
+                                           tr("Set New Password"),
+                                           tr("Enter new password:"),
                                            QLineEdit::Password,
                                            "",
                                            &ok);
@@ -148,19 +148,19 @@ void PasswordManager::changePassword()
 
     // 비밀번호 정책 검증 (선택사항)
     if (newPwd.length() < 4) {
-        QMessageBox::warning(this, tr("오류"), tr("비밀번호는 최소 4자 이상이어야 합니다."));
+        QMessageBox::warning(this, tr("Error"), tr("Password must be at least 4 characters long."));
         return;
     }
 
     QString confirmPwd = QInputDialog::getText(this,
-                                               tr("새 비밀번호 확인"),
-                                               tr("다시 한 번 입력하세요:"),
+                                               tr("Confirm New Password"),
+                                               tr("Re-enter new password:"),
                                                QLineEdit::Password,
                                                "",
                                                &ok);
 
     if (!ok || newPwd != confirmPwd) {
-        QMessageBox::warning(this, tr("오류"), tr("비밀번호가 일치하지 않습니다."));
+        QMessageBox::warning(this, tr("Error"), tr("Passwords do not match."));
         return;
     }
 
@@ -170,7 +170,7 @@ void PasswordManager::changePassword()
     //신호 발생 : 제어기 config에 있는 비밀번호 업데이트
     emit masterPasswordChanged();
 
-    QMessageBox::information(this, tr("완료"), tr("비밀번호가 변경되었습니다."));
+    QMessageBox::information(this, tr("Success"), tr("Password changed successfully."));
 }
 QByteArray PasswordManager::deriveKey() const
 {

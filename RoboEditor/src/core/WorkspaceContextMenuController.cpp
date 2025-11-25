@@ -257,14 +257,14 @@ void WorkspaceContextMenuController::onDeleteFile(const QString &filePath)
         return;
 
     auto reply = QMessageBox::question(
-            treeView_, "파일 삭제", QString("'%1' 파일을 삭제할까요?").arg(info.fileName()));
+            treeView_, tr("Delete File"), tr("Are you sure you want to delete '%1'?").arg(info.fileName()));
     if (reply != QMessageBox::Yes)
         return;
 
     services::ServiceResult result = services::FileService::deleteFile(filePath.toStdString());
 
     if (!result.success) {
-        QMessageBox::warning(treeView_, "삭제 실패", QString::fromStdString(result.errorMessage));
+        QMessageBox::warning(treeView_, tr("Delete Failed"), QString::fromStdString(result.errorMessage));
         return;
     }
 
@@ -279,14 +279,14 @@ void WorkspaceContextMenuController::onDeleteFolder(const QString &folderPath)
         return;
 
     if (folderPath == workspaceRoot_) {
-        QMessageBox::warning(treeView_, "삭제 불가", "워크스페이스 루트는 삭제할 수 없습니다.");
+        QMessageBox::warning(treeView_, tr("Cannot Delete"), tr("Workspace root cannot be deleted."));
         return;
     }
 
     auto reply = QMessageBox::question(
             treeView_,
-            "폴더 삭제",
-            QString("'%1' 폴더 및 하위 항목이 모두 삭제됩니다.\n삭제할까요?").arg(info.fileName()));
+            tr("Delete Folder"),
+            tr("Folder '%1' and all its contents will be deleted.\nContinue?").arg(info.fileName()));
 
     if (reply != QMessageBox::Yes)
         return;
@@ -295,7 +295,7 @@ void WorkspaceContextMenuController::onDeleteFolder(const QString &folderPath)
             services::FolderService::deleteFolder(folderPath.toStdString());
 
     if (!result.success) {
-        QMessageBox::warning(treeView_, "삭제 실패", QString::fromStdString(result.errorMessage));
+        QMessageBox::warning(treeView_, tr("Delete Failed"), QString::fromStdString(result.errorMessage));
         return;
     }
 
@@ -356,7 +356,7 @@ void WorkspaceContextMenuController::onInlineEditAccepted()
 
             if (!r.success) {
                 QMessageBox::warning(
-                        treeView_, "파일 생성 실패", QString::fromStdString(r.errorMessage));
+                        treeView_, tr("File Creation Failed"), QString::fromStdString(r.errorMessage));
                 ok = false;
             } else {
                 // 성공 시 워크스페이스 갱신
@@ -389,7 +389,7 @@ void WorkspaceContextMenuController::onInlineEditAccepted()
 
             if (!r.success) {
                 QMessageBox::warning(
-                        treeView_, "폴더 생성 실패", QString::fromStdString(r.errorMessage));
+                        treeView_, tr("Folder Creation Failed"), QString::fromStdString(r.errorMessage));
                 ok = false;
             } else {
                 refreshWorkspace(pendingTargetDir_);
@@ -408,7 +408,7 @@ void WorkspaceContextMenuController::onInlineEditAccepted()
 
         // 이미 존재하는 이름이면 에러 (원하면 여기에도 (1) 붙이는 로직 넣을 수 있음)
         if (QFileInfo::exists(newPath) && newPath != pendingOldPath_) {
-            QMessageBox::warning(treeView_, "이름 변경 실패", "이미 존재하는 이름입니다.");
+            QMessageBox::warning(treeView_, tr("Rename Failed"), tr("Name already exists."));
             ok = false;
         } else {
             services::ServiceResult r;
@@ -422,7 +422,7 @@ void WorkspaceContextMenuController::onInlineEditAccepted()
 
             if (!r.success) {
                 QMessageBox::warning(
-                        treeView_, "이름 변경 실패", QString::fromStdString(r.errorMessage));
+                        treeView_, tr("Rename Failed"), QString::fromStdString(r.errorMessage));
                 ok = false;
             } else {
                 refreshWorkspace(parentDir.absolutePath());
@@ -490,7 +490,7 @@ void WorkspaceContextMenuController::onDuplicateFile(const QString &filePath)
     services::ServiceResult readRes = services::FileService::readFile(filePath.toStdString());
     if (!readRes.success) {
         QMessageBox::warning(
-                treeView_, "파일 복사 실패", QString::fromStdString(readRes.errorMessage));
+                treeView_, tr("Duplicate Failed"), QString::fromStdString(readRes.errorMessage));
         return;
     }
 
@@ -505,7 +505,7 @@ void WorkspaceContextMenuController::onDuplicateFile(const QString &filePath)
 
     if (!createRes.success) {
         QMessageBox::warning(
-                treeView_, "파일 복사 실패", QString::fromStdString(createRes.errorMessage));
+                treeView_, tr("Duplicate Failed"), QString::fromStdString(readRes.errorMessage));
         return;
     }
 
@@ -560,7 +560,7 @@ void WorkspaceContextMenuController::onDuplicateFolder(const QString &folderPath
     };
 
     if (!copyDirRecursively(folderPath, newFolderPath)) {
-        QMessageBox::warning(treeView_, "폴더 복사 실패", "폴더 복사 중 오류가 발생했습니다.");
+        QMessageBox::warning(treeView_, tr("Duplicate Failed"), tr("Error occurred while duplicating folder."));
         return;
     }
 

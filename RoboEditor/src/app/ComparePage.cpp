@@ -381,7 +381,7 @@ void ComparePage::recalcDiff(const QString &leftText, const QString &leftPath)
 
         // 상단 타입 정보 박스에는 그대로 표시
         if (diffPanel_) {
-            diffPanel_->setFileTypeInfo(leftTypeName, rightTypeName, false, tr("호환되지 않음"));
+            diffPanel_->setFileTypeInfo(leftTypeName, rightTypeName, false, tr("Incompatible"));
         }
 
         // 테이블에 "확장자 불일치" 한 줄 추가
@@ -389,7 +389,7 @@ void ComparePage::recalcDiff(const QString &leftText, const QString &leftPath)
         row.line            = -1;
         row.leftLineNumber  = -1;
         row.rightLineNumber = -1;
-        row.key             = tr("확장자 불일치");
+        row.key             = tr("Extension Mismatch");
         row.origin          = rightTypeName;  // 오른쪽 타입
         row.target          = leftTypeName;   // 왼쪽 타입
         row.state           = "MISMATCH";     // 하이라이트는 안 줄 상태값
@@ -454,7 +454,7 @@ void ComparePage::recalcDiff(const QString &leftText, const QString &leftPath)
                 r.rightLineNumber = errorLine;
                 r.state           = "ERROR";
                 r.key             = (errorLine > 0) ? QString::number(errorLine) : "Parse Error";
-                r.target          = "YAML 형식이 올바르지 않습니다.";
+                r.target          = tr("Invalid YAML format.");
                 r.origin          = errorDetail;  // 상세 에러는 우측에 표시
 
                 errRows.append(r);

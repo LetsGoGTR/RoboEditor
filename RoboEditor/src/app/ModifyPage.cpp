@@ -220,15 +220,15 @@ void ModifyPage::showCompareFile()
     if (!lastComparedPath_.isEmpty()) {
         // 간단한 질문 다이얼로그
         QMessageBox msgBox(this);
-        msgBox.setWindowTitle(tr("파일 비교"));
+        msgBox.setWindowTitle(tr("Compare File"));
         msgBox.setText(
-                tr("이전에 비교한 파일이 있습니다:\n%1\n\n이전 파일을 다시 사용하시겠습니까?")
+                tr("A previously compared file exists:\n%1\n\nDo you want to use the previous file?")
                         .arg(QFileInfo(lastComparedPath_).fileName()));
         msgBox.setIcon(QMessageBox::Question);
         msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel);
-        msgBox.button(QMessageBox::Yes)->setText(tr("이전 파일 사용"));
-        msgBox.button(QMessageBox::No)->setText(tr("새 파일 선택"));
-        msgBox.button(QMessageBox::Cancel)->setText(tr("취소"));
+        msgBox.button(QMessageBox::Yes)->setText(tr("Use Previous"));
+        msgBox.button(QMessageBox::No)->setText(tr("Select New"));
+        msgBox.button(QMessageBox::Cancel)->setText(tr("Cancel"));
 
         int result = msgBox.exec();
 
@@ -574,8 +574,8 @@ void ModifyPage::closeFile(int index)
     if (doc->gisModified()) {
         auto result = QMessageBox::question(
                 this,
-                "저장 확인",
-                doc->gfileName() + " 파일이 수정되었습니다.\n저장하시겠습니까?",
+                tr("Save Changes"),
+                tr("File '%1' has been modified.\nDo you want to save changes?").arg(doc->gfileName()),
                 QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel);
 
         if (result == QMessageBox::Yes)
