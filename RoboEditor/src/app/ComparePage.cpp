@@ -185,6 +185,11 @@ void ComparePage::onFolderFileClicked(const QString &relPath)
 
 void ComparePage::setLeftEditor(CodeEditor *leftEditor)
 {
+    // 이전 에디터가 존재하고 새 에디터와 다르다면, 하이라이터 연결 해제
+    if (leftText_ && leftText_ != leftEditor) {
+        leftText_->setDiffHighlighter(nullptr);
+    }
+
     leftText_ = leftEditor;
     if (leftText_) {
         leftText_->setDiffHighlighter(leftDiffHighlighter_);
