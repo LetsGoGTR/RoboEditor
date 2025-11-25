@@ -585,70 +585,32 @@ void MainWindow::showSystemInfoFromMenu()
 void MainWindow::showUserGuideFromMenu()
 {
     QString guide = "<h2>RoboEditor User Guide</h2>"
-                    "<h3>Getting Started</h3>"
-                    "<p><b>Adding a Controller:</b><br>"
-                    "1. Click 'Add Controller' or press Ctrl+Shift+N<br>"
-                    "2. Enter controller name, IP address, and credentials<br>"
-                    "3. Test connection and save configuration</p>"
-                    "<br>"
-                    "<h3>File Operations</h3>"
-                    "<p><b>Opening Files:</b><br>"
-                    "- Use Ctrl+O to open local files<br>"
-                    "- Double-click controller files in the tree view to open remotely</p>"
-                    "<p><b>Editing Files:</b><br>"
-                    "- Syntax highlighting is automatically applied<br>"
-                    "- Changes are saved locally until you upload to controller</p>"
-                    "<p><b>Saving Files:</b><br>"
-                    "- Ctrl+S: Save current file<br>"
-                    "- Ctrl+Shift+S: Save all open files</p>"
-                    "<br>"
-                    "<h3>Controller Management</h3>"
-                    "<p><b>Backup/Restore:</b><br>"
-                    "- Right-click controller → 'Backup from Controller'<br>"
-                    "- Backups are stored as compressed archives with timestamps<br>"
-                    "- Use 'Restore to Controller' to upload backup files</p>"
-                    "<p><b>File Comparison:</b><br>"
-                    "- Ctrl+D: Compare two files side-by-side<br>"
-                    "- Ctrl+Shift+D: Compare entire folders with diff highlighting</p>"
-                    "<p><b>SFTP Operations:</b><br>"
-                    "- Upload/Download files via right-click context menu<br>"
-                    "- Browse remote filesystem in tree view<br>"
-                    "- Monitor transfer progress in status bar</p>"
-                    "<br>"
-                    "<h3>Logs & Monitoring</h3>"
-                    "<p><b>Log Panel:</b><br>"
-                    "- View real-time system logs in bottom panel<br>"
-                    "- Filter by log level (Debug/Info/Warning/Error)<br>"
-                    "- Export logs for debugging purposes</p>"
-                    "<br>"
-                    "<h3>Tips & Tricks</h3>"
-                    "<p>• Use F5 to refresh controller file lists<br>"
-                    "• Right-click tabs for quick file operations<br>"
-                    "• Drag files between local and remote views<br>"
-                    "• Use search (Ctrl+F) to find text in open files<br>"
-                    "• Check status bar for connection status</p>"
-                    "<br>"
-                    "<h3>Troubleshooting</h3>"
-                    "<p><b>Connection Issues:</b><br>"
-                    "- Verify IP address and credentials<br>"
-                    "- Check network connectivity<br>"
-                    "- Ensure SSH/SFTP service is running on controller</p>"
-                    "<p><b>File Transfer Errors:</b><br>"
-                    "- Check file permissions on remote system<br>"
-                    "- Verify sufficient disk space<br>"
-                    "- Review logs for detailed error messages</p>"
-                    "<br>"
-                    "<p><i>For additional support, press F1 or contact technical support.</i></p>";
+
+                    "<h3>Register Controller</h3>"
+                    "<p>- Enter server-side information to register a controller.<br>"
+                    "- Default API port: <b>HTTP 80</b>, <b>HTTPS 443</b>.<br>"
+                    "- If connection succeeds, the controller is added to the list.<br>"
+
+                    "<h3>Backup</h3>"
+                    "<p>- Copies controller workspace to PC Storage.<br>"
+                    "- Select a controller and a target directory.<br>"
+                    "- Backup files are stored with timestamps.<br>"
+                    "- Use: Controller Menu → <b>Backup from Controller</b>.</p>"
+
+                    "<h3>Apply Workspace</h3>"
+                    "<p>- Applies PC Storage workspace to selected controllers.<br>"
+                    "- The controller's current workspace is saved before applying.<br>"
+                    "- Can apply only when controller is <b>connected and not running</b>.<br>"
+                    "- Use: Controller Menu → <b>Apply to Controller</b>.</p>"
+
+                    "<p><i>Tip: Check controller status in the status bar before applying.</i></p>";
 
     QMessageBox msgBox(this);
     msgBox.setWindowTitle("User Guide");
     msgBox.setTextFormat(Qt::RichText);
     msgBox.setText(guide);
     msgBox.setIcon(QMessageBox::Information);
-
-    // 내용이 길어서 스크롤 가능하도록 크기 조정
-    msgBox.setStyleSheet("QMessageBox { min-width: 600px; }");
-
+    msgBox.setStyleSheet("QMessageBox { min-width: 500px; }");
     msgBox.exec();
 }
 void MainWindow::showAboutFromMenu()
