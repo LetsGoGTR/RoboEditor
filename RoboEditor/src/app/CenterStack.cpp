@@ -16,6 +16,7 @@
 #include <QStyleHints>
 #include <QVBoxLayout>
 
+#include "AppConfig.h"
 #include "ApplyPage.h"
 #include "BackupPage.h"
 #include "ComparePage.h"
@@ -23,7 +24,29 @@
 #include "LogManager.h"
 #include "ModifyPage.h"
 #include "WorkspaceContextMenuController.h"
-#include "AppConfig.h"
+
+namespace
+{
+    QIcon loadThemedIcon(const QString &iconPath)
+    {
+        QPixmap pixmap(iconPath);
+        if (pixmap.isNull()) {
+            qWarning() << "[Icon] Failed to load:" << iconPath;
+            return QIcon();
+        }
+
+        bool isDark = (qApp->styleHints()->colorScheme() == Qt::ColorScheme::Dark);
+
+        if (isDark) {
+            QImage image = pixmap.toImage();
+            image.invertPixels();
+            pixmap = QPixmap::fromImage(image);
+            qDebug() << "[Icon] Inverted for dark mode:" << iconPath;
+        }
+
+        return QIcon(pixmap);
+    }
+}  // namespace
 
 static QIcon makeCircleIcon(const QColor &color, int size = 12)
 {
@@ -127,22 +150,19 @@ void CenterStack::setupUI()
     QHBoxLayout *topButtonLayout = new QHBoxLayout;
 
     QToolButton *backButton = new QToolButton;
-    backButton->setIcon(QIcon::fromTheme("go-previous"));
-    backButton->setText("←");
+    backButton->setIcon(loadThemedIcon(CenterStack::getIconPath() + "/back.png"));
     backButton->setToolTip("Return to controller list");
     backButton->setVisible(false);
     backButton->setAutoRaise(true);
 
     QToolButton *refreshButton = new QToolButton;
-    refreshButton->setText("⟳");
-    refreshButton->setIcon(QIcon::fromTheme("view-refresh"));
+    refreshButton->setIcon(loadThemedIcon(CenterStack::getIconPath() + "/rotate.png"));
     refreshButton->setToolTip("Reload controller list");
     refreshButton->setVisible(true);
     refreshButton->setAutoRaise(true);
 
     QToolButton *addButton = new QToolButton;
-    addButton->setText("+");
-    addButton->setIcon(QIcon::fromTheme("list-add"));
+    addButton->setIcon(loadThemedIcon(CenterStack::getIconPath() + "/plus.png"));
     addButton->setToolTip("Add controller");
     addButton->setVisible(true);
     addButton->setAutoRaise(true);
@@ -427,7 +447,8 @@ void CenterStack::updateControllerList()
     for (const auto &c : controllers) {
         QStandardItem *item = new QStandardItem(c.serialNumber);
         item->setEditable(false);
-        item->setData(AppConfig::getBackupPath() + QString("/%1").arg(c.serialNumber), Qt::UserRole + 1);
+        item->setData(AppConfig::getBackupPath() + QString("/%1").arg(c.serialNumber),
+                      Qt::UserRole + 1);
         item->setToolTip(QString("Protocol: %1 Host: %2\nSFTP: %3\nUser: %4\nWorkspace: %5")
                                  .arg(c.host)
                                  .arg(c.sftpPort)
@@ -579,6 +600,15 @@ void CenterStack::hideLogPanel()
         logPanel_->hide();
         qDebug() << "[CenterStack] Log panel hidden";
     }
+}
+QString CenterStack::getIconPath()
+{
+    static QString path;
+    if (path.isEmpty()) {
+        path = QCoreApplication::applicationDirPath() + "/styles/icon";
+        qDebug() << "[IconPath] Initialized:" << path;
+    }
+    return path;
 }
 CenterStack::~CenterStack()
 {

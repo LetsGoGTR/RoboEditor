@@ -33,8 +33,6 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
     ensureLog();     // 로그 관리자
     ensureCenter();  // 중앙 위젯 (파일 트리 + 에디터)
     wire();
-
-    qDebug() << "mainwindow good";
     qApp->installEventFilter(this);
 
     applyStyleSheet();
@@ -631,6 +629,7 @@ void MainWindow::showAboutFromMenu()
     msgBox.setIconPixmap(QPixmap(":/icons/app_icon.png").scaled(64, 64, Qt::KeepAspectRatio));
     msgBox.exec();
 }
+
 void MainWindow::closeEvent(QCloseEvent *event)
 {
     QMainWindow::closeEvent(event);
