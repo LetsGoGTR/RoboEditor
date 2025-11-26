@@ -1,4 +1,6 @@
 #include "DiffTree.h"
+#include "DiffPython.h"
+#include "DiffYaml.h"
 
 #include <algorithm>
 #include <archive.h>
@@ -8,9 +10,6 @@
 #include <iostream>
 #include <set>
 #include <vector>
-
-#include "DiffPython.h"
-#include "DiffYaml.h"
 
 using std::string;
 

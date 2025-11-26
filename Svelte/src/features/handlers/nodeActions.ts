@@ -132,6 +132,10 @@ export async function loadFile(
 	file: FileNode
 ): Promise<monaco.editor.IStandaloneCodeEditor | null> {
 	if (!monacoInstance || !file) return editor;
+	if (!file.path) {
+		console.warn('[loadFile] file.path 가 유효하지 않습니다:', file);
+		return editor;
+	}
 
 	const uri = monacoInstance.Uri.file(file.path);
 	let model = monacoInstance.editor.getModel(uri);
@@ -141,7 +145,7 @@ export async function loadFile(
 
 	let text: string;
 
-	if (view?.content !== null) {
+	if (view && view.content !== null) {
 		text = view.content;
 	} else {
 		const res = await _getFile(file.path);

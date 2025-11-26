@@ -7,23 +7,27 @@
   let selectedFolder = $state<FolderNode | null>(null);
 
   // 폼 필드 상태
-  let ip           = $state("");
-  let sftpPort     = $state(8889);
-  let serialNumber = $state("");
-  let username     = $state("");
-  let password     = $state("");
-  let name         = $state("");        // 디바이스 이름 (별도로 받고 싶으면)
-  let description  = $state("");        // 설명 (선택)
+  let serialNumber              = $state("");
+  let name                      = $state("");        // 디바이스 이름
+  let description               = $state("");        // 설명 (선택)
+  let host                      = $state("");
+  let scheme                    = $state("http");        // ? (선택)
+  let apiPort                   = $state(80);
+  let sftpPort                  = $state(8890);
+  let sftpUser                  = $state("");
+  let sftpPassword              = $state("");
 
   function handleCancel() {
     // 모든 입력값 초기화
-    name = "";
     serialNumber = "";
+    name = "";
     description = "";
-    ip = "";
-    sftpPort = 8889;
-    username = "";
-    password = "";
+    host = "";
+    scheme = "http";
+    apiPort = 80;
+    sftpPort = 8890;
+    sftpUser = "";
+    sftpPassword = "";
     selectedFolder = null;
   }
 
@@ -42,11 +46,12 @@
       serialNumber,                      // 필수
       name,                              // 필수
       description: description || (selectedFolder?.path ?? ""), // 선택
-      api: ip,                           // 필요하면 `http://${ip}` 이런 식으로 바꿔도 됨
-      sftpHost: ip,
+      host: host,
+      scheme: scheme,
+      apiPort: Number(apiPort),
       sftpPort: Number(sftpPort),
-      sftpUser: username,
-      sftpPassword: password
+      sftpUser: sftpUser,
+      sftpPassword: sftpPassword
     };
 
     try {
@@ -102,7 +107,19 @@
       id="ip"
       name="ip"
       placeholder="ex. 192.168.0.10"
-      bind:value={ip}
+      bind:value={host}
+    />
+  </div>
+
+  <div class="form-row">
+    <label for="sftp-port">API Port</label>
+    <input
+      type="number"
+      id="api-port"
+      name="api-port"
+      min="1"
+      max="65535"
+      bind:value={apiPort}
     />
   </div>
 
@@ -124,7 +141,7 @@
       type="text"
       id="username"
       name="username"
-      bind:value={username}
+      bind:value={sftpUser}
     />
   </div>
 
@@ -134,7 +151,7 @@
       type="password"
       id="password"
       name="password"
-      bind:value={password}
+      bind:value={sftpPassword}
     />
   </div>
 

@@ -132,6 +132,7 @@
 	root={$fileTree}
 	mode="file"
 	onConfirm={async ({ left, right }) => {
+		if (left.type !== "file" || right.type !== "file") return;
 		await handleDiffFiles(left, right);
 		gotoPage('compare');
 	}}
@@ -143,6 +144,7 @@
 	root={$fileTree}
 	mode="directory"
 	onConfirm={async ({ left, right }) => {
+		if (left.type !== "directory" || right.type !== "directory") return;
 		await handleDiffWorkspaces(left, right);
 		gotoPage('compare');
 	}}

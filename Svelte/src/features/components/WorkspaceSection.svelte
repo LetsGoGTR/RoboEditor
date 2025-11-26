@@ -9,7 +9,7 @@
   import { gotoPage } from '@/stores/currentPage';
   import { selectedDirectory } from '@/stores/selectedDirectory';
   import { _getWorkspace} from '@/apis/workspace';
-  import { toWorkspaceFromApi } from '@/utils/workspaceApiTransport';
+  import { buildWorkspaceFromApi } from '@/utils/workspaceApiTransport';
 
   let tree: TreeNode | null = null;
   let activeId: 'left' | 'right' = 'left';
@@ -47,9 +47,8 @@
           return;
         }
 
-        const workspace: Workspace = toWorkspaceFromApi(res);
+        const workspace: Workspace = buildWorkspaceFromApi(res);
 
-        // 🔥 여기서 그냥 "이제부터 이 워크스페이스 트리만 보여준다" 라고 생각하고 덮어쓰기
         fileTree.set(workspace);
         selectedDirectory.set(workspace);
         return;

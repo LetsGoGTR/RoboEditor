@@ -1,32 +1,15 @@
 // handlers/workspace.ts
 import { gotoPage } from '@/stores/currentPage';
-import { workspaceStore } from '@/stores/workspace';
+import { workspaceStore } from '@utils/workspaceApiTransport';
 import { fileTree } from '@/stores/fileTree';
-import type { WorkspaceNode } from '@/types';
+import type { Workspace } from '@/types';
 
 import {
-	_listWorkspaces,
 	_createWorkspace,
 	_getWorkspace,
 	_updateWorkspace,
 	_deleteWorkspace
 } from '@apis/workspace';
-
-/* ============================================================
- *  Workspace: 전체 목록 가져오기
- * ============================================================ */
-export async function handleListWorkspaces() {
-	try {
-		const res = await _listWorkspaces();
-		if (!res?.success) return alert('워크스페이스 목록을 불러오지 못했습니다.');
-
-		workspaceStore.setList(res.data);
-		return res.data;
-	} catch (err) {
-		console.error('[workspace:list] 오류:', err);
-		alert('워크스페이스 목록 조회 중 오류가 발생했습니다.');
-	}
-}
 
 /* ============================================================
  *  Workspace 생성
@@ -35,14 +18,14 @@ export async function handleCreateWorkspace(deviceId: string, payload: Record<st
 	try {
 		const res = await _createWorkspace(deviceId, payload);
 		if (!res?.success) {
-			return alert('워크스페이스 생성에 실패했습니다.');
+			return alert('워크스페이스 생성에 실패했습니다.'); 
 		}
 
-		const ws: WorkspaceNode = res.data;
+		const ws: Workspace = res.data;
 		workspaceStore.add(ws);
 
 		// 생성 후 상세 페이지 이동
-		gotoPage('workspace-detail', { workspaceId: ws.id });
+		// gotoPage('workspace-detail', { edit });
 
 		return ws;
 	} catch (err) {

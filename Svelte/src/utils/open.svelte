@@ -1,4 +1,4 @@
-<script lang="ts">
+<!-- <script lang="ts">
   import { _getDevice } from '@/apis/controller';
   import { openDirectoryDialog, finishOpenDirectory } from '@/utils/open';
   
@@ -48,7 +48,7 @@
       <h2>워크스페이스 선택</h2>
 
       <div class="body">
-        <!-- 왼쪽: 워크스페이스 목록 -->
+        왼쪽: 워크스페이스 목록
         <div class="workspace-list">
           {#each dialog.workspaces as w}
             <button
@@ -61,12 +61,12 @@
           {/each}
         </div>
 
-        <!-- 오른쪽: 선택된 워크스페이스 트리 미리보기 -->
+        오른쪽: 선택된 워크스페이스 트리 미리보기
         <div class="workspace-tree">
           {#if loadingWorkspace}
             <p>트리 로딩 중...</p>
           {:else if selectedData}
-            <!-- 여기에 실제 트리 컴포넌트 연결하면 됨 -->
+            여기에 실제 트리 컴포넌트 연결하면 됨
             <pre>{JSON.stringify(selectedData.tree, null, 2)}</pre>
           {:else}
             <p>워크스페이스를 선택하면 하위 트리가 표시됩니다.</p>
@@ -88,4 +88,4 @@
       </div>
     </div>
   </div>
-{/if}
+{/if} -->
