@@ -143,6 +143,9 @@ void api::v1::Operation::backup(const drogon::HttpRequestPtr                    
     std::string host   = deviceResult.data["host"].asString();
     std::string scheme = deviceResult.data["scheme"].asString();
     int         port   = deviceResult.data["apiPort"].asInt();
+    LOG_INFO << "host: " << host;
+    LOG_INFO << "apiPort: " << port;
+    
 
     if (host.empty()) {
         host = "localhost";

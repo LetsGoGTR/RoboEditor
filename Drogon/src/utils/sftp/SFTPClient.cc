@@ -1,13 +1,21 @@
 #include "SFTPClient.h"
 
-#include <arpa/inet.h>
+#ifdef _WIN32
+    #define WIN32_LEAN_AND_MEAN
+    #include <winsock2.h>
+    #include <ws2tcpip.h>
+    #define FT_CLOSE_SOCKET(s) ::closesocket(s)
+#else
+    #include <arpa/inet.h>
+    #include <netdb.h>
+    #include <netinet/in.h>
+    #include <sys/socket.h>
+    #include <unistd.h>
+    #define FT_CLOSE_SOCKET(s) ::close(s)
+#endif
+
 #include <cstring>
 #include <fstream>
-#include <netdb.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <unistd.h>
-
 #include <drogon/drogon.h>
 
 SFTPClient::SFTPClient(const SFTPConfig &cfg) :
@@ -62,7 +70,7 @@ bool SFTPClient::createSocket()
             break;  // 연결 성공
         }
 
-        ::close(socket);
+        FT_CLOSE_SOCKET(socket);
         socket = -1;
     }
 
@@ -118,7 +126,7 @@ bool SFTPClient::connectSSHOnly()
     if (!session) {
         lastError = "SSH 세션 초기화 실패";
         LOG_ERROR << "SSH 세션 초기화 실패";
-        ::close(socket);
+        FT_CLOSE_SOCKET(socket);
         socket = -1;
         return false;
     }
@@ -128,7 +136,7 @@ bool SFTPClient::connectSSHOnly()
         lastError = "SSH 핸드셰이크 실패";
         LOG_ERROR << "SSH 핸드셰이크 실패";
         libssh2_session_free(session);
-        ::close(socket);
+        FT_CLOSE_SOCKET(socket);
         session = nullptr;
         socket  = -1;
         return false;
@@ -137,7 +145,7 @@ bool SFTPClient::connectSSHOnly()
     // 4. 인증
     if (!authenticatePassword()) {
         libssh2_session_free(session);
-        ::close(socket);
+        FT_CLOSE_SOCKET(socket);
         session = nullptr;
         socket  = -1;
         return false;
@@ -157,7 +165,7 @@ bool SFTPClient::connect()
     // SFTP 초기화
     if (!initSFTP()) {
         libssh2_session_free(session);
-        ::close(socket);
+        FT_CLOSE_SOCKET(socket);
         session = nullptr;
         socket  = -1;
         return false;
@@ -179,7 +187,7 @@ void SFTPClient::disconnect()
         session = nullptr;
     }
     if (socket >= 0) {
-        ::close(socket);
+        FT_CLOSE_SOCKET(socket);
         socket = -1;
     }
 }

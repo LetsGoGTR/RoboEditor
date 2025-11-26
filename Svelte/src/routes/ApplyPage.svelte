@@ -1,4 +1,4 @@
-<script lang="ts">
+<!-- <script lang="ts">
   import ControllerList from '@features/ApplyControllerList.svelte';
   import { dummyController } from '@/testData';
 	import type { TreeNode } from '@/types';
@@ -234,4 +234,4 @@ button:disabled {
   background: #ccc;
   cursor: not-allowed;
 }
-</style>
+</style> -->

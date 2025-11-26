@@ -1,8 +1,11 @@
 <script lang="ts">
-  import type { Controller, ControllerMeta, Workspace, WorkspaceMeta, FolderNode } from '@/types';
+  import type { Controller } from '@/types';
   import { _listDevices, _getDevice } from '@/apis/controller';
+  import { wrapDeviceAsController } from '@handlers/controller';
   import { fileTree } from '@/stores/fileTree';
   import { onMount } from 'svelte';
+  import type { ApiWorkspaceMetadata } from '@/utils/workspaceApiTransport';
+  import { buildWorkspaceEntry, buildControllerRoot } from '@/utils/workspaceApiTransport';
 
   let devices = $state<Controller[]>([]);               //디바이스 목록.
   let loadingDevices = $state(false);                   //디바이스 목록 로딩 중 여부
@@ -12,27 +15,6 @@
   let loadingWorkspace = $state(false);                 //워크스페이스 로딩 중 여부.
   let workspaceError = $state<string | null>(null);     //워크스페이스 목록 조회 에러 메시지.
 
-  function wrapDeviceAsController(raw: any): Controller {
-    const meta: ControllerMeta = {
-      
-      serialNumber: raw.serialNumber,
-      name: raw.name,
-      description: raw.description ?? null,
-      api: raw.api,
-      sftpHost: raw.sftpHost,
-      sftpPort: raw.sftpPort,
-      sftpUser: raw.sftpUser,
-      sftpPassword: raw.sftpPassword,
-      createdAt: raw.createdAt,
-      updatedAt: raw.updatedAt,
-      state: 'idle' // 일단 기본값
-    };
-
-    return {
-      controllerMeta: meta,
-      workspaces: []
-    };
-  }
 
   export async function loadDevices() {
     loadingDevices = true;
@@ -44,12 +26,7 @@
         devices = [];
         return;
       }
-      const rawDevices = res.data?.devices ?? [];
-      devices = rawDevices.map(wrapDeviceAsController);
-    } catch (err) {
-      console.error(err);
-      deviceError = '디바이스 목록 조회 중 오류가 발생했습니다.';
-      devices = [];
+      devices = (res.data?.devices ?? []).map((raw: any) => wrapDeviceAsController(raw));
     } finally {
       loadingDevices = false;
     }
@@ -74,24 +51,11 @@
         return;
       }
 
-      const wsList: WorkspaceMeta[] = res.workspaces?.workspaces ?? [];
+      const wsList: ApiWorkspaceMetadata[] = res.workspaces?.workspaces ?? [];
 
-      dev.workspaces = wsList.map((ws) => ({
-        id: ws.uuid,
-        name: ws.name,
-        type: 'directory',
-        path: null,
-        children: [],
-        workspaceMeta: ws
-      }));
+      dev.workspaces = wsList.map((meta) => buildWorkspaceEntry(meta));
       
-      const deviceNode: FolderNode = {
-        id: `device:${deviceId}`,
-        name: dev.controllerMeta.name ?? deviceId,
-        type: 'directory',
-        path: `${deviceId}`,
-        children: dev.workspaces
-      };
+      const deviceNode = buildControllerRoot(dev.controllerMeta, dev.workspaces);
 
       fileTree.set(deviceNode);    
     } catch (err) {

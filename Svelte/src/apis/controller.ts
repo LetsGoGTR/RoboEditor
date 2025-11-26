@@ -20,8 +20,8 @@ export const _getDevice = async (deviceId: string) => {
 	return res.json();
 };
 
-export const _updateDevice = async (id: string, payload: any) => {
-	const res = await fetch(`${DEVICE_API_PATH}/${id}`, {
+export const _updateDevice = async (deviceId: string, payload: any) => {
+	const res = await fetch(`${DEVICE_API_PATH}/${deviceId}`, {
 		method: 'PUT',
 		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify(payload)
@@ -29,8 +29,8 @@ export const _updateDevice = async (id: string, payload: any) => {
 	return res.json();
 };
 
-export const _deleteDevice = async (id: string) => {
-	const res = await fetch(`${DEVICE_API_PATH}/${id}`, {
+export const _deleteDevice = async (deviceId: string) => {
+	const res = await fetch(`${DEVICE_API_PATH}/${deviceId}`, {
 		method: 'DELETE'
 	});
 	return res.json();

@@ -66,7 +66,6 @@ export type TreeNode = FolderNode | FileNode;
 
 export interface WorkspaceMeta {
 	uuid: string;
-	name: string;
 	target?: string | null;
 	description?: string | null;
 	createdAt: string;
@@ -89,8 +88,9 @@ export interface ControllerMeta {
 	name: string;
 	description?: string | null;
 
-	api: string;
-	sftpHost: string;
+	host: string;
+	scheme?: string | null;
+	apiPort: number;
 	sftpPort: number;
 	sftpUser?: string;
 	sftpPassword?: string;
