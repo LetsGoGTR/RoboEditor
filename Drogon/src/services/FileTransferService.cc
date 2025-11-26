@@ -9,6 +9,7 @@
 #include <fstream>
 #include <iomanip>
 #include <sstream>
+#include <future>
 
 #include "../services/DeviceService.h"
 #include "../services/WorkspaceService.h"

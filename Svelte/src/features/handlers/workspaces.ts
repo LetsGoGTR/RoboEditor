@@ -1,6 +1,6 @@
 // handlers/workspace.ts
 import { gotoPage } from '@/stores/currentPage';
-import { workspaceStore } from '@/stores/workspace';
+import { workspaceStore } from '@utils/workspaceApiTransport';
 import { fileTree } from '@/stores/fileTree';
 import type { Workspace } from '@/types';
 
@@ -18,7 +18,7 @@ export async function handleCreateWorkspace(deviceId: string, payload: Record<st
 	try {
 		const res = await _createWorkspace(deviceId, payload);
 		if (!res?.success) {
-			return alert('워크스페이스 생성에 실패했습니다.');
+			return alert('워크스페이스 생성에 실패했습니다.'); 
 		}
 
 		const ws: Workspace = res.data;

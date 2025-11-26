@@ -23,7 +23,7 @@
     name = "";
     description = "";
     host = "";
-    scheme: "http";
+    scheme = "http";
     apiPort = 80;
     sftpPort = 8890;
     sftpUser = "";

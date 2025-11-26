@@ -2,6 +2,7 @@
 
 #include <json/json.h>
 #include <string>
+#include <utility>
 
 #include "../utils/sftp/SFTPClient.h"
 #include "../utils/sftp/SFTPConfig.h"
@@ -18,10 +19,10 @@ class FileTransferService
 {
   public:
     // 원격에서 백업 다운로드 (output.tgz 고정)
-    services::ServiceResult backupFromRemote(const std::string &deviceId);
+    static services::ServiceResult backupFromRemote(const std::string &deviceId);
 
     // 워크스페이스 적용 (input.tgz 고정)
-    services::ServiceResult applyWorkspace(const std::string &workspaceId,
+    static services::ServiceResult applyWorkspace(const std::string &workspaceId,
                                            const std::string &deviceId,
                                            const std::string &password);
 
@@ -34,8 +35,8 @@ class FileTransferService
 
   private:
     // Workspace API 호출 메서드
-    RemoteApiResult compressWorkspace(const std::string &user, const std::string &api);
-    RemoteApiResult extractWorkspace(const std::string &user, const std::string &api);
+    static RemoteApiResult compressWorkspace(const std::string &user, const std::string &api);
+    static RemoteApiResult extractWorkspace(const std::string &user, const std::string &api);
 
     // 비밀번호 파일 경로 가져오기
     static std::string getPasswordFilePath();
