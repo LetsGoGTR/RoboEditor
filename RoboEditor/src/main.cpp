@@ -4,33 +4,13 @@
 #include <QLocale>
 #include <QStyleHints>
 
+#include "CenterStack.h"
 #include "PasswordManager.h"
 #include "app/mainwindow.h"
-
-static void loadTheme()
-{
-    bool dark = qApp->styleHints()->colorScheme() == Qt::ColorScheme::Dark;
-
-    // Build correct QSS file path
-    QString fileName = dark ? "dark.qss" : "light.qss";
-
-    QString stylePath = QApplication::applicationDirPath() + "/../../src/styles/" + fileName;
-
-    QFile styleFile(stylePath);
-
-    if (styleFile.open(QFile::ReadOnly)) {
-        QString style = QLatin1String(styleFile.readAll());
-        qApp->setStyleSheet(style);
-    } else {
-        qWarning() << "⚠️ Failed to load QSS:" << stylePath;
-    }
-}
 
 int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);
-
-    loadTheme();
 
     QTranslator       translator;
     const QStringList uiLanguages = QLocale::system().uiLanguages();
@@ -41,6 +21,9 @@ int main(int argc, char *argv[])
             break;
         }
     }
+
+    QString logoPath = CenterStack::getIconPath() + "/logo.png";
+    a.setWindowIcon(QIcon(logoPath));
 
     MainWindow w;
     a.installEventFilter(&w);

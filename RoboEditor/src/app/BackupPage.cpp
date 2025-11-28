@@ -9,6 +9,7 @@
 #include "ControllerManager.h"
 #include "LogManager.h"
 #include "ProgressDialog.h"
+#include "AppConfig.h"
 #include "ui_BackupPage.h"
 
 BackupPage::BackupPage(QWidget *parent) :
@@ -130,11 +131,11 @@ void BackupPage::confirmSelection()
 void BackupPage::importAnySpace()
 {
     QString dirName = QFileDialog::getExistingDirectory(
-            this,                // 부모 위젯 포인터 (nullptr 대신 this 권장)
-            "Select Workspace",  // 대화상자 제목
-            "C:/backup",         // 초기 디렉토리 경로
-            QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks  // 폴더만 표시
-    );
+            this,
+            "Select Workspace",
+            AppConfig::getBackupPath(),         // 초기 디렉토리 경로
+            QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks
+            );
 
     if (dirName.isEmpty())  // 사용자가 취소한 경우
         return;
