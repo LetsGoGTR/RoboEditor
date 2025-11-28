@@ -16,6 +16,8 @@
 TopMenu::TopMenu(MainWindow *mw) : QObject(mw), mw_(mw)
 {
     build();
+
+    qDebug() << "TopMenu good";
 }
 
 void TopMenu::build()
@@ -29,14 +31,25 @@ void TopMenu::build()
     help_    = mb->addMenu("Help");
 
     // add file actions
-    actNewFile_    = file_->addAction("New File");
-    actOpenFile_   = file_->addAction("Open File");
+    actNewFile_  = file_->addAction("New File");
+    actOpenFile_ = file_->addAction("Open File");
+    file_->addSeparator();
     actSaveFile_   = file_->addAction("Save File");
     actSaveAsFile_ = file_->addAction("Save as File");
     actSaveAll_    = file_->addAction("Save All");
-    actCloseFile_  = file_->addAction("Close File");
-    actCloseAll_   = file_->addAction("Close All");
-    actExit_       = file_->addAction("Exit");
+    file_->addSeparator();
+    actCloseFile_ = file_->addAction("Close File");
+    actCloseAll_  = file_->addAction("Close All");
+    file_->addSeparator();
+    actExit_ = file_->addAction("Exit");
+
+    actNewFile_->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_N));
+    actOpenFile_->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_O));
+    actSaveFile_->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_S));
+    actSaveAll_->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_S));
+    actCloseFile_->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_W));
+    actCloseAll_->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_W));
+    actExit_->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_Q));
 
     connect(actNewFile_, &QAction::triggered, mw_, &MainWindow::createNewDocument);
     connect(actOpenFile_, &QAction::triggered, mw_, &MainWindow::openFileFromMenu);
@@ -49,12 +62,21 @@ void TopMenu::build()
 
     // add edit actions
 
-    actUndo_      = edit_->addAction("Undo");
-    actRedo_      = edit_->addAction("Redo");
-    actCut_       = edit_->addAction("Cut");
-    actCopy_      = edit_->addAction("Copy");
-    actPaste_     = edit_->addAction("Paste");
+    actUndo_ = edit_->addAction("Undo");
+    actRedo_ = edit_->addAction("Redo");
+    edit_->addSeparator();
+    actCut_   = edit_->addAction("Cut");
+    actCopy_  = edit_->addAction("Copy");
+    actPaste_ = edit_->addAction("Paste");
+    edit_->addSeparator();
     actSelectAll_ = edit_->addAction("Select All");
+
+    actUndo_->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_Z));
+    actRedo_->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_Y));
+    actCut_->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_X));
+    actCopy_->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_C));
+    actPaste_->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_V));
+    actSelectAll_->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_A));
 
     connect(actUndo_, &QAction::triggered, mw_, &MainWindow::undoFromMenu);
     connect(actRedo_, &QAction::triggered, mw_, &MainWindow::redoFromMenu);
@@ -69,6 +91,7 @@ void TopMenu::build()
     modifyMenu_       = ctrl_->addMenu("Modify Controller Setting");
     removeMenu_       = ctrl_->addMenu("Remove Controller");
     actRefreshList_   = ctrl_->addAction("Refresh List");
+    ctrl_->addSeparator();
     actCompareFile_   = ctrl_->addAction("Compare Files");
     actCompareFolder_ = ctrl_->addAction("Compare Folders");
     actBackup_        = ctrl_->addAction("Backup from Controller");
@@ -89,44 +112,52 @@ void TopMenu::build()
     connect(actBackup_, &QAction::triggered, mw_, &MainWindow::backupFromMenu);
     connect(actApply_, &QAction::triggered, mw_, &MainWindow::applyFromMenu);
 
-    // add view actions
-    showLogMenu_ = view_->addMenu("Show Log");
+    actRefreshList_->setShortcut(QKeySequence(Qt::Key_F5));
+    actBackup_->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_B));
+    actAddController_->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_N));
+    actCompareFile_->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_D));
+    actCompareFolder_->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_D));
 
-    actToggleLog_ = new QAction("Show Log Viewer", this);
+    // add view actions
+
+    actToggleLog_ = new QAction("Show Log", this);
     actToggleLog_->setCheckable(true);
     actToggleLog_->setChecked(true);
-    actToggleLog_->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_L));
 
-    showLogMenu_->addAction(actToggleLog_);
-    showLogMenu_->addSeparator();
-
-    posGroup_ = new QActionGroup(this);
+    showLogMenu_ = view_->addMenu("Log Position");
+    posGroup_    = new QActionGroup(this);
     posGroup_->setExclusive(true);
 
-    screenGroup_ = new QActionGroup(this);
-    screenGroup_->setExclusive(true);
+    actLogPanel_  = mk("Log → In Editor");
+    actLogBottom_ = mk("Log → Bottom");
+    actLogRight_  = mk("Log → Right");
+    actLogLeft_   = mk("Log → Left");
+    actLogTop_    = mk("Log → Top");
 
-    auto mk = [&](const char *t) {
-        auto *a = new QAction(t, this);
-        a->setCheckable(true);
-        posGroup_->addAction(a);
-        return a;
-    };
+    actLogPanel_->setChecked(true);
 
-    showLogMenu_->addAction(mk("Log → Bottom"));
-    showLogMenu_->addAction(mk("Log → Right"));
-    showLogMenu_->addAction(mk("Log → Left"));
-    showLogMenu_->addAction(mk("Log → Top"));
-    showLogMenu_->addAction(mk("Log → Float"));
-    posGroup_->actions().front()->setChecked(true);
+    view_->addAction(actToggleLog_);
+    view_->addMenu(showLogMenu_);
 
-    connect(actToggleLog_, &QAction::toggled, this, [this](bool checked) {
-        if (LogManager::instance()) {
-            LogManager::instance()->setVisible(checked);
+    // 시그널 연결
+    connect(actToggleLog_, &QAction::toggled, this, &TopMenu::logToggled);
+
+    connect(posGroup_, &QActionGroup::triggered, this, [this](QAction *act) {
+        if (act == actLogPanel_) {
+            emit logPositionChanged(Qt::NoDockWidgetArea, true);
+        } else if (act == actLogBottom_) {
+            emit logPositionChanged(Qt::BottomDockWidgetArea, false);
+        } else if (act == actLogRight_) {
+            emit logPositionChanged(Qt::RightDockWidgetArea, false);
+        } else if (act == actLogLeft_) {
+            emit logPositionChanged(Qt::LeftDockWidgetArea, false);
+        } else if (act == actLogTop_) {
+            emit logPositionChanged(Qt::TopDockWidgetArea, false);
         }
     });
 
-    auto sS = [&](const char *t) {
+    screenGroup_ = new QActionGroup(this);
+    auto sS      = [&](const char *t) {
         auto *a = new QAction(t, this);
         a->setCheckable(true);
         screenGroup_->addAction(a);
@@ -136,7 +167,9 @@ void TopMenu::build()
     setScreenSize_ = view_->addMenu("Screen Size");
 
     actFullScreen_ = sS("Full Screen");
-    actMaximize_   = sS("MaxiMize");
+    actFullScreen_->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_F11));
+    actMaximize_ = sS("MaxiMize");
+    actMaximize_->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_F11));
 
     setScreenSize_->addAction(actFullScreen_);
     setScreenSize_->addAction(actMaximize_);
@@ -155,10 +188,26 @@ void TopMenu::build()
     connect(actChangePswd_, &QAction::triggered, this, &TopMenu::onChangePasswordTriggered);
     tools_->addAction(actChangePswd_);
 
+    // add help actions
+
+    actUserGuide_ = help_->addAction("User Guide");
+    actUserGuide_->setShortcut(QKeySequence(Qt::Key_F1));
+    actShortcuts_ = help_->addAction("Keyboard Shortcuts");
+    help_->addSeparator();
+    actSystemInfo_ = help_->addAction("System Information");
+    help_->addSeparator();
+    actAbout_ = help_->addAction("About RoboEditor");
+
+    connect(actUserGuide_, &QAction::triggered, mw_, &MainWindow::showUserGuideFromMenu);
+    connect(actShortcuts_, &QAction::triggered, mw_, &MainWindow::showShortcutsFromMenu);
+    connect(actSystemInfo_, &QAction::triggered, mw_, &MainWindow::showSystemInfoFromMenu);
+    connect(actAbout_, &QAction::triggered, mw_, &MainWindow::showAboutFromMenu);
+
     //themeToggle_ = new QAction("Toggle Dark/Light", this);
     //sett_->addAction(themeToggle_);
 
     // add help actions
+    qDebug() << "insert done";
 }
 
 void TopMenu::onChangePasswordTriggered()
@@ -171,4 +220,12 @@ void TopMenu::onChangePasswordTriggered()
                      &ControllerManager::onMasterPasswordChanged);
 
     manager.changePassword();
+}
+QAction *TopMenu::mk(const QString &text)
+{
+    QAction *act = new QAction(text, this);
+    act->setCheckable(true);
+    showLogMenu_->addAction(act);
+    posGroup_->addAction(act);
+    return act;
 }

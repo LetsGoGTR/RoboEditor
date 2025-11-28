@@ -2,8 +2,10 @@
 #define MAINWINDOW_H
 #pragma once
 #include <QDir>
+#include <QDockWidget>
 #include <QFileDialog>
 #include <QMainWindow>
+#include <QPointer>
 
 #include <memory>
 
@@ -12,6 +14,7 @@
 #include "ComparePage.h"
 #include "ModifyPage.h"
 #include "ShortcutManager.h"
+#include "TopMenu.h"
 
 class TopMenu;
 class NavDock;
@@ -29,6 +32,7 @@ class MainWindow : public QMainWindow
         static bool        dark;
         static bool        manualMode;
         ControllerManager *getControllerManager();
+        void               updateLogView();
 
       public slots:
         void toggleTheme();
@@ -60,6 +64,14 @@ class MainWindow : public QMainWindow
         void compareFileFromMenu();
         void compareFolderFromMenu();
 
+        void showUserGuideFromMenu();
+        void showShortcutsFromMenu();
+        void showSystemInfoFromMenu();
+        void showAboutFromMenu();
+
+        void onLogToggled(bool visible);
+        void onLogPositionChanged(Qt::DockWidgetArea area, bool isPanel);
+
       protected:
         void closeEvent(QCloseEvent * event) override;
         bool eventFilter(QObject * obj, QEvent * event) override;
@@ -85,13 +97,16 @@ class MainWindow : public QMainWindow
         void loadTheme(bool isDark);
 
         bool isFullScreen_ = false;
+        bool isDarkMode_   = false;
+        bool m_logVisible  = true;
+        bool m_logIsPanel  = true;
 
-        bool isDarkMode_ = false;
+        Qt::DockWidgetArea    m_logArea = Qt::BottomDockWidgetArea;
+        QPointer<QDockWidget> m_logDock;
 
         std::unique_ptr<TopMenu>     menu_;
         std::unique_ptr<CenterStack> center_;  // CenterStack → Center
         std::unique_ptr<NavDock>     nav_;
-        std::unique_ptr<LogManager>  logm_;
 };
 
 #endif  // MAINWINDOW_H

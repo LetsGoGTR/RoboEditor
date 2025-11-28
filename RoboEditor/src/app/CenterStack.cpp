@@ -16,13 +16,38 @@
 #include <QStyleHints>
 #include <QVBoxLayout>
 
+#include "AppConfig.h"
 #include "ApplyPage.h"
 #include "BackupPage.h"
 #include "ComparePage.h"
 #include "ControllerManager.h"
 #include "LogManager.h"
+#include "LogTextEdit.h"
 #include "ModifyPage.h"
 #include "WorkspaceContextMenuController.h"
+
+namespace
+{
+    QIcon loadThemedIcon(const QString &iconPath)
+    {
+        QPixmap pixmap(iconPath);
+        if (pixmap.isNull()) {
+            qWarning() << "[Icon] Failed to load:" << iconPath;
+            return QIcon();
+        }
+
+        bool isDark = (qApp->styleHints()->colorScheme() == Qt::ColorScheme::Dark);
+
+        if (isDark) {
+            QImage image = pixmap.toImage();
+            image.invertPixels();
+            pixmap = QPixmap::fromImage(image);
+            qDebug() << "[Icon] Inverted for dark mode:" << iconPath;
+        }
+
+        return QIcon(pixmap);
+    }
+}  // namespace
 
 static QIcon makeCircleIcon(const QColor &color, int size = 12)
 {
@@ -50,6 +75,8 @@ CenterStack::CenterStack(QWidget *parent) :
     workspaceModel_(nullptr),
     modifyPage_(nullptr)
 {
+    this->setObjectName("CenterStackRoot");
+
     stack_ = new QStackedWidget;
     cmp_   = new ComparePage;
 
@@ -90,19 +117,26 @@ void CenterStack::showCompare()
     stack_->setCurrentIndex(idxC_);
 }
 
-void CenterStack::showModifyWithCompare()
+void CenterStack::showModifyWithCompareFile()
 {
     // ModifyPage의 Compare 기능 활성화
     if (modifyPage_) {
-        modifyPage_->showCompare();
+        modifyPage_->showCompareFile();
     }
 }
-
+void CenterStack::showModifyWithCompareFolders()
+{
+    // ModifyPage의 Compare 기능 활성화
+    if (modifyPage_) {
+        modifyPage_->showCompareFolders();
+    }
+}
 void CenterStack::setupUI()
 {
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
     splitter_               = new QSplitter(Qt::Horizontal, this);
-    treeTabWidget_          = new QTabWidget(splitter_);
+    splitter_->setHandleWidth(2);
+    treeTabWidget_ = new QTabWidget(splitter_);
 
     // ===== Controller Model (QStandardItemModel) =====
     controllerModel_ = new QStandardItemModel(this);
@@ -117,18 +151,27 @@ void CenterStack::setupUI()
     QHBoxLayout *topButtonLayout = new QHBoxLayout;
 
     QToolButton *backButton = new QToolButton;
-    backButton->setText("← Back");
+    backButton->setIcon(loadThemedIcon(CenterStack::getIconPath() + "/back.png"));
     backButton->setToolTip("Return to controller list");
     backButton->setVisible(false);
+    backButton->setAutoRaise(true);
 
     QToolButton *refreshButton = new QToolButton;
-    refreshButton->setText("⟳ Refresh");
+    refreshButton->setIcon(loadThemedIcon(CenterStack::getIconPath() + "/rotate.png"));
     refreshButton->setToolTip("Reload controller list");
     refreshButton->setVisible(true);
+    refreshButton->setAutoRaise(true);
+
+    QToolButton *addButton = new QToolButton;
+    addButton->setIcon(loadThemedIcon(CenterStack::getIconPath() + "/plus.png"));
+    addButton->setToolTip("Add controller");
+    addButton->setVisible(true);
+    addButton->setAutoRaise(true);
 
     topButtonLayout->addWidget(backButton);
-    topButtonLayout->addWidget(refreshButton);
     topButtonLayout->addStretch();
+    topButtonLayout->addWidget(refreshButton);
+    topButtonLayout->addWidget(addButton);
 
     // (1) Controller List
     controllerList_ = new QListView;
@@ -141,7 +184,7 @@ void CenterStack::setupUI()
     // (2) Backup Tree
     backupModel_ = new QFileSystemModel(this);
     backupModel_->setFilter(QDir::NoDotAndDotDot | QDir::Dirs);
-    backupModel_->setRootPath("C:/backup");
+    backupModel_->setRootPath(AppConfig::getBackupPath());
 
     backupTree_ = new QTreeView;
     backupTree_->setModel(backupModel_);
@@ -167,7 +210,7 @@ void CenterStack::setupUI()
 
     workspaceModel_ = new QFileSystemModel(this);
     workspaceModel_->setFilter(QDir::NoDotAndDotDot | QDir::AllEntries);
-    workspaceModel_->setRootPath("C:/backup");
+    workspaceModel_->setRootPath(AppConfig::getBackupPath());
 
     workspaceTree_ = new QTreeView;
     workspaceTree_->setModel(workspaceModel_);
@@ -197,14 +240,80 @@ void CenterStack::setupUI()
     treeTabWidget_->addTab(tab1, "Controller");
     treeTabWidget_->addTab(tab2, "Workspace");
 
+    rightSplitter_ = new QSplitter(Qt::Vertical, this);
+    rightSplitter_->setHandleWidth(0);
+
     // ===== ModifyPage =====
-    modifyPage_ = new ModifyPage(splitter_);
+
+    modifyPage_ = new ModifyPage(rightSplitter_);
+    logPanel_   = new QWidget(rightSplitter_);
+
+    QVBoxLayout *logPanelLayout = new QVBoxLayout(logPanel_);
+    logPanelLayout->setContentsMargins(0, 0, 0, 0);
+    logPanelLayout->setSpacing(0);
+
+    // ----- 상단 제목바 -----
+    QFrame *header = new QFrame;
+    header->setObjectName("LogHeader");
+    header->setFrameShape(QFrame::NoFrame);
+
+    QHBoxLayout *headerLayout = new QHBoxLayout(header);
+    headerLayout->setContentsMargins(8, 6, 8, 6);
+
+    logTitle_ = new QLabel("Log File");
+    logTitle_->setObjectName("LogTitle");
+    headerLayout->addWidget(logTitle_);
+    headerLayout->addStretch();
+
+    // LogTextEdit 생성 (멤버 변수로 저장)
+    logView_ = new LogTextEdit(logPanel_);  // logView -> logView_로 변경
+    logView_->setObjectName("LogView");
+
+    connect(LogManager::instance(),
+            &LogManager::logAppended,
+            logView_,                      // 여기도 logView_로 변경
+            [this](const QString &text) {  // logView 대신 this 사용
+                logView_->appendPlainText(text);
+                QTextCursor cursor = logView_->textCursor();
+                cursor.movePosition(QTextCursor::End);
+                logView_->setTextCursor(cursor);
+            });
+
+    logPanelLayout->addWidget(header);
+    logPanelLayout->addWidget(logView_);  // logView_로 변경
+
+    rightSplitter_->addWidget(modifyPage_);
+    rightSplitter_->addWidget(logPanel_);
+    rightSplitter_->setSizes({750, 250});
+    rightSplitter_->setStretchFactor(0, 75);
+    rightSplitter_->setStretchFactor(1, 25);
+
     splitter_->addWidget(treeTabWidget_);
-    splitter_->addWidget(modifyPage_);
-    splitter_->setStretchFactor(0, 2);
+    splitter_->addWidget(rightSplitter_);
+    splitter_->setStretchFactor(0, 3);
     splitter_->setStretchFactor(1, 15);
+
     mainLayout->addWidget(splitter_);
     setLayout(mainLayout);
+
+    // LogManager 초기화 체크
+    auto *mgr = LogManager::instance();
+    if (!mgr) {
+        qWarning() << "[CenterStack] LogManager is null!";
+        return;
+    }
+    qDebug() << "[CenterStack] LogManager instance OK";
+
+    if (!logTitle_) {
+        qWarning() << "[CenterStack] logTitle_ is null!";
+        return;
+    }
+    qDebug() << "[CenterStack] logTitle_ OK";
+
+    // 로그 파일명 설정
+    QString fileName = mgr->getLogFileName();
+    qDebug() << "[CenterStack] LogFileName:" << fileName;
+    logTitle_->setText(fileName);
 
     // ---------------------- 시그널 연결 ----------------------
 
@@ -238,6 +347,7 @@ void CenterStack::setupUI()
 
         backButton->setVisible(true);
         refreshButton->setVisible(false);
+        addButton->setVisible(false);
 
         qDebug() << "Switched to BackupTree for:" << controllerPath;
     });
@@ -247,6 +357,7 @@ void CenterStack::setupUI()
         internalStack_->setCurrentIndex(0);
         backButton->setVisible(false);
         refreshButton->setVisible(true);
+        addButton->setVisible(true);
         qDebug() << "Returned to controller list view";
     });
 
@@ -299,6 +410,13 @@ void CenterStack::setupUI()
         qDebug() << "[CenterStack] Controller list refreshed.";
     });
 
+    // [7] Add버튼 클릭 -> 제어기 추가
+    connect(addButton, &QToolButton::clicked, this, [=]() {
+        ControllerManager::instance()->registerController();
+        this->updateControllerList();
+        qDebug() << "[CenterStack] Controller list Added.";
+    });
+
     updateControllerList();
 }
 
@@ -325,9 +443,10 @@ void CenterStack::updateControllerList()
     for (const auto &c : controllers) {
         QStandardItem *item = new QStandardItem(c.serialNumber);
         item->setEditable(false);
-        item->setData(QString("C:/backup/%1").arg(c.serialNumber), Qt::UserRole + 1);
-        item->setToolTip(QString("IP: %1\nSFTP: %2\nUser: %3\nWorkspace: %4")
-                                 .arg(c.ip)
+        item->setData(AppConfig::getBackupPath() + QString("/%1").arg(c.serialNumber),
+                      Qt::UserRole + 1);
+        item->setToolTip(QString("Protocol: %1 Host: %2\nSFTP: %3\nUser: %4\nWorkspace: %5")
+                                 .arg(c.host)
                                  .arg(c.sftpPort)
                                  .arg(c.username)
                                  .arg(c.wsPath));
@@ -408,9 +527,9 @@ void CenterStack::onRemoveController(const QString &serialNumber)
 {
     QMessageBox::StandardButton reply;
     reply = QMessageBox::question(this,
-                                  "제어기 삭제",
-                                  QString("정말로 '%1'을(를) 삭제하시겠습니까?\n\n"
-                                          "※ 백업 폴더는 삭제되지 않습니다.")
+                                  tr("Delete Controller"),
+                                  tr("Are you sure you want to delete '%1'?\n\n"
+                                     "Note: The backup folder will not be deleted.")
                                           .arg(serialNumber),
                                   QMessageBox::Yes | QMessageBox::No);
 
@@ -429,7 +548,7 @@ void CenterStack::onRemoveController(const QString &serialNumber)
             updateControllerList();
 
             QMessageBox::information(
-                    this, "삭제 완료", QString("'%1'이(가) 삭제되었습니다.").arg(serialNumber));
+                    this, tr("Deleted"), tr("'%1' has been deleted.").arg(serialNumber));
 
             QString msg = QString("Controller removed: %1").arg(serialNumber);
             LogManager::append(msg);
@@ -460,10 +579,33 @@ void CenterStack::stopPolling()
 
 void CenterStack::onPollingTimeout()
 {
-    qDebug() << "timeout";
+    //qDebug() << "timeout";
     ControllerManager::instance()->updateControllersStates();
 }
+void CenterStack::showLogPanel()
+{
+    if (logPanel_) {
+        logPanel_->show();
+        qDebug() << "[CenterStack] Log panel shown";
+    }
+}
 
+void CenterStack::hideLogPanel()
+{
+    if (logPanel_) {
+        logPanel_->hide();
+        qDebug() << "[CenterStack] Log panel hidden";
+    }
+}
+QString CenterStack::getIconPath()
+{
+    static QString path;
+    if (path.isEmpty()) {
+        path = QCoreApplication::applicationDirPath() + "/styles/icon";
+        qDebug() << "[IconPath] Initialized:" << path;
+    }
+    return path;
+}
 CenterStack::~CenterStack()
 {
     stopPolling();

@@ -4,6 +4,7 @@
 
 #include <QDateTime>
 #include <QDir>
+#include <QDirIterator>
 #include <QFile>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -16,6 +17,7 @@
 #include "LogManager.h"
 #include "PasswordManager.h"
 #include "SftpClient.h"
+#include "AppConfig.h"
 
 static ControllerManager *getinstance = nullptr;
 
@@ -59,12 +61,13 @@ void ControllerManager::registerController()
             QString msg = QString("Registration failed : [%1] already exists")
                                   .arg(newConInfo.serialNumber);
             LogManager::append(msg);
-            QMessageBox::warning(nullptr, "등록 실패", "이미 동일한 제어기가 등록되어 있습니다.");
+            QMessageBox::warning(nullptr, tr("Registration Failed"), 
+                                 tr("A controller with the same Serial Number is already registered."));
             return;
         }
 
         // SN 폴더 자동 생성
-        QString folderPath = "C:/backup/" + newConInfo.serialNumber;
+        QString folderPath = AppConfig::getBackupPath() + "/" + newConInfo.serialNumber;
         QDir    dir;
         bool    folderCreated = false;
 
@@ -74,8 +77,8 @@ void ControllerManager::registerController()
                 folderCreated = true;
             } else {
                 QMessageBox::warning(nullptr,
-                                     "폴더 생성 실패",
-                                     "작업 경로에 폴더를 생성할 수 없습니다:\n" + folderPath);
+                                     tr("Folder Creation Failed"),
+                                     tr("Cannot create folder at the working path:\n") + folderPath);
                 return;
             }
         }
@@ -86,10 +89,10 @@ void ControllerManager::registerController()
                                   .arg(newConInfo.serialNumber);
             LogManager::append(msg);
             QMessageBox::warning(nullptr,
-                                 "등록 실패",
-                                 "제어기와의 연결을 확인할 수 없습니다.\n"
-                                 "API 또는 SFTP 연결이 실패했습니다.\n"
-                                 "IP 주소, 포트, 계정 정보를 확인해주세요.");
+                                 tr("Registration Failed"),
+                                 tr("Cannot verify connection to the controller.\n"
+                                    "API or SFTP connection failed.\n"
+                                    "Please check the host address, port, and credentials."));
             if (folderCreated) {
                 if (dir.rmpath(folderPath)) {
                     qDebug() << "등록 실패로 인한 폴더 삭제:" << folderPath;
@@ -106,12 +109,6 @@ void ControllerManager::registerController()
         newConInfo.isRunning   = false;
         newConInfo.birth       = QDateTime::currentDateTime().toString(Qt::ISODate);
         controllers_.append(newConInfo);
-
-        qDebug() << "SN:" << newConInfo.serialNumber;
-        qDebug() << "IP:" << newConInfo.ip;
-        qDebug() << "SFTP:" << newConInfo.sftpPort;
-        qDebug() << "Username:" << newConInfo.username;
-
         saveToFile(newConInfo.serialNumber);
         QString msg = QString("[%1] registred").arg(newConInfo.serialNumber);
         LogManager::append(msg);
@@ -176,19 +173,33 @@ void ControllerManager::updateInfo(const ControllerInfo &newInfo)
 {
     ControllerSetting dialog;
     dialog.setControllerInfo(newInfo);
-
     if (dialog.exec() == QDialog::Accepted) {
         ControllerInfo updated = dialog.getControllerInfo();
 
-        QString serialNumber;
+        // 먼저 연결 검증
+        if (!validateConnection(updated)) {
+            QString msg = QString("[%1] update failed: connection validation failed")
+                                  .arg(updated.serialNumber);
+            LogManager::append(msg);
 
+            QMessageBox::warning(&dialog,
+                                 tr("Update Failed"),
+                                 tr("Cannot verify connection to the controller.\n"
+                                    "API or SFTP connection failed.\n"
+                                    "Please check the host address, port, and credentials."));
+            return;  // 검증 실패
+        }
+
+        QString serialNumber;
         {
             QMutexLocker locker(&mutex_);
             for (auto &c : controllers_) {
                 if (c.serialNumber == newInfo.serialNumber) {
                     serialNumber = c.serialNumber;
-
-                    c.ip       = updated.ip;
+                    // 검증 성공
+                    c.protocol = updated.protocol;
+                    c.host     = updated.host;
+                    c.apiPort  = updated.apiPort;
                     c.username = updated.username;
                     c.sftpPort = updated.sftpPort;
                     c.pswd     = updated.pswd;
@@ -196,17 +207,14 @@ void ControllerManager::updateInfo(const ControllerInfo &newInfo)
 
                     QString msg = QString("[%1] state has been updated").arg(c.serialNumber);
                     LogManager::append(msg);
-
                     break;
                 }
             }
         }
 
         saveToFile();
-
         cleanupApiClient(serialNumber);
         setupApiClient(serialNumber);
-
         emit controllerListChanged();
     }
 }
@@ -229,8 +237,7 @@ void ControllerManager::setupApiClient(const QString &serialNumber)
         return;
     }
 
-    QString    baseUrl = QString("%1").arg(info.ip);
-    ApiClient *client  = new ApiClient(baseUrl, this);
+    ApiClient *client = new ApiClient(info, this);
 
     // serialNumber를 값으로 캡처
     //running 값이 바뀌었을 때
@@ -310,8 +317,7 @@ void ControllerManager::updateControllersStates()
             continue;
         }
 
-        QString inputUrl    = QString("%1").arg(c.ip);
-        QString expectedUrl = ApiClient::normalizeBaseUrl(inputUrl);
+        QString expectedUrl = ApiClient::normalizeBaseUrlAPI(c);
         QString currentUrl  = client->getBaseUrl();
 
         if (currentUrl != expectedUrl) {
@@ -505,22 +511,24 @@ bool ControllerManager::backupRequest(const QString &serialNumber, const QString
     QString sn = info.serialNumber;
     QString snDir;  // 항상 C:\backup\123 형태로 맞춤
     {
-        QString tail = QFileInfo(base.path()).fileName();
+        // "backup" 폴더 내인지 확인 로직
+        QString backupRoot = AppConfig::getBackupPath();
+        QString absoluteBase = QDir(baseBackupDir).absolutePath();
+        QString absoluteRoot = QDir(backupRoot).absolutePath();
 
-        // 1) base가 "C:/backup" 같은 루트일 때만 SN 하위 폴더 생성
-        if (tail.compare("backup", Qt::CaseInsensitive) == 0) {
-            // 예: base = C:/backup → C:/backup/SN1
+        // 1) base가 AppConfig::getBackupPath() 와 같으면 하위 폴더 생성
+        if (absoluteBase.compare(absoluteRoot, Qt::CaseInsensitive) == 0) {
             snDir = base.filePath(sn);
         }
-        // 2) base가 이미 해당 SN 폴더일 때는 있는 폴더 그대로 사용
-        else if (tail == sn) {
-            // 예: base = C:/backup/SN1 → C:/backup/SN1
-            snDir = base.path();
-        }
-        // 3) 그 외는 호출자가 넘긴 baseBackupDir을 그대로 최상위로 사용
+        // 2) 그 외는 호출자가 넘긴 baseBackupDir을 그대로 사용 (이미 SN 폴더일 수도 있음)
         else {
-            // 예: base = C:/backup/test → C:/backup/test
-            snDir = base.path();
+            // 만약 base의 이름이 SN과 같다면 그대로 사용
+            if (QFileInfo(absoluteBase).fileName() == sn) {
+                snDir = absoluteBase;
+            } else {
+                // 아니라면 SN 폴더를 만들어주는 것이 안전하지만, 기존 로직(3번)을 유지
+                snDir = absoluteBase;
+            }
         }
     }
     if (!QDir().mkpath(snDir)) {
@@ -693,10 +701,8 @@ bool ControllerManager::send(const QString     &serialNumber,
         return false;
     }
 
-    // 호스트와 포트 분리
-    QPair<QString, quint16> hostPort = parseHostPort(controller.ip, controller.sftpPort);
-    QString                 host     = hostPort.first;
-    quint16                 port     = hostPort.second;
+    QString host = controller.host;
+    quint16 port = controller.sftpPort;
 
     qDebug() << "[send] Parsed host:" << host << "port:" << port;
 
@@ -758,9 +764,9 @@ bool ControllerManager::receive(const QString &serialNumber,
     }
 
     // 호스트와 포트 분리
-    QPair<QString, quint16> hostPort = parseHostPort(controller.ip, controller.sftpPort);
-    QString                 host     = hostPort.first;
-    quint16                 port     = hostPort.second;
+
+    QString host = controller.host;
+    quint16 port = controller.sftpPort;
 
     qDebug() << "[receive] Parsed host:" << host << "port:" << port;
 
@@ -843,6 +849,27 @@ bool ControllerManager::receive(const QString &serialNumber,
             return false;
         }
     }
+    // 1. 하위 파일/폴더 권한 설정
+    QDirIterator it(finalPath, QDir::AllEntries | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
+    while (it.hasNext()) {
+        QString entryPath = it.next();
+        QFileInfo fi(entryPath);
+
+        if (fi.isDir()) {
+            // 폴더: 775 (rwxrwxr-x) - 그룹에게도 쓰기/진입 권한 부여
+            QFile::setPermissions(entryPath,
+                                  QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner |
+                                          QFileDevice::ReadGroup | QFileDevice::WriteGroup | QFileDevice::ExeGroup | // 그룹 쓰기 추가
+                                          QFileDevice::ReadOther | QFileDevice::ExeOther);
+        } else {
+            // 파일: 664 (rw-rw-r--) - 그룹에게도 쓰기 권한 부여
+            QFile::setPermissions(entryPath,
+                                  QFileDevice::ReadOwner | QFileDevice::WriteOwner |
+                                          QFileDevice::ReadGroup | QFileDevice::WriteGroup | // 그룹 쓰기 추가
+                                          QFileDevice::ReadOther);
+        }
+    }
+
 
     qDebug() << "Receive completed successfully ->" << finalPath;
     return true;
@@ -852,7 +879,7 @@ bool ControllerManager::receive(const QString &serialNumber,
 bool ControllerManager::saveController(const ControllerInfo &controller)
 {
     // 1. 경로 생성
-    QString folderPath = QString("C:/backup/%1/config").arg(controller.serialNumber);
+    QString folderPath = AppConfig::getBackupPath() + QString("/%1/config").arg(controller.serialNumber);
     QString filePath   = folderPath + "/controller.json";
 
     // 2. config 디렉토리 생성
@@ -866,8 +893,11 @@ bool ControllerManager::saveController(const ControllerInfo &controller)
 
     // 3. JSON 객체 생성
     QJsonObject obj;
+
+    obj["protocol"]     = controller.protocol;
     obj["serialNumber"] = controller.serialNumber;
-    obj["ip"]           = controller.ip;
+    obj["host"]         = controller.host;
+    obj["apiPort"]      = controller.apiPort;
     obj["sftpPort"]     = controller.sftpPort;
     obj["username"]     = controller.username;
     obj["pswd"]         = pm_->encrypt(controller.pswd);
@@ -893,7 +923,7 @@ bool ControllerManager::saveController(const ControllerInfo &controller)
 bool ControllerManager::loadController(const QString &serialNumber)
 {
     // 1. 파일 경로 생성
-    QString folderPath = QString("C:/backup/%1/config").arg(serialNumber);
+    QString folderPath = AppConfig::getBackupPath() + QString("/%1/config").arg(serialNumber);
     QString filePath   = folderPath + "/controller.json";
 
     // 2. 파일 존재 확인
@@ -923,8 +953,10 @@ bool ControllerManager::loadController(const QString &serialNumber)
     QJsonObject obj = doc.object();
     // 6. ControllerInfo 생성
     ControllerInfo c;
+    c.protocol     = obj["protocol"].toInt();
     c.serialNumber = obj["serialNumber"].toString();
-    c.ip           = obj["ip"].toString();
+    c.host         = obj["host"].toString();
+    c.apiPort      = obj["apiPort"].toInt();
     c.sftpPort     = obj["sftpPort"].toInt();
     c.username     = obj["username"].toString();
     c.pswd         = pm_->decrypt(obj["pswd"].toString());
@@ -959,6 +991,13 @@ void ControllerManager::saveControllerList()
 {
     //전체 제어기 목록 업데이트
 
+    QString configDir = AppConfig::getBackupPath() + "/config";
+    QDir dir;
+    if (!dir.exists(configDir)) {
+        dir.mkpath(configDir);
+    }
+    QString listPath = configDir + "/controller_list.json";
+
     // 1. Mutex로 보호된 영역에서 복사
     QList<ControllerInfo> controllersCopy;
     {
@@ -971,7 +1010,7 @@ void ControllerManager::saveControllerList()
     for (const auto &c : controllersCopy) {
         QJsonObject obj;
         obj["serialNumber"] = c.serialNumber;
-        obj["ip"]           = c.ip;
+        obj["host"]         = c.host;
         snArray.append(obj);
     }
 
@@ -984,7 +1023,6 @@ void ControllerManager::saveControllerList()
     QJsonDocument doc(root);
 
     // 4. 파일 저장
-    QString listPath = QString("C:/backup/config/controller_list.json");
     QFile   file(listPath);
 
     if (!file.open(QIODevice::WriteOnly)) {
@@ -998,7 +1036,7 @@ void ControllerManager::saveControllerList()
 void ControllerManager::loadControllerList()
 {
     //전체 제어기 목록 가져오기
-    QString listPath = QString("C:/backup/config/controller_list.json");
+    QString listPath = AppConfig::getBackupPath() + "/config/controller_list.json";
 
     QFile file(listPath);
     if (!file.exists()) {
@@ -1071,32 +1109,7 @@ void ControllerManager::resumeStateUpdates()
     // 즉시 한 번 업데이트
     QTimer::singleShot(0, this, &ControllerManager::updateControllersStates);
 }
-QPair<QString, quint16> ControllerManager::parseHostPort(const QString &hostString,
-                                                         quint16        defaultPort)
-{
-    QString host = hostString.trimmed();
 
-    // 프로토콜 제거
-    if (host.startsWith("https://"))
-        host.remove(0, 8);
-    else if (host.startsWith("http://"))
-        host.remove(0, 7);
-
-    // 경로 제거
-    int slashIndex = host.indexOf('/');
-    if (slashIndex != -1) {
-        host = host.left(slashIndex);
-    }
-
-    // SFTP는 포트 parsing 하지 않음 (API와 분리)
-    // ip:port 입력이어도 ip만 추출
-    int colonIndex = host.indexOf(':');
-    if (colonIndex != -1) {
-        host = host.left(colonIndex);
-    }
-
-    return qMakePair(host, defaultPort);
-}
 bool ControllerManager::validateConnection(const ControllerInfo &info)
 {
     qDebug() << "[validateConnection] Validating connection for" << info.serialNumber;
@@ -1109,8 +1122,7 @@ bool ControllerManager::validateConnection(const ControllerInfo &info)
 
 bool ControllerManager::validateApiConnection(const ControllerInfo &info)
 {
-    QString baseUrl       = QString("%1").arg(info.ip);
-    QString normalizedUrl = ApiClient::normalizeBaseUrl(baseUrl);
+    QString normalizedUrl = ApiClient::normalizeBaseUrlAPI(info);
 
     QNetworkAccessManager manager;
     QNetworkRequest       request;
@@ -1171,32 +1183,25 @@ bool ControllerManager::validateApiConnection(const ControllerInfo &info)
 
 bool ControllerManager::validateSftpConnection(const ControllerInfo &info)
 {
-    QPair<QString, quint16> hostPort = parseHostPort(info.ip, info.sftpPort);
-    QString                 host     = hostPort.first;
-    quint16                 port     = hostPort.second;
-
-    SFTPClient client(host, port, info.username, info.pswd);
-
-    bool success = client.connectToServer();
+    // info에서 직접 포트 사용
+    SFTPClient client(info.host, info.sftpPort, info.username, info.pswd);
+    bool       success = client.connectToServer();
 
     if (success) {
         qDebug() << "[validateSftpConnection] SFTP connection successful";
         client.disconnect();
-
         QString msg = QString("[%1] SFTP connection validated successfully (host=%2, port=%3)")
                               .arg(info.serialNumber)
-                              .arg(host)
-                              .arg(port);
+                              .arg(info.host)
+                              .arg(info.sftpPort);
         LogManager::append(msg);
     } else {
-        // lastError_에서 상세 에러 메시지 가져오기
         QString errorMsg = client.getLastError();
-
-        QString msg = QString("[%1] SFTP connection failed - %2 (host=%3, port=%4, user=%5)")
+        QString msg      = QString("[%1] SFTP connection failed - %2 (host=%3, port=%4, user=%5)")
                               .arg(info.serialNumber)
                               .arg(errorMsg)
-                              .arg(host)
-                              .arg(port)
+                              .arg(info.host)
+                              .arg(info.sftpPort)
                               .arg(info.username);
         LogManager::append(msg);
         qWarning() << msg;

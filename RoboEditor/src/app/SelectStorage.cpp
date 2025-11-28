@@ -8,11 +8,12 @@
 #include <QRadioButton>
 
 #include "ApplyPage.h"
+#include "AppConfig.h"
 
 selectTableWidget::selectTableWidget(QWidget *parent) : QWidget(parent)
 {
     resize(1000, 600);
-    rootPath    = "C:/backup";
+    rootPath    = AppConfig::getBackupPath();
     currentPath = rootPath;
 
     QSplitter   *splitter = new QSplitter(this);

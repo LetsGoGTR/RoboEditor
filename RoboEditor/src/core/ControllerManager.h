@@ -13,7 +13,9 @@
 struct ControllerInfo
 {
     QString serialNumber;
-    QString ip;
+    int     protocol;
+    QString host;
+    int     apiPort;
     int     sftpPort;
     QString username;
     QString pswd;
@@ -105,14 +107,12 @@ class ControllerManager : public QObject
         bool validateApiConnection(const ControllerInfo &info);
         bool validateSftpConnection(const ControllerInfo &info);
 
-        static QPair<QString, quint16> parseHostPort(const QString &hostString,
-                                                     quint16        defaultPort);
-        bool                           stateUpdatesPaused_ = false;
-        QString                        configFilePath_;
-        QList<ControllerInfo>          controllers_;
-        QMap<QString, ApiClient *>     apiClients_;
-        PasswordManager               *pm_;
-        mutable QMutex                 mutex_;
+        bool                       stateUpdatesPaused_ = false;
+        QString                    configFilePath_;
+        QList<ControllerInfo>      controllers_;
+        QMap<QString, ApiClient *> apiClients_;
+        PasswordManager           *pm_;
+        mutable QMutex             mutex_;
 };
 
 #endif  // CONTROLLERMANAGER_H

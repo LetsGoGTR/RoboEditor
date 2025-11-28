@@ -27,6 +27,7 @@
 // Core services
 #include "../core/services/DiffService.h"
 #include "../core/services/WorkspaceService.h"
+#include "AppConfig.h"
 
 ComparePage::ComparePage(QWidget *parent) : QWidget(parent)
 {
@@ -55,6 +56,7 @@ QWidget *ComparePage::buildDock()
     v->setContentsMargins(0, 0, 0, 0);
 
     rightSplit_ = new QSplitter(Qt::Horizontal, w);
+    rightSplit_->setHandleWidth(2);
 
     compareTabWidget_ = new QTabWidget(rightSplit_);
     compareTabWidget_->setTabsClosable(true);
@@ -74,8 +76,8 @@ QWidget *ComparePage::buildDock()
             rightText_   = qobject_cast<CodeEditor *>(compareTabWidget_->widget(curr));
             QString path = compareTabWidget_->tabToolTip(curr);
             if (!path.isEmpty()) {
-                targetPath_ = path;
-                emit targetPathChanged(path);
+                rightPath_ = path;
+                emit rightFileChanged(path);
             }
         } else {
             rightText_ = nullptr;
@@ -84,11 +86,26 @@ QWidget *ComparePage::buildDock()
 
     connect(compareTabWidget_, &QTabWidget::currentChanged, this, [this](int index) {
         if (index >= 0) {
-            rightText_   = qobject_cast<CodeEditor *>(compareTabWidget_->widget(index));
+            QWidget *tabPage = compareTabWidget_->widget(index);
+            rightText_       = tabPage ? tabPage->findChild<CodeEditor *>() : nullptr;
+
             QString path = compareTabWidget_->tabToolTip(index);
-            if (!path.isEmpty()) {
-                targetPath_ = path;
-                emit targetPathChanged(path);
+
+            if (!path.isEmpty() && rightText_) {
+                rightPath_ = path;
+                emit rightFileChanged(path);
+
+                if (leftText_) {
+                    QString leftContent  = leftText_->toPlainText();
+                    QString rightContent = rightText_->toPlainText();
+
+                    qDebug() << "Tab changed - Left length:" << leftContent.length()
+                             << "Right length:" << rightContent.length();
+
+                    if (!leftContent.isEmpty() && !rightContent.isEmpty()) {
+                        recalcDiff(leftContent, cachedLeftPath_);
+                    }
+                }
             }
         } else {
             rightText_ = nullptr;
@@ -123,79 +140,14 @@ QWidget *ComparePage::buildRightPanel()
     topLayout->addWidget(btnSelectFile);
     btnSelectFile->setObjectName("fileBtn");
 
-    connect(btnSelectFile, &QPushButton::clicked, this, [this]() {
-        // 1) ModifyPage에서 왼쪽 편집기를 넘겨준 경우: 그걸 그대로 사용
-        if (leftText_) {
-            QString leftContent = leftText_->toPlainText();
-            QString leftPath = leftText_->lastLoadedPath();  // 비어 있어도 recalcDiff에서 보정함
-
-            // 오른쪽 파일만 선택 (기준/base)
-            QString rightPath = QFileDialog::getOpenFileName(
-                    this, tr("Select right file (base)"), "C:/backup", tr("All Files (*.*)"));
-            if (rightPath.isEmpty())
-                return;
-
-            // ComparePage의 오른쪽 탭에 파일 로드 + diff 재계산
-            setTargetPath(rightPath);
-            recalcDiff(leftContent, leftPath);
-            return;
-        }
-
-        // 2) 왼쪽 편집기가 없는 경우(단독 ComparePage 사용 시): 기존 동작 유지
-        QString leftPath = QFileDialog::getOpenFileName(
-                this, tr("Select left file (compare)"), "C:/backup", tr("All Files (*.*)"));
-        if (leftPath.isEmpty())
-            return;
-
-        QString rightPath = QFileDialog::getOpenFileName(
-                this, tr("Select right file (base)"), "C:/backup", tr("All Files (*.*)"));
-        if (rightPath.isEmpty())
-            return;
-
-        performDiff(leftPath, rightPath);
-    });
+    connect(btnSelectFile, &QPushButton::clicked, this, &ComparePage::triggerFileCompare);
 
     auto btnSelectFolder = new QPushButton(tr("Compare Folders"), topBar);
     btnSelectFolder->setFixedSize(120, 26);
     topLayout->addWidget(btnSelectFolder);
     btnSelectFolder->setObjectName("folderBtn");
-    connect(btnSelectFolder, &QPushButton::clicked, this, [this]() {
-        QFileDialog dialog(this, tr("Select folder or archive (compare)"), "C:/backup");
-        dialog.setFileMode(QFileDialog::Directory);
-        dialog.setOption(QFileDialog::ShowDirsOnly, false);
-        dialog.setOption(QFileDialog::DontUseNativeDialog, true);
-        dialog.setNameFilter(tr("Folders and Archives (*.zip *.tar *.tar.gz *.tgz)"));
 
-        QListView *listView = dialog.findChild<QListView *>("listView");
-        if (listView)
-            listView->setSelectionMode(QAbstractItemView::SingleSelection);
-
-        QString leftPath;
-        if (dialog.exec() == QDialog::Accepted) {
-            QStringList paths = dialog.selectedFiles();
-            if (!paths.isEmpty())
-                leftPath = paths.first();
-        }
-        if (leftPath.isEmpty())
-            return;
-
-        QFileDialog dialog2(this, tr("Select folder or archive (base)"), "C:/backup");
-        dialog2.setFileMode(QFileDialog::Directory);
-        dialog2.setOption(QFileDialog::ShowDirsOnly, false);
-        dialog2.setOption(QFileDialog::DontUseNativeDialog, true);
-        dialog2.setNameFilter(tr("Folders and Archives (*.zip *.tar *.tar.gz *.tgz)"));
-
-        QString rightPath;
-        if (dialog2.exec() == QDialog::Accepted) {
-            QStringList paths = dialog2.selectedFiles();
-            if (!paths.isEmpty())
-                rightPath = paths.first();
-        }
-        if (rightPath.isEmpty())
-            return;
-
-        performFolderDiff(leftPath, rightPath);
-    });
+    connect(btnSelectFolder, &QPushButton::clicked, this, &ComparePage::triggerFolderCompare);
 
     layout->addWidget(topBar);
 
@@ -233,12 +185,17 @@ void ComparePage::onFolderFileClicked(const QString &relPath)
 
 void ComparePage::setLeftEditor(CodeEditor *leftEditor)
 {
+    // 이전 에디터가 존재하고 새 에디터와 다르다면, 하이라이터 연결 해제
+    if (leftText_ && leftText_ != leftEditor) {
+        leftText_->setDiffHighlighter(nullptr);
+    }
+
     leftText_ = leftEditor;
     if (leftText_) {
         leftText_->setDiffHighlighter(leftDiffHighlighter_);
         cachedLeftPath_ = leftText_->lastLoadedPath();
         cachedLeftText_ = leftText_->toPlainText();
-        if (!targetPath_.isEmpty()) {
+        if (!rightPath_.isEmpty()) {
             recalcDiff(cachedLeftText_, cachedLeftPath_);
         }
     }
@@ -265,80 +222,93 @@ QString ComparePage::formatPathForCompare(const QString &fullPath) const
     if (fullPath.isEmpty())
         return "No file opened";
     QString displayPath = fullPath;
-    if (displayPath.startsWith("C:/backup", Qt::CaseInsensitive))
-        displayPath.remove(0, 9);
-    else if (displayPath.startsWith("C:\\backup", Qt::CaseInsensitive))
-        displayPath.remove(0, 9);
+    QString backupPath = AppConfig::getBackupPath();
+    if (displayPath.startsWith(backupPath, Qt::CaseInsensitive))
+        displayPath.remove(0, backupPath.length());
+
     if (displayPath.startsWith('/') || displayPath.startsWith('\\'))
         displayPath.remove(0, 1);
     displayPath.replace('/', " > ");
     displayPath.replace('\\', " > ");
     return displayPath;
 }
-void ComparePage::setTargetPath(const QString &path)
+
+//오른쪽 코드 에디터 만들고 targetPath 설정
+void ComparePage::setRightFile(const QString &path)
 {
     if (path.isEmpty() || !compareTabWidget_)
         return;
 
-    targetPath_ = path;
+    rightPath_ = path;
+
+    QString content = loadFileContent(path);
+    rightText_      = createCompareTab(path, content);
+
+    emit rightFileChanged(path);
+
+    if (leftText_ && !cachedLeftText_.isEmpty()) {
+        recalcDiff(cachedLeftText_, cachedLeftPath_);
+    }
+}
+
+// 새로운 compareTab 생성
+CodeEditor *ComparePage::createCompareTab(const QString &path, const QString &content)
+{
     QFileInfo fileInfo(path);
     QString   fileName     = fileInfo.fileName();
     QString   absolutePath = fileInfo.absoluteFilePath();
 
-    while (compareTabWidget_->count() > 0) {
-        auto *widget = compareTabWidget_->widget(0);
-        compareTabWidget_->removeTab(0);
-        if (widget)
-            widget->deleteLater();
-    }
+    // 기존 탭 제거
+    // while (compareTabWidget_->count() > 0) {
+    //     auto *widget = compareTabWidget_->widget(0);
+    //     compareTabWidget_->removeTab(0);
+    //     if (widget) widget->deleteLater();
+    // }
 
+    // 새 탭 생성
     QWidget     *tabPage    = new QWidget(compareTabWidget_);
     QVBoxLayout *pageLayout = new QVBoxLayout(tabPage);
     pageLayout->setContentsMargins(0, 0, 0, 0);
     pageLayout->setSpacing(0);
 
+    // 경로 레이블
     QLabel *pathLabel = new QLabel(tabPage);
     pathLabel->setObjectName("pathLabel");
     pathLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
     pathLabel->setText(formatPathForCompare(absolutePath));
     pageLayout->addWidget(pathLabel);
 
-    auto *newTextEdit = new CodeEditor(tabPage);
-    newTextEdit->setReadOnly(true);
-    newTextEdit->setAccept(true);
-
+    // 에디터 생성
+    auto *editor = new CodeEditor(tabPage);
+    editor->setReadOnly(true);
+    editor->setAccept(true);
     if (rightDiffHighlighter_) {
-        newTextEdit->setDiffHighlighter(rightDiffHighlighter_);
+        editor->setDiffHighlighter(rightDiffHighlighter_);
     }
+    editor->setPlainText(content);
+    pageLayout->addWidget(editor);
 
-    pageLayout->addWidget(newTextEdit);
-
-    QFile f(path);
-    if (f.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        QTextStream in(&f);
-        newTextEdit->setPlainText(in.readAll());
-        f.close();
-    } else {
-        newTextEdit->setPlainText(tr("Failed to open: %1").arg(path));
-    }
-
-    connect(newTextEdit, &DropTextEdit::fileDropped, this, [this](const QString &droppedPath) {
-        setTargetPath(droppedPath);
+    // 드롭 이벤트 연결
+    connect(editor, &DropTextEdit::fileDropped, this, [this](const QString &droppedPath) {
+        setRightFile(droppedPath);
     });
 
+    // 탭 추가
     int index = compareTabWidget_->addTab(tabPage, fileName);
     compareTabWidget_->setTabToolTip(index, absolutePath);
     compareTabWidget_->setCurrentIndex(index);
 
-    rightText_ = newTextEdit;
-    emit targetPathChanged(path);
-
-    QString leftContent = leftText_ ? leftText_->toPlainText() : cachedLeftText_;
-    if (!cachedLeftPath_.isEmpty()) {
-        recalcDiff(leftContent, cachedLeftPath_);
-    }
+    return editor;
 }
-
+QString ComparePage::loadFileContent(const QString &path)
+{
+    QFile f(path);
+    if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        return tr("Failed to open: %1").arg(path);
+    }
+    QTextStream in(&f);
+    return in.readAll();
+}
 void ComparePage::setDiffRows(const QList<DiffRow> &rows)
 {
     // 1. 에디터 하이라이터(CodeEditor) 업데이트 로직
@@ -383,6 +353,7 @@ void ComparePage::setDiffRows(const QList<DiffRow> &rows)
     }
 }
 
+//modiifyPage에서 왼쪽 에디터가 호출
 void ComparePage::recalcDiff(const QString &leftText, const QString &leftPath)
 {
     if (!compareTabWidget_ || compareTabWidget_->count() == 0)
@@ -399,7 +370,7 @@ void ComparePage::recalcDiff(const QString &leftText, const QString &leftPath)
     if (!diffPanel_)
         return;
 
-    if (targetPath_.isEmpty()) {
+    if (rightPath_.isEmpty()) {
         diffPanel_->clearAll();
         clearHighlights();  // 경로 없으면 하이라이트도 제거
         return;
@@ -407,7 +378,7 @@ void ComparePage::recalcDiff(const QString &leftText, const QString &leftPath)
 
     // 1. 파일 타입 감지
     auto lType = FileTypeHelper::detect(effectiveLeftPath);
-    auto rType = FileTypeHelper::detect(targetPath_);
+    auto rType = FileTypeHelper::detect(rightPath_);
 
     if (!effectiveLeftPath.isEmpty() && !FileTypeHelper::isCompatible(lType, rType)) {
         const QString leftTypeName  = FileTypeHelper::typeName(lType);
@@ -415,7 +386,7 @@ void ComparePage::recalcDiff(const QString &leftText, const QString &leftPath)
 
         // 상단 타입 정보 박스에는 그대로 표시
         if (diffPanel_) {
-            diffPanel_->setFileTypeInfo(leftTypeName, rightTypeName, false, tr("호환되지 않음"));
+            diffPanel_->setFileTypeInfo(leftTypeName, rightTypeName, false, tr("Incompatible"));
         }
 
         // 테이블에 "확장자 불일치" 한 줄 추가
@@ -423,7 +394,7 @@ void ComparePage::recalcDiff(const QString &leftText, const QString &leftPath)
         row.line            = -1;
         row.leftLineNumber  = -1;
         row.rightLineNumber = -1;
-        row.key             = tr("확장자 불일치");
+        row.key             = tr("Extension Mismatch");
         row.origin          = rightTypeName;  // 오른쪽 타입
         row.target          = leftTypeName;   // 왼쪽 타입
         row.state           = "MISMATCH";     // 하이라이트는 안 줄 상태값
@@ -440,7 +411,7 @@ void ComparePage::recalcDiff(const QString &leftText, const QString &leftPath)
     }
 
     QString                 fileTypeStr = FileTypeHelper::typeName(rType);
-    QPair<QString, QString> headers     = determineColumnHeaders(effectiveLeftPath, targetPath_);
+    QPair<QString, QString> headers     = determineColumnHeaders(effectiveLeftPath, rightPath_);
 
     // UI 설정
     diffPanel_->setupFileDiffMode(fileTypeStr, headers.first, headers.second);
@@ -448,7 +419,7 @@ void ComparePage::recalcDiff(const QString &leftText, const QString &leftPath)
     // 2. Diff 수행
     services::ServiceResult result = services::DiffService::diff(rightText.toStdString(),
                                                                  leftText.toStdString(),
-                                                                 targetPath_.toStdString(),
+                                                                 rightPath_.toStdString(),
                                                                  effectiveLeftPath.toStdString());
 
     // 3. 에러 처리 (라인 번호 복구)
@@ -488,7 +459,7 @@ void ComparePage::recalcDiff(const QString &leftText, const QString &leftPath)
                 r.rightLineNumber = errorLine;
                 r.state           = "ERROR";
                 r.key             = (errorLine > 0) ? QString::number(errorLine) : "Parse Error";
-                r.target          = "YAML 형식이 올바르지 않습니다.";
+                r.target          = tr("Invalid YAML format.");
                 r.origin          = errorDetail;  // 상세 에러는 우측에 표시
 
                 errRows.append(r);
@@ -556,7 +527,7 @@ void ComparePage::recalcDiff(const QString &leftText, const QString &leftPath)
 
     setDiffRows(diffRows);  // ComparePage::setDiffRows 호출
 
-    emit uiCompareClicked(effectiveLeftPath, targetPath_);
+    emit uiCompareClicked(effectiveLeftPath, rightPath_);
 }
 
 QList<DiffRow> ComparePage::parseDiffResult(const Json::Value &result, const QString &fileType)
@@ -711,17 +682,21 @@ QList<DiffRow> ComparePage::parseDiffResult(const Json::Value &result, const QSt
 
 void ComparePage::performDiff(const QString &leftPath, const QString &rightPath)
 {
+    showCompareEditor(true);
+
     QFile leftFile(leftPath);
     if (!leftFile.open(QIODevice::ReadOnly | QIODevice::Text))
         return;
     QString leftContent = QString::fromUtf8(leftFile.readAll());
 
-    setTargetPath(rightPath);
+    setRightFile(rightPath);
     recalcDiff(leftContent, leftPath);
 }
 
 void ComparePage::performFolderDiff(const QString &leftPath, const QString &rightPath)
 {
+    showCompareEditor(false);
+
     QString lPath = leftPath;
     QString rPath = rightPath;
 
@@ -784,14 +759,16 @@ ComparePage::ControllerPathInfo ComparePage::extractControllerInfo(const QString
     ControllerPathInfo info;
     if (path.isEmpty())
         return info;
-    QString     normalized = QDir::fromNativeSeparators(QDir::cleanPath(path));
-    QStringList parts      = normalized.split('/', Qt::SkipEmptyParts);
+    QString normalized = QDir::cleanPath(path);
+    QString backupPath = QDir::cleanPath(AppConfig::getBackupPath());
 
-    for (int i = 0; i < parts.size(); ++i) {
-        if (parts[i].compare("backup", Qt::CaseInsensitive) == 0) {
-            if (i + 1 < parts.size())
-                info.serial = parts[i + 1];
-            break;
+    if (normalized.startsWith(backupPath, Qt::CaseInsensitive)) {
+        QString relative = normalized.mid(backupPath.length());
+        if (relative.startsWith('/') || relative.startsWith('\\')) relative.remove(0, 1);
+
+        QStringList parts = relative.split('/', Qt::SkipEmptyParts);
+        if (!parts.isEmpty()) {
+            info.serial = parts.first();
         }
     }
     return info;
@@ -836,4 +813,70 @@ void ComparePage::onDiffRowClicked(const DiffRow &row)
     if (rightText_) {
         rightText_->scrollToLine(line);
     }
+}
+void ComparePage::showCompareEditor(bool show)
+{
+    QWidget *tabPanel = rightSplit_->widget(0);
+
+    if (show) {
+        tabPanel->show();
+        rightSplit_->setSizes({1, 1});  // equal split
+    } else {
+        tabPanel->hide();
+        rightSplit_->setSizes({0, 1});  // right only
+    }
+}
+void ComparePage::triggerFileCompare()
+{
+    showCompareEditor(true);
+    QString path = QFileDialog::getOpenFileName(
+            this,
+            tr("Select file to compare"),
+            AppConfig::getBackupPath(),
+            tr("All Files (*.*);;YAML Files (*.yaml *.yml);;Text Files (*.txt)"));
+
+    if (!path.isEmpty()) {
+        setRightFile(path);
+    }
+}
+
+void ComparePage::triggerFolderCompare()
+{
+    showCompareEditor(false);
+
+    QFileDialog dialog(this, tr("Select folder or archive (compare)"), AppConfig::getBackupPath());
+    dialog.setFileMode(QFileDialog::Directory);
+    dialog.setOption(QFileDialog::ShowDirsOnly, false);
+    dialog.setOption(QFileDialog::DontUseNativeDialog, true);
+    dialog.setNameFilter(tr("Folders and Archives (*.zip *.tar *.tar.gz *.tgz)"));
+
+    QListView *listView = dialog.findChild<QListView *>("listView");
+    if (listView)
+        listView->setSelectionMode(QAbstractItemView::SingleSelection);
+
+    QString leftPath;
+    if (dialog.exec() == QDialog::Accepted) {
+        QStringList paths = dialog.selectedFiles();
+        if (!paths.isEmpty())
+            leftPath = paths.first();
+    }
+    if (leftPath.isEmpty())
+        return;
+
+    QFileDialog dialog2(this, tr("Select folder or archive (base)"), AppConfig::getBackupPath());
+    dialog2.setFileMode(QFileDialog::Directory);
+    dialog2.setOption(QFileDialog::ShowDirsOnly, false);
+    dialog2.setOption(QFileDialog::DontUseNativeDialog, true);
+    dialog2.setNameFilter(tr("Folders and Archives (*.zip *.tar *.tar.gz *.tgz)"));
+
+    QString rightPath;
+    if (dialog2.exec() == QDialog::Accepted) {
+        QStringList paths = dialog2.selectedFiles();
+        if (!paths.isEmpty())
+            rightPath = paths.first();
+    }
+    if (rightPath.isEmpty())
+        return;
+
+    performFolderDiff(leftPath, rightPath);
 }
