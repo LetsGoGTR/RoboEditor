@@ -13,9 +13,9 @@
 #include "../utils/JsonFileUtils.h"
 #include "../utils/PathValidator.h"
 #include "../utils/TimeUtils.h"
-#include "../utils/logging/Logger.h"
 #include "DeviceService.h"
 #include "FolderService.h"
+#include <drogon/drogon.h>
 
 namespace fs = std::filesystem;
 
@@ -85,21 +85,21 @@ services::WorkspaceService::importWorkspace(const std::string       &archivePath
 {
     // Validate archive file
     if (!fs::exists(archivePath)) {
-        utils::logging::warn("Archive file does not exist: " + archivePath);
+        LOG_WARN << "Archive file does not exist: " << archivePath;
         return ServiceResult::createError("Archive file does not exist: " + archivePath);
     }
     if (!isSupportedArchive(archivePath)) {
-        utils::logging::warn("Unsupported archive format: " + archivePath);
+        LOG_WARN << "Unsupported archive format: " << archivePath;
         return ServiceResult::createError("Unsupported archive format: " + archivePath);
     }
 
     // Validate path for security
     if (!utils::validatePath(metadata.uuid)) {
-        utils::logging::warn("Invalid workspace ID: " + metadata.uuid);
+        LOG_WARN << "Invalid workspace ID: " << metadata.uuid;
         return ServiceResult::createError("Invalid workspace ID: " + metadata.uuid);
     }
     if (!deviceId.empty() && !utils::validatePath(deviceId)) {
-        utils::logging::warn("Invalid device ID: " + deviceId);
+        LOG_WARN << "Invalid device ID: " << deviceId;
         return ServiceResult::createError("Invalid device ID: " + deviceId);
     }
 
@@ -108,7 +108,7 @@ services::WorkspaceService::importWorkspace(const std::string       &archivePath
 
     // Check if workspace already exists
     if (fs::exists(workspacePath) && fs::is_directory(workspacePath)) {
-        utils::logging::warn("Workspace already exists: " + metadata.uuid);
+        LOG_WARN << "Workspace already exists: " << metadata.uuid;
         return ServiceResult::createError("Workspace already exists: " + metadata.uuid);
     }
 
@@ -162,7 +162,7 @@ services::WorkspaceService::importWorkspace(const std::string       &archivePath
         result.success = true;
         result.data    = metadata.toJson();
 
-        utils::logging::info("Imported workspace: " + metadata.name + " (ID: " + metadata.uuid + ")");
+        LOG_INFO << "Imported workspace: " << metadata.name << " (ID: " << metadata.uuid << ")";
         return result;
 
     } catch (const std::exception &e) {
@@ -178,11 +178,11 @@ services::ServiceResult services::WorkspaceService::exportWorkspace(const std::s
 {
     // Validate path for security
     if (!utils::validatePath(workspaceId)) {
-        utils::logging::warn("Invalid workspace ID: " + workspaceId);
+        LOG_WARN << "Invalid workspace ID: " << workspaceId;
         return ServiceResult::createError("Invalid workspace ID: " + workspaceId);
     }
     if (!deviceId.empty() && !utils::validatePath(deviceId)) {
-        utils::logging::warn("Invalid device ID: " + deviceId);
+        LOG_WARN << "Invalid device ID: " << deviceId;
         return ServiceResult::createError("Invalid device ID: " + deviceId);
     }
 
@@ -191,7 +191,7 @@ services::ServiceResult services::WorkspaceService::exportWorkspace(const std::s
 
     // Check if workspace exists
     if (!fs::exists(workspacePath) || !fs::is_directory(workspacePath)) {
-        utils::logging::warn("Workspace not found: " + workspaceId);
+        LOG_WARN << "Workspace not found: " << workspaceId;
         return ServiceResult::createError("Workspace not found: " + workspaceId);
     }
 
@@ -241,7 +241,7 @@ services::ServiceResult services::WorkspaceService::exportWorkspace(const std::s
         result.success = true;
         result.data    = metadata.toJson();
 
-        utils::logging::info("Exported workspace: " + metadata.name + " (ID: " + workspaceId + ")");
+        LOG_INFO << "Exported workspace: " << metadata.name << " (ID: " << workspaceId << ")";
         return result;
 
     } catch (const std::exception &e) {
@@ -253,7 +253,7 @@ services::ServiceResult services::WorkspaceService::listWorkspaces(const std::st
 {
     // Validate device ID if provided
     if (!deviceId.empty() && !utils::validatePath(deviceId)) {
-        utils::logging::warn("Invalid device ID: " + deviceId);
+        LOG_WARN << "Invalid device ID: " << deviceId;
         return ServiceResult::createError("Invalid device ID: " + deviceId);
     }
 
@@ -319,11 +319,9 @@ services::ServiceResult services::WorkspaceService::listWorkspaces(const std::st
         result.data["count"]      = (int)workspaces.size();
 
         if (deviceId.empty()) {
-            utils::logging::info("Listed " + std::to_string(workspaces.size()) +
-                                 " workspaces from all devices");
+            LOG_INFO << "Listed " << workspaces.size() << " workspaces from all devices";
         } else {
-            utils::logging::info("Listed " + std::to_string(workspaces.size()) +
-                                 " workspaces from device: " + deviceId);
+            LOG_INFO << "Listed " << workspaces.size() << " workspaces from device: " << deviceId;
         }
         return result;
 
@@ -376,7 +374,7 @@ Json::Value services::WorkspaceService::getDirectoryTree(const std::string &path
         tree["children"] = children;
 
     } catch (const std::exception &e) {
-        utils::logging::error("Failed to build directory tree: " + std::string(e.what()));
+        LOG_ERROR << "Failed to build directory tree: " << e.what();
     }
 
     return tree;
@@ -394,11 +392,11 @@ services::WorkspaceService::createWorkspace(const WorkspaceMetadata &metadata,
 
     // Validate path for security
     if (!utils::validatePath(metadata.uuid)) {
-        utils::logging::warn("Invalid workspace ID: " + metadata.uuid);
+        LOG_WARN << "Invalid workspace ID: " << metadata.uuid;
         return ServiceResult::createError("Invalid workspace ID: " + metadata.uuid);
     }
     if (!deviceId.empty() && !utils::validatePath(deviceId)) {
-        utils::logging::warn("Invalid device ID: " + deviceId);
+        LOG_WARN << "Invalid device ID: " << deviceId;
         return ServiceResult::createError("Invalid device ID: " + deviceId);
     }
 
@@ -407,7 +405,7 @@ services::WorkspaceService::createWorkspace(const WorkspaceMetadata &metadata,
 
     // Check if workspace already exists
     if (fs::exists(workspacePath) && fs::is_directory(workspacePath)) {
-        utils::logging::warn("Workspace already exists: " + metadata.uuid);
+        LOG_WARN << "Workspace already exists: " << metadata.uuid;
         return ServiceResult::createError("Workspace already exists: " + metadata.uuid);
     }
 
@@ -436,7 +434,7 @@ services::WorkspaceService::createWorkspace(const WorkspaceMetadata &metadata,
         result.success = true;
         result.data    = newMetadata.toJson();
 
-        utils::logging::info("Created workspace: " + metadata.name + " (ID: " + metadata.uuid + ")");
+        LOG_INFO << "Created workspace: " << metadata.name << " (ID: " << metadata.uuid << ")";
         return result;
 
     } catch (const std::exception &e) {
@@ -452,11 +450,11 @@ services::ServiceResult services::WorkspaceService::readWorkspace(const std::str
 {
     // Validate path for security
     if (!utils::validatePath(workspaceId)) {
-        utils::logging::warn("Invalid workspace ID: " + workspaceId);
+        LOG_WARN << "Invalid workspace ID: " << workspaceId;
         return ServiceResult::createError("Invalid workspace ID: " + workspaceId);
     }
     if (!deviceId.empty() && !utils::validatePath(deviceId)) {
-        utils::logging::warn("Invalid device ID: " + deviceId);
+        LOG_WARN << "Invalid device ID: " << deviceId;
         return ServiceResult::createError("Invalid device ID: " + deviceId);
     }
 
@@ -465,7 +463,7 @@ services::ServiceResult services::WorkspaceService::readWorkspace(const std::str
 
     // Check if workspace exists
     if (!fs::exists(workspacePath) || !fs::is_directory(workspacePath)) {
-        utils::logging::warn("Workspace not found: " + workspaceId);
+        LOG_WARN << "Workspace not found: " << workspaceId;
         return ServiceResult::createError("Workspace not found: " + workspaceId);
     }
 
@@ -479,7 +477,7 @@ services::ServiceResult services::WorkspaceService::readWorkspace(const std::str
     result.data["metadata"] = metadata.toJson();
     result.data["tree"]     = getDirectoryTree(workspacePath);
 
-    utils::logging::info("Retrieved workspace: " + workspaceId);
+    LOG_INFO << "Retrieved workspace: " << workspaceId;
     return result;
 }
 
@@ -491,11 +489,11 @@ services::WorkspaceService::updateWorkspace(const std::string       &workspaceId
 {
     // Validate path for security
     if (!utils::validatePath(workspaceId)) {
-        utils::logging::warn("Invalid workspace ID: " + workspaceId);
+        LOG_WARN << "Invalid workspace ID: " << workspaceId;
         return ServiceResult::createError("Invalid workspace ID: " + workspaceId);
     }
     if (!deviceId.empty() && !utils::validatePath(deviceId)) {
-        utils::logging::warn("Invalid device ID: " + deviceId);
+        LOG_WARN << "Invalid device ID: " << deviceId;
         return ServiceResult::createError("Invalid device ID: " + deviceId);
     }
 
@@ -504,7 +502,7 @@ services::WorkspaceService::updateWorkspace(const std::string       &workspaceId
 
     // Check if workspace exists
     if (!fs::exists(workspacePath) || !fs::is_directory(workspacePath)) {
-        utils::logging::warn("Workspace not found: " + workspaceId);
+        LOG_WARN << "Workspace not found: " << workspaceId;
         return ServiceResult::createError("Workspace not found: " + workspaceId);
     }
 
@@ -531,7 +529,7 @@ services::WorkspaceService::updateWorkspace(const std::string       &workspaceId
         result.success = true;
         result.data    = updatedMetadata.toJson();
 
-        utils::logging::info("Updated workspace: " + workspaceId);
+        LOG_INFO << "Updated workspace: " << workspaceId;
         return result;
 
     } catch (const std::exception &e) {
@@ -545,11 +543,11 @@ services::ServiceResult services::WorkspaceService::deleteWorkspace(const std::s
 {
     // Validate path for security
     if (!utils::validatePath(workspaceId)) {
-        utils::logging::warn("Invalid workspace ID: " + workspaceId);
+        LOG_WARN << "Invalid workspace ID: " << workspaceId;
         return ServiceResult::createError("Invalid workspace ID: " + workspaceId);
     }
     if (!deviceId.empty() && !utils::validatePath(deviceId)) {
-        utils::logging::warn("Invalid device ID: " + deviceId);
+        LOG_WARN << "Invalid device ID: " << deviceId;
         return ServiceResult::createError("Invalid device ID: " + deviceId);
     }
 
@@ -558,7 +556,7 @@ services::ServiceResult services::WorkspaceService::deleteWorkspace(const std::s
 
     // Check if workspace exists
     if (!fs::exists(workspacePath) || !fs::is_directory(workspacePath)) {
-        utils::logging::warn("Workspace not found: " + workspaceId);
+        LOG_WARN << "Workspace not found: " << workspaceId;
         return ServiceResult::createError("Workspace not found: " + workspaceId);
     }
 
@@ -577,7 +575,7 @@ services::ServiceResult services::WorkspaceService::deleteWorkspace(const std::s
         result.success = true;
         result.data    = metadata.toJson();
 
-        utils::logging::info("Deleted workspace: " + workspaceId);
+        LOG_INFO << "Deleted workspace: " << workspaceId;
         return result;
 
     } catch (const std::exception &e) {
@@ -591,15 +589,15 @@ services::ServiceResult services::WorkspaceService::moveWorkspace(const std::str
 {
     // Validate paths for security
     if (!utils::validatePath(workspaceId)) {
-        utils::logging::warn("Invalid workspace ID: " + workspaceId);
+        LOG_WARN << "Invalid workspace ID: " << workspaceId;
         return ServiceResult::createError("Invalid workspace ID: " + workspaceId);
     }
     if (!utils::validatePath(newWorkspaceId)) {
-        utils::logging::warn("Invalid new workspace ID: " + newWorkspaceId);
+        LOG_WARN << "Invalid new workspace ID: " << newWorkspaceId;
         return ServiceResult::createError("Invalid new workspace ID: " + newWorkspaceId);
     }
     if (!deviceId.empty() && !utils::validatePath(deviceId)) {
-        utils::logging::warn("Invalid device ID: " + deviceId);
+        LOG_WARN << "Invalid device ID: " << deviceId;
         return ServiceResult::createError("Invalid device ID: " + deviceId);
     }
 
@@ -614,13 +612,13 @@ services::ServiceResult services::WorkspaceService::moveWorkspace(const std::str
 
     // Check if source workspace exists
     if (!fs::exists(oldPath) || !fs::is_directory(oldPath)) {
-        utils::logging::warn("Source workspace not found: " + workspaceId);
+        LOG_WARN << "Source workspace not found: " << workspaceId;
         return ServiceResult::createError("Source workspace not found: " + workspaceId);
     }
 
     // Check if destination already exists
     if (fs::exists(newPath) && fs::is_directory(newPath)) {
-        utils::logging::warn("Destination workspace already exists: " + newWorkspaceId);
+        LOG_WARN << "Destination workspace already exists: " << newWorkspaceId;
         return ServiceResult::createError("Destination workspace already exists: " +
                                           newWorkspaceId);
     }
@@ -653,8 +651,7 @@ services::ServiceResult services::WorkspaceService::moveWorkspace(const std::str
         result.data["newId"]   = newWorkspaceId;
         result.data["info"]    = metadata.toJson();
 
-        utils::logging::info("Successfully moved workspace from: " + workspaceId +
-                             " to: " + newWorkspaceId);
+        LOG_INFO << "Successfully moved workspace from: " << workspaceId << " to: " << newWorkspaceId;
         return result;
 
     } catch (const std::exception &e) {

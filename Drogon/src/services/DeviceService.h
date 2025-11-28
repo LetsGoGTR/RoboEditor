@@ -11,8 +11,9 @@ namespace services
     struct DeviceMetadata
     {
         std::string serialNumber;
-        std::string api;
-        std::string sftpHost;
+        std::string host;
+        std::string scheme;
+        int         apiPort;
         int         sftpPort;
         std::string sftpPassword;
         std::string sftpUser;

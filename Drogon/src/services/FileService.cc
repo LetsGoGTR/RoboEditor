@@ -6,7 +6,7 @@
 
 #include "../utils/ConfigUtils.h"
 #include "../utils/PathValidator.h"
-#include "../utils/logging/Logger.h"
+#include <drogon/drogon.h>
 
 namespace fs = std::filesystem;
 
@@ -33,7 +33,7 @@ Json::Value services::FileService::getFileInfo(const std::string &filePath)
         info["modified"] = (Json::Int64)time_t_val;
 
     } catch (const std::exception &e) {
-        utils::logging::error("Error getting file info: " + std::string(e.what()));
+        LOG_ERROR << "Error getting file info: " << e.what();
     }
 
     return info;
@@ -47,7 +47,7 @@ services::ServiceResult services::FileService::readFile(const std::string &fileP
     // Validate relative path for security
     if (!utils::validatePath(filePath)) {
         result.errorMessage = "Invalid file path";
-        utils::logging::warn("Invalid file path: " + filePath);
+        LOG_WARN << "Invalid file path: " << filePath;
         return result;
     }
 
@@ -57,7 +57,7 @@ services::ServiceResult services::FileService::readFile(const std::string &fileP
     // Check if file exists
     if (!fs::exists(fullPath) || !fs::is_regular_file(fullPath)) {
         result.errorMessage = "File does not exist";
-        utils::logging::warn("File does not exist: " + fullPath);
+        LOG_WARN << "File does not exist: " << fullPath;
         return result;
     }
 
@@ -70,11 +70,11 @@ services::ServiceResult services::FileService::readFile(const std::string &fileP
         result.data["info"]    = getFileInfo(fullPath);
         result.success         = true;
 
-        utils::logging::info("Successfully read file: " + fullPath);
+        LOG_INFO << "Successfully read file: " << fullPath;
 
     } catch (const std::exception &e) {
         result.errorMessage = "Failed to read file: " + std::string(e.what());
-        utils::logging::error(result.errorMessage);
+        LOG_ERROR << result.errorMessage;
     }
 
     return result;
@@ -89,7 +89,7 @@ services::ServiceResult services::FileService::createFile(const std::string &fil
     // Validate relative path for security
     if (!utils::validatePath(filePath)) {
         result.errorMessage = "Invalid file path";
-        utils::logging::warn("Invalid file path: " + filePath);
+        LOG_WARN << "Invalid file path: " << filePath;
         return result;
     }
 
@@ -99,7 +99,7 @@ services::ServiceResult services::FileService::createFile(const std::string &fil
     // Check if file already exists
     if (fs::exists(fullPath) && fs::is_regular_file(fullPath)) {
         result.errorMessage = "File already exists";
-        utils::logging::warn("File already exists: " + fullPath);
+        LOG_WARN << "File already exists: " << fullPath;
         return result;
     }
 
@@ -113,7 +113,7 @@ services::ServiceResult services::FileService::createFile(const std::string &fil
         std::ofstream file(fullPath, std::ios::binary);
         if (!file) {
             result.errorMessage = "Failed to create file";
-            utils::logging::error("Failed to create file: " + fullPath);
+            LOG_ERROR << "Failed to create file: " << fullPath;
             return result;
         }
 
@@ -123,11 +123,11 @@ services::ServiceResult services::FileService::createFile(const std::string &fil
         result.data["info"] = getFileInfo(fullPath);
         result.success      = true;
 
-        utils::logging::info("Successfully created file: " + fullPath);
+        LOG_INFO << "Successfully created file: " << fullPath;
 
     } catch (const std::exception &e) {
         result.errorMessage = "Failed to create file: " + std::string(e.what());
-        utils::logging::error(result.errorMessage);
+        LOG_ERROR << result.errorMessage;
     }
 
     return result;
@@ -142,7 +142,7 @@ services::ServiceResult services::FileService::updateFile(const std::string &fil
     // Validate relative path for security
     if (!utils::validatePath(filePath)) {
         result.errorMessage = "Invalid file path";
-        utils::logging::warn("Invalid file path: " + filePath);
+        LOG_WARN << "Invalid file path: " << filePath;
         return result;
     }
 
@@ -152,7 +152,7 @@ services::ServiceResult services::FileService::updateFile(const std::string &fil
     // Check if file exists
     if (!fs::exists(fullPath) || !fs::is_regular_file(fullPath)) {
         result.errorMessage = "File does not exist";
-        utils::logging::warn("File does not exist: " + fullPath);
+        LOG_WARN << "File does not exist: " << fullPath;
         return result;
     }
 
@@ -160,7 +160,7 @@ services::ServiceResult services::FileService::updateFile(const std::string &fil
         std::ofstream file(fullPath, std::ios::binary | std::ios::trunc);
         if (!file) {
             result.errorMessage = "Failed to open file for writing";
-            utils::logging::error("Failed to open file: " + fullPath);
+            LOG_ERROR << "Failed to open file: " << fullPath;
             return result;
         }
 
@@ -170,11 +170,11 @@ services::ServiceResult services::FileService::updateFile(const std::string &fil
         result.data["info"] = getFileInfo(fullPath);
         result.success      = true;
 
-        utils::logging::info("Successfully updated file: " + fullPath);
+        LOG_INFO << "Successfully updated file: " << fullPath;
 
     } catch (const std::exception &e) {
         result.errorMessage = "Failed to update file: " + std::string(e.what());
-        utils::logging::error(result.errorMessage);
+        LOG_ERROR << result.errorMessage;
     }
 
     return result;
@@ -188,7 +188,7 @@ services::ServiceResult services::FileService::deleteFile(const std::string &fil
     // Validate relative path for security
     if (!utils::validatePath(filePath)) {
         result.errorMessage = "Invalid file path";
-        utils::logging::warn("Invalid file path: " + filePath);
+        LOG_WARN << "Invalid file path: " << filePath;
         return result;
     }
 
@@ -198,7 +198,7 @@ services::ServiceResult services::FileService::deleteFile(const std::string &fil
     // Check if file exists
     if (!fs::exists(fullPath) || !fs::is_regular_file(fullPath)) {
         result.errorMessage = "File does not exist";
-        utils::logging::warn("File does not exist: " + fullPath);
+        LOG_WARN << "File does not exist: " << fullPath;
         return result;
     }
 
@@ -206,11 +206,11 @@ services::ServiceResult services::FileService::deleteFile(const std::string &fil
         fs::remove(fullPath);
         result.success = true;
 
-        utils::logging::info("Successfully deleted file: " + fullPath);
+        LOG_INFO << "Successfully deleted file: " << fullPath;
 
     } catch (const std::exception &e) {
         result.errorMessage = "Failed to delete file: " + std::string(e.what());
-        utils::logging::error(result.errorMessage);
+        LOG_ERROR << result.errorMessage;
     }
 
     return result;
@@ -225,7 +225,7 @@ services::ServiceResult services::FileService::moveFile(const std::string &oldPa
     // Validate relative paths for security
     if (!utils::validatePath(oldPath) || !utils::validatePath(newPath)) {
         result.errorMessage = "Invalid file path";
-        utils::logging::warn("Invalid file path - old: " + oldPath + ", new: " + newPath);
+        LOG_WARN << "Invalid file path - old: " << oldPath << ", new: " << newPath;
         return result;
     }
 
@@ -236,14 +236,14 @@ services::ServiceResult services::FileService::moveFile(const std::string &oldPa
     // Check if source file exists
     if (!fs::exists(fullOldPath) || !fs::is_regular_file(fullOldPath)) {
         result.errorMessage = "Source file does not exist";
-        utils::logging::warn("Source file does not exist: " + fullOldPath);
+        LOG_WARN << "Source file does not exist: " << fullOldPath;
         return result;
     }
 
     // Check if destination already exists
     if (fs::exists(fullNewPath) && fs::is_regular_file(fullNewPath)) {
         result.errorMessage = "Destination file already exists";
-        utils::logging::warn("Destination file already exists: " + fullNewPath);
+        LOG_WARN << "Destination file already exists: " << fullNewPath;
         return result;
     }
 
@@ -262,12 +262,11 @@ services::ServiceResult services::FileService::moveFile(const std::string &oldPa
         result.data["info"]    = getFileInfo(fullNewPath);
         result.success         = true;
 
-        utils::logging::info("Successfully moved file from: " + fullOldPath +
-                             " to: " + fullNewPath);
+        LOG_INFO << "Successfully moved file from: " << fullOldPath << " to: " << fullNewPath;
 
     } catch (const std::exception &e) {
         result.errorMessage = "Failed to move file: " + std::string(e.what());
-        utils::logging::error(result.errorMessage);
+        LOG_ERROR << result.errorMessage;
     }
 
     return result;
