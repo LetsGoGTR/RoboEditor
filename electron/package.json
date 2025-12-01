@@ -1,0 +1,55 @@
+{
+  "name": "roboeditor",
+  "version": "1.0.0",
+  "main": "index.js",
+  "description": "backup desktop app",
+  "author": "",
+  "license": "ISC",
+  "scripts": {
+    "dev": "electron .",
+    "build": "node build-auto.js"
+  },
+  "keywords": [],
+  "dependencies": {
+    "cross-env": "^10.1.0"
+  },
+  "devDependencies": {
+    "electron": "^39.2.2",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.example.roboeditor",
+    "productName": "RoboEditor",
+    "icon": "app/roboeditor-icon.ico",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "index.js",
+      "preload.js",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "app/",
+        "to": "app"
+      }
+    ],
+    "win": {
+      "target": [ "portable" ],
+      "signAndEditExecutable": false,
+      "forceCodeSigning": false,
+      "extraResources": [
+        {
+          "from": "back/",
+          "to": "back",
+          "filter": [
+            "**/*.exe",
+            "**/*.dll",
+            "config.json"
+          ]
+        }
+      ]
+    }
+  }
+}
