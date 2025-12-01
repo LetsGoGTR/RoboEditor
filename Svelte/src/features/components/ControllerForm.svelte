@@ -155,7 +155,7 @@
     />
   </div>
 
-  <div class="form-row">
+  <!-- <div class="form-row">
     <label for="folder-path">폴더 경로</label>
     <input
       id="folder-path"
@@ -170,7 +170,7 @@
     {#if $fileTree}
       <DirectoryTree root={$fileTree} mode="view" onselect={handleSelect} />
     {/if}
-  </div>
+  </div> -->
 
   <div class="button-row">
     <button type="button" onclick={handleOk}>OK</button>
@@ -202,7 +202,7 @@
     gap: 0.5rem;
   }
 
-  .folder-section {
+  /* .folder-section {
     border: solid 1px #ccc;
     border-radius: 0.3rem;
     min-height: 200px;
@@ -210,7 +210,7 @@
     overflow-y: auto;
     padding: 0.5rem;
     background: #fafafa;
-  }
+  } */
 
   label {
     flex: 0 0 110px;

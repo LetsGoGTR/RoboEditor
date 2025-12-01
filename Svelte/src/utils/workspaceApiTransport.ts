@@ -1,34 +1,33 @@
 // src/utils/workspaceApiTransport.ts
 import type { FolderNode, Workspace, WorkspaceMeta, ControllerMeta } from '@/types';
-
+import { stripBaseRoute } from '@utils/nodeAction';
 /**
  * Drogon의 getDirectoryTree 응답을 FolderNode로 변환
  */
 export function toFolderNodeFromDrogon(raw: any): FolderNode {
+  const cleanPath = stripBaseRoute(raw.path ?? '');
   const node: FolderNode = {
     id: crypto.randomUUID(),
     name: raw.name,
     type: 'directory',
-    path: raw.path ?? null,
+    path: cleanPath,
     children: []
   };
 
-  if (Array.isArray(raw.files)) {
-    for (const f of raw.files) {
-      node.children.push({
-        id: crypto.randomUUID(),
-        name: f.name,
-        type: 'file',
-        path: f.path ?? null,
-        size: f.size ?? 0,
-        lastModified: String(f.lastModified ?? '')
-      });
-    }
-  }
-
-  if (Array.isArray(raw.directories)) {
-    for (const d of raw.directories) {
-      node.children.push(toFolderNodeFromDrogon(d));
+  if (Array.isArray(raw.children)) {
+    for (const child of raw.children) {
+      if (child.type === 'file') {
+        node.children.push({
+          id: crypto.randomUUID(),
+          name: child.name,
+          type: 'file',
+          path: stripBaseRoute(child.path ?? ''),
+          size: child.size ?? 0,
+          lastModified: String(child.lastModified ?? '')
+        });
+      } else if (child.type === 'directory') {
+        node.children.push(toFolderNodeFromDrogon(child));
+      }
     }
   }
 

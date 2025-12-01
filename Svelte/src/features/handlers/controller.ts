@@ -1,5 +1,6 @@
 // src/features/handlers/controller.ts
 import type { Controller, ControllerMeta } from '@/types';
+import { _listDevices } from '@/apis/controller';
 
 /** API에서 받은 raw 디바이스 → Controller 도메인 모델 */
 export function wrapDeviceAsController(raw: any): Controller {
@@ -22,4 +23,15 @@ export function wrapDeviceAsController(raw: any): Controller {
     controllerMeta: meta,
     workspaces: []
   };
+}
+
+/** 디바이스 목록 조회 공용 함수 */
+export async function fetchControllers(): Promise<Controller[]> {
+  const res: any = await _listDevices();
+
+  if (!res?.success) {
+    throw new Error('디바이스 목록 조회 실패');
+  }
+
+  return (res.data?.devices ?? []).map((raw: any) => wrapDeviceAsController(raw));
 }

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import DirTree from '@components/DirectoryTree.svelte';
 	import type { FolderNode, TreeNode } from '@/types';
+	import { toWorkspaceDisplayPath } from '@utils/nodeAction';
 
 	let {
 		open = $bindable(false),
@@ -71,7 +72,7 @@
 					type="text"
 					class="path-input"
 					readonly
-					value={selectedFolder ? selectedFolder.path : ''}
+					value={selectedFolder ? toWorkspaceDisplayPath(selectedFolder.path) : ''}
 				/>
 			</div>
 

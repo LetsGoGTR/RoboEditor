@@ -1,8 +1,6 @@
 <script lang="ts">
 	import { fileTree } from '@/stores/fileTree';
 	import { gotoPage } from '@/stores/currentPage';
-	import { _createFolder } from '@apis/folder';
-	import { _createFile } from '@apis/file';
 	import {
 		handleCreateFile,
 		handleCreateFolder,
@@ -11,10 +9,12 @@
 	} from '@handlers/nodeActions';
 	import type { TreeNode } from '@/types';
 	import NewFileDialog from './dialogs/NewFileDialog.svelte';
+	import NewFolderDialog from './dialogs/NewFolderDialog.svelte';
 	import DeleteDialog from './dialogs/DeleteDialog.svelte';
 	import { handleDiffFiles, handleDiffWorkspaces } from '@handlers/diff';
 	import CompareDialog from '@features/dialogs/CompareDialog.svelte';
-	import NewFolderDialog from './dialogs/NewFolderDialog.svelte';
+	import { handleCreateWorkspace } from '@handlers/workspaces';
+  	import NewWorkspaceDialog from './dialogs/NewWorkspaceDialog.svelte';
 
 	let warningDialog: HTMLDialogElement;
 	let showNewFile = $state(false);
@@ -22,7 +22,9 @@
 	let showDelete = $state(false);
 	let showCompareFile = $state(false);
 	let showCompareFolder = $state(false);
-	let root = $derived(fileTree);
+	let showNewWorkspace = $state(false);
+	let root = $derived($fileTree);
+
 
 	function clickApply() {
 		gotoPage('apply');
@@ -34,13 +36,17 @@
 		gotoPage('register');
 	}
 	function clickNewFile() {
-		if (!root) return alert('워크스페이스가 없습니다.');
+		if (!root) return alert('워크스페이스가 선택되지 않았습니다.');
 		showNewFile = true;
 	}
 
 	function clickNewFolder() {
-		if (!root) return alert('워크스페이스가 없습니다.');
+		if (!root) return alert('워크스페이스가 선택되지 않았습니다.');
 		showNewFolder = true;
+	}
+
+	function clickNewWorkspace() {
+		showNewWorkspace = true;
 	}
 
 	function clickDelete() {
@@ -61,6 +67,26 @@
 		if (!root) return warningDialog.showModal();
 		showCompareFolder = true;
 	}
+
+	async function handleNewWorkspaceConfirm(payload: {
+		deviceId: string;
+		name: string;
+		description?: string | null;
+	}) {
+		const { deviceId, name, description } = payload;
+
+		if (!deviceId || !name.trim()) {
+		alert('디바이스와 워크스페이스 이름을 확인해 주세요.');
+		return;
+		}
+
+		await handleCreateWorkspace(deviceId, {
+		name: name.trim(),
+		description: description?.trim() || undefined
+		});
+
+		showNewWorkspace = false;
+	}
 </script>
 
 <div class="full-width" role="menubar">
@@ -71,6 +97,7 @@
 			<ul class="dropdown">
 				<li><button onclick={clickNewFile}>새 텍스트 파일</button></li>
 				<li><button onclick={clickNewFolder}>새 폴더</button></li>
+				<li><button onclick={clickNewWorkspace}>새 워크스페이스</button></li>
 				<li><hr /></li>
 				<li><button onclick={clickDelete}>파일 또는 폴더 삭제</button></li>
 				<li><hr /></li>
@@ -118,6 +145,12 @@
 	root={$fileTree}
 	onConfirm={handleCreateFolder}
 	onCancel={() => (showNewFolder = false)}
+/>
+
+<NewWorkspaceDialog
+	bind:open={showNewWorkspace}
+	onConfirm={handleNewWorkspaceConfirm}
+	onCancel={() => (showNewWorkspace = false)}
 />
 
 <DeleteDialog

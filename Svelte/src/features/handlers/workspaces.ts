@@ -1,15 +1,29 @@
 // handlers/workspace.ts
-import { gotoPage } from '@/stores/currentPage';
-import { workspaceStore } from '@utils/workspaceApiTransport';
-import { fileTree } from '@/stores/fileTree';
 import type { Workspace } from '@/types';
-
 import {
 	_createWorkspace,
 	_getWorkspace,
 	_updateWorkspace,
 	_deleteWorkspace
 } from '@apis/workspace';
+
+import { _getDevice } from '@apis/controller';
+import {
+	buildWorkspaceEntry,
+	buildWorkspaceFromApi,
+	type ApiWorkspaceMetadata
+} from '@/utils/workspaceApiTransport';
+
+async function fetchDeviceWorkspaces(deviceId: string): Promise<Workspace[]> {
+	const res: any = await _getDevice(deviceId);
+
+	if (!res?.success) {
+		throw new Error('디바이스 정보 재조회 실패');
+	}
+
+	const wsList: ApiWorkspaceMetadata[] = res.workspaces?.workspaces ?? [];
+	return wsList.map((meta) => buildWorkspaceEntry(meta));
+}
 
 /* ============================================================
  *  Workspace 생성
@@ -21,13 +35,15 @@ export async function handleCreateWorkspace(deviceId: string, payload: Record<st
 			return alert('워크스페이스 생성에 실패했습니다.'); 
 		}
 
-		const ws: Workspace = res.data;
-		workspaceStore.add(ws);
+		const workspaces = await fetchDeviceWorkspaces(deviceId);
 
 		// 생성 후 상세 페이지 이동
 		// gotoPage('workspace-detail', { edit });
 
-		return ws;
+		return {
+			workspace: res.data,
+			workspaces
+		};
 	} catch (err) {
 		console.error('[workspace:create] 오류:', err);
 		alert('워크스페이스 생성 중 문제가 발생했습니다.');
@@ -46,14 +62,9 @@ export async function handleGetWorkspace(deviceId: string, workspaceId: string) 
 			return null;
 		}
 
-		workspaceStore.setCurrent(res.data);
+		const workspace: Workspace = buildWorkspaceFromApi(res);
 
-		// workspace 내부 폴더 트리 초기화
-		if (res.data?.rootPath) {
-			fileTree.loadWorkspaceTree(res.data.rootPath);
-		}
-
-		return res.data;
+		return workspace;
 	} catch (err) {
 		console.error('[workspace:get] 오류:', err);
 		alert('워크스페이스 상세조회 중 문제가 발생했습니다.');
@@ -76,8 +87,11 @@ export async function handleUpdateWorkspace(
 		 return;
 		}
 
-		workspaceStore.update(res.data);
-		return res.data;
+		const workspaces = await fetchDeviceWorkspaces(deviceId);
+		return {
+			workspace: res.data,
+			workspaces
+		};
 	} catch (err) {
 		console.error('[workspace:update] 오류:', err);
 		alert('워크스페이스 수정 중 문제가 발생했습니다.');
@@ -98,10 +112,10 @@ export async function handleDeleteWorkspace(deviceId: string, workspaceId: strin
 			return alert('워크스페이스 삭제에 실패했습니다.');
 		}
 
-		workspaceStore.remove(workspaceId);
-
-		// workspace 화면이면 목록으로 이동
-		gotoPage('workspace-list');
+		const workspaces = await fetchDeviceWorkspaces(deviceId);
+		return {
+			workspaces
+		};
 	} catch (err) {
 		console.error('[workspace:delete] 오류:', err);
 		alert('워크스페이스 삭제 중 문제가 발생했습니다.');

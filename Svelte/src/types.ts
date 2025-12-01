@@ -23,7 +23,7 @@ export interface TabItem {
  * 1. 기본 타입 정의
  * ============================================================ */
 
-export type NodeType = 'directory' | 'file';
+export type NodeType = 'file' | 'directory';
 
 /** 모든 노드가 공통으로 가지는 속성 */
 export interface BaseNode {
