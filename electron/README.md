@@ -405,7 +405,7 @@ Electron Builder가 기본적으로 파일명을 `${productName}-${version}.${ex
 # Drogon 빌드 방법
 - **Docker(개발용)**
    1. `docker-compose.yml` svelte 빌드 파일 경로 지정
-   2. main 수정
+   2. main.cc 수정
         ```
         #include <drogon/drogon.h>
         int main()
@@ -418,7 +418,7 @@ Electron Builder가 기본적으로 파일명을 `${productName}-${version}.${ex
             drogon::app().run();
         }
         ```
-   3. utils/ConfigUtils.h 수정
+   <!-- 3. utils/ConfigUtils.h 수정
         ```
         inline std::string getBaseDir()
         {
@@ -440,7 +440,7 @@ Electron Builder가 기본적으로 파일명을 `${productName}-${version}.${ex
         {
             return drogon::app().getCustomConfig()["storage"]["temp_backup_dir"].asString();
         }
-        ```
+        ``` -->
    4. docker compose build
    5. docker compose up
 

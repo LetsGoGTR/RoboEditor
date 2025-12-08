@@ -112,3 +112,5 @@ compile_commands.json
 
 build/*
 .cache
+
+Drogon_linux/

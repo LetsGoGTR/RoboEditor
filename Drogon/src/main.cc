@@ -8,3 +8,20 @@ int main()
     // Run HTTP framework,the method will block in the internal event loop
     drogon::app().run();
 }
+
+/*
+#include <filesystem>
+
+int main(int argc, char* argv[]) {
+    namespace fs = std::filesystem;
+
+    fs::path exePath = fs::absolute(argv[0]);
+    fs::path exeDir  = exePath.parent_path();
+
+    std::error_code ec;
+    fs::current_path(exeDir, ec);
+
+    drogon::app().loadConfigFile("config.json");
+    drogon::app().run();
+}
+*/
